@@ -175,7 +175,9 @@ async function main(): Promise<void> {
     : { owner: fallbackOwner, repo: fallbackRepo };
   const multi = seeds.length > 1;
   process.stderr.write(
-    `crawling ${seeds.length} seed(s) in ${primary.owner}/${primary.repo} (depth ${args.depth}, max ${args.maxNodes} nodes, hub>${args.hubThreshold})\n`,
+    seeds.length
+      ? `crawling ${seeds.length} seed(s) in ${primary.owner}/${primary.repo} (depth ${args.depth}, max ${args.maxNodes} nodes, hub>${args.hubThreshold})\n`
+      : `backlog empty in ${primary.owner}/${primary.repo}; no graph crawl needed\n`,
   );
 
   const { nodes, cappedOut } = seeds.length

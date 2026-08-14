@@ -47,7 +47,16 @@ describe("buildReconcileReport", () => {
       key: "o/r#1",
       action: "verify-completed",
       confidence: "medium",
+      evidence: [
+        {
+          code: "merged-closing-work",
+          related: ["o/r#2"],
+        },
+      ],
     });
+    expect(result.nextSteps).toEqual([
+      "Verify nominated actions against current main, acceptance criteria, and live behavior before changing GitHub state.",
+    ]);
   });
 
   test("finds an open PR superseded by merged work on the same issue", () => {
@@ -97,7 +106,11 @@ describe("buildReconcileReport", () => {
     expect(result.items[0]).toMatchObject({
       action: "keep-untracked",
       confidence: "high",
+      evidence: [{ code: "no-related-pr", related: [] }],
     });
+    expect(result.nextSteps).toEqual([
+      "Reproduce or inspect untracked issues before prioritizing or closing them.",
+    ]);
   });
 
   test("reports competing PRs and deterministic counts", () => {
@@ -109,6 +122,11 @@ describe("buildReconcileReport", () => {
     const result = report([issue, first, second]);
     expect(result.counts.byAction["resolve-competing"]).toBe(3);
     expect(result.items.map((item) => item.key)).toEqual(["o/r#1", "o/r#2", "o/r#3"]);
+    expect(result.items.map((item) => item.evidence[0])).toMatchObject([
+      { code: "multiple-open-closing-prs", related: ["o/r#2", "o/r#3"] },
+      { code: "competing-open-pr", related: ["o/r#1", "o/r#3"] },
+      { code: "competing-open-pr", related: ["o/r#1", "o/r#2"] },
+    ]);
   });
 
   test("reports node fetch failures as incomplete evidence", () => {
@@ -117,6 +135,42 @@ describe("buildReconcileReport", () => {
     const result = report([failed]);
     expect(result.limits.fetchFailures).toEqual(["o/r#1"]);
     expect(result.counts.openIssues).toBe(0);
+    expect(result.nextSteps).toEqual([
+      "Retry failed graph nodes before acting on their absence from this report.",
+    ]);
+  });
+
+  test("gives an empty backlog only the discovery next step", () => {
+    const result = buildReconcileReport(new Map(), {
+      repo: "o/r",
+      seeds: [],
+      seedLimit: 80,
+      nodeCap: 80,
+      cappedOut: [],
+      generatedAt: "2026-08-14T00:00:00.000Z",
+    });
+    expect(result.items).toEqual([]);
+    expect(result.nextSteps).toEqual([
+      "Dogfood the product and inspect repository intent before proposing the next direction.",
+    ]);
+  });
+
+  test("puts incomplete coverage before item-specific actions", () => {
+    const result = buildReconcileReport(
+      new Map([["o/r#1", node("o/r#1", "PullRequest", "OPEN")]]),
+      {
+        repo: "o/r",
+        seeds: ["o/r#1"],
+        seedLimit: 1,
+        nodeCap: 1,
+        cappedOut: ["o/r#2"],
+        generatedAt: "2026-08-14T00:00:00.000Z",
+      },
+    );
+    expect(result.nextSteps).toEqual([
+      "Increase --max-nodes or re-seed omitted neighborhoods before claiming full backlog coverage.",
+      "Run the repository review gate on every PR selected for merge.",
+    ]);
   });
 });
 
@@ -126,6 +180,7 @@ describe("renderReconcile", () => {
     const markdown = renderReconcile(result);
     expect(markdown).toContain("# Backlog reconciliation: o/r");
     expect(markdown).toContain("## Untracked open issues");
-    expect(markdown).toContain("Verify candidates against current main");
+    expect(markdown).toContain("Evidence [no-related-pr]");
+    expect(markdown).toContain("Reproduce or inspect untracked issues");
   });
 });

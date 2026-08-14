@@ -8,18 +8,24 @@ export const XREF_SCHEMA = {
   },
   commands: {
     graph: {
-      mutates: false,
+      githubMutations: false,
+      localWrites: [
+        "~/.xref snapshots unless --no-snapshot is set",
+        "explicit --json and --html output paths",
+      ],
       formats: ["markdown"],
       description: "Crawl and render the reference graph around explicit seeds.",
     },
     reconcile: {
-      mutates: false,
+      githubMutations: false,
+      localWrites: ["~/.xref snapshots unless --no-snapshot is set"],
       outputSchemaVersion: 1,
       formats: ["json", "markdown"],
       description: "Inventory an open repository backlog and derive verification actions.",
     },
     schema: {
-      mutates: false,
+      githubMutations: false,
+      localWrites: [],
       formats: ["json"],
       description: "Print the stable agent-facing command contract.",
     },

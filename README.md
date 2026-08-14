@@ -51,7 +51,7 @@ Inventories the whole open backlog without requiring labels, then emits evidence
 xref reconcile --repo owner/repo
 ```
 
-Interactive terminals receive Markdown. Pipes and agents receive versioned JSON by default. Use `--format markdown|json` to choose explicitly, and `xref schema` to inspect the machine contract.
+Interactive terminals receive Markdown. Pipes and agents receive versioned JSON by default. Every item includes stable evidence codes, human summaries, and related node keys. Use `--format markdown|json` to choose explicitly, and `xref schema` to inspect the machine contract and local-write behavior.
 
 **"What should I fix first?"**
 Ranks open nodes by discussion heat, so triage is by impact rather than by inbox order.
@@ -158,7 +158,9 @@ Each run produces:
 
 The `--json` file additionally includes the computed `components`, `overlaps`, and `priorities` so downstream tooling does not recompute them.
 
-`xref reconcile --repo owner/repo` searches open issues and pull requests up to the configured node limit, crawls their reference graph, and groups them into deterministic actions such as `verify-completed`, `close-superseded`, `resolve-competing`, `repair-closing-link`, and `keep-untracked`. It reports seed truncation, omitted references, and fetch failures. A graph relationship is evidence, not proof of working behavior, so every close candidate requires verification against current `main`, acceptance criteria, and the live product.
+`xref reconcile --repo owner/repo` searches open issues and pull requests up to the configured node limit, crawls their reference graph, and groups them into deterministic actions such as `verify-completed`, `close-superseded`, `resolve-competing`, `repair-closing-link`, and `keep-untracked`. Evidence is structured as `{ code, summary, related }` so agents can branch on stable reasons without parsing prose. It reports seed truncation, omitted references, and fetch failures before item-specific next steps. A graph relationship is evidence, not proof of working behavior, so every close candidate requires verification against current `main`, acceptance criteria, and the live product.
+
+The command never mutates GitHub. It saves a local snapshot under `~/.xref/` unless `--no-snapshot` is set. `xref schema` reports GitHub mutations and local writes separately so automated callers can enforce their own state boundary.
 
 ## HTML explorer
 

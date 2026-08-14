@@ -14,6 +14,24 @@ export type ReconcileAction =
 
 export type ReconcileConfidence = "high" | "medium" | "low";
 
+export type ReconcileEvidenceCode =
+  | "merged-closing-work"
+  | "merged-related-work"
+  | "multiple-open-closing-prs"
+  | "open-related-work"
+  | "no-related-pr"
+  | "merged-pr-same-closing-target"
+  | "merged-pr-closed-related-issue"
+  | "missing-closing-link"
+  | "competing-open-pr"
+  | "open-pr-unclassified";
+
+export interface ReconcileEvidence {
+  code: ReconcileEvidenceCode;
+  summary: string;
+  related: NodeKey[];
+}
+
 export interface ReconcileItem {
   key: NodeKey;
   kind: "Issue" | "PullRequest";
@@ -21,7 +39,7 @@ export interface ReconcileItem {
   url: string;
   action: ReconcileAction;
   confidence: ReconcileConfidence;
-  evidence: string[];
+  evidence: ReconcileEvidence[];
   recommendedAction: string;
 }
 
@@ -78,6 +96,18 @@ const ACTION_TITLES: Record<ReconcileAction, string> = {
   "keep-untracked": "Untracked open issues",
 };
 
+function evidence(
+  code: ReconcileEvidenceCode,
+  summary: string,
+  related: NodeKey[] = [],
+): ReconcileEvidence {
+  return { code, summary, related: [...new Set(related)].sort() };
+}
+
+function referencedKeys(values: string[]): NodeKey[] {
+  return [...new Set(values.flatMap((value) => value.match(/[\w.-]+\/[\w.-]+#\d+/g) ?? []))].sort();
+}
+
 function relatedPrs(issue: GraphNode, nodes: Map<NodeKey, GraphNode>): GraphNode[] {
   return [...nodes.values()].filter(
     (node) =>
@@ -111,7 +141,13 @@ function issueItem(issue: GraphNode, nodes: Map<NodeKey, GraphNode>): ReconcileI
       url: issue.url,
       action: "verify-completed",
       confidence: "medium",
-      evidence: [`Merged closing work: ${mergedClosers.map((node) => node.key).join(", ")}`],
+      evidence: [
+        evidence(
+          "merged-closing-work",
+          `Merged closing work: ${mergedClosers.map((node) => node.key).join(", ")}`,
+          mergedClosers.map((node) => node.key),
+        ),
+      ],
       recommendedAction:
         "Verify acceptance criteria against main and live behavior, then close if satisfied.",
     };
@@ -124,7 +160,13 @@ function issueItem(issue: GraphNode, nodes: Map<NodeKey, GraphNode>): ReconcileI
       url: issue.url,
       action: "verify-completed",
       confidence: "low",
-      evidence: [`Merged related work: ${mergedRelated.map((node) => node.key).join(", ")}`],
+      evidence: [
+        evidence(
+          "merged-related-work",
+          `Merged related work: ${mergedRelated.map((node) => node.key).join(", ")}`,
+          mergedRelated.map((node) => node.key),
+        ),
+      ],
       recommendedAction:
         "Compare the issue scope with the merged work before deciding whether to close it.",
     };
@@ -137,7 +179,13 @@ function issueItem(issue: GraphNode, nodes: Map<NodeKey, GraphNode>): ReconcileI
       url: issue.url,
       action: "resolve-competing",
       confidence: "high",
-      evidence: [`Open closing PRs: ${openClosers.map((node) => node.key).join(", ")}`],
+      evidence: [
+        evidence(
+          "multiple-open-closing-prs",
+          `Open closing PRs: ${openClosers.map((node) => node.key).join(", ")}`,
+          openClosers.map((node) => node.key),
+        ),
+      ],
       recommendedAction:
         "Choose one implementation path and respond to every contributor before closing duplicates.",
     };
@@ -151,7 +199,13 @@ function issueItem(issue: GraphNode, nodes: Map<NodeKey, GraphNode>): ReconcileI
       url: issue.url,
       action: "keep-linked",
       confidence: structural ? "high" : "medium",
-      evidence: [`Open related work: ${openRelated.map((node) => node.key).join(", ")}`],
+      evidence: [
+        evidence(
+          "open-related-work",
+          `Open related work: ${openRelated.map((node) => node.key).join(", ")}`,
+          openRelated.map((node) => node.key),
+        ),
+      ],
       recommendedAction: structural
         ? "Keep the issue open until the linked PR is resolved."
         : "Confirm that the related PR covers the issue and add an explicit closing link if appropriate.",
@@ -164,7 +218,12 @@ function issueItem(issue: GraphNode, nodes: Map<NodeKey, GraphNode>): ReconcileI
     url: issue.url,
     action: "keep-untracked",
     confidence: "high",
-    evidence: ["No open or merged PR relationship was found in the crawled graph."],
+    evidence: [
+      evidence(
+        "no-related-pr",
+        "No open or merged PR relationship was found in the crawled graph.",
+      ),
+    ],
     recommendedAction:
       "Reproduce or inspect the issue before prioritizing, closing, or shaping work from it.",
   };
@@ -188,7 +247,11 @@ function pullRequestItem(pr: GraphNode, nodes: Map<NodeKey, GraphNode>): Reconci
       action: "close-superseded",
       confidence: "high",
       evidence: [
-        `Merged PRs close the same issue: ${superseders.map((node) => node.key).join(", ")}`,
+        evidence(
+          "merged-pr-same-closing-target",
+          `Merged PRs close the same issue: ${superseders.map((node) => node.key).join(", ")}`,
+          [...superseders.map((node) => node.key), ...targets].sort(),
+        ),
       ],
       recommendedAction:
         "Verify scope parity, credit the contributor, and close if the merged work fully supersedes it.",
@@ -203,7 +266,13 @@ function pullRequestItem(pr: GraphNode, nodes: Map<NodeKey, GraphNode>): Reconci
       url: pr.url,
       action: "verify-superseded",
       confidence: "medium",
-      evidence: [`Merged ${possible.pr} closed related ${possible.issue} after this PR opened.`],
+      evidence: [
+        evidence(
+          "merged-pr-closed-related-issue",
+          `Merged ${possible.pr} closed related ${possible.issue} after this PR opened.`,
+          [possible.pr, possible.issue],
+        ),
+      ],
       recommendedAction:
         "Compare the diff and intended behavior before deciding whether to close it.",
     };
@@ -217,7 +286,9 @@ function pullRequestItem(pr: GraphNode, nodes: Map<NodeKey, GraphNode>): Reconci
       url: pr.url,
       action: "repair-closing-link",
       confidence: "high",
-      evidence: missing,
+      evidence: missing.map((summary) =>
+        evidence("missing-closing-link", summary, referencedKeys([summary])),
+      ),
       recommendedAction: "Add or correct the GitHub closing reference before merge.",
     };
   }
@@ -230,7 +301,9 @@ function pullRequestItem(pr: GraphNode, nodes: Map<NodeKey, GraphNode>): Reconci
       url: pr.url,
       action: "resolve-competing",
       confidence: "high",
-      evidence: competing,
+      evidence: competing.map((summary) =>
+        evidence("competing-open-pr", summary, referencedKeys([summary])),
+      ),
       recommendedAction:
         "Choose the preferred implementation and respond to all affected contributors.",
     };
@@ -242,7 +315,12 @@ function pullRequestItem(pr: GraphNode, nodes: Map<NodeKey, GraphNode>): Reconci
     url: pr.url,
     action: "review-open-pr",
     confidence: "high",
-    evidence: ["The PR is open and was not classified as superseded or competing."],
+    evidence: [
+      evidence(
+        "open-pr-unclassified",
+        "The PR is open and was not classified as superseded or competing.",
+      ),
+    ],
     recommendedAction: "Run the repository review gate on the exact latest SHA.",
   };
 }
@@ -302,6 +380,50 @@ export function buildReconcileReport(
     number
   >;
   for (const item of items) byAction[item.action]++;
+  const seedLimitReached = options.seeds.length >= options.seedLimit;
+  const fetchFailures = [...nodes.values()]
+    .filter((node) => !node.fetched)
+    .map((node) => node.key)
+    .sort();
+  const cappedOut = [...options.cappedOut].sort();
+  const nextSteps: string[] = [];
+  if (seedLimitReached || cappedOut.length) {
+    nextSteps.push(
+      "Increase --max-nodes or re-seed omitted neighborhoods before claiming full backlog coverage.",
+    );
+  }
+  if (fetchFailures.length) {
+    nextSteps.push("Retry failed graph nodes before acting on their absence from this report.");
+  }
+  if (
+    items.some((item) =>
+      [
+        "close-superseded",
+        "verify-superseded",
+        "resolve-competing",
+        "repair-closing-link",
+        "verify-completed",
+      ].includes(item.action),
+    )
+  ) {
+    nextSteps.push(
+      "Verify nominated actions against current main, acceptance criteria, and live behavior before changing GitHub state.",
+    );
+  }
+  if (items.some((item) => item.action === "review-open-pr")) {
+    nextSteps.push("Run the repository review gate on every PR selected for merge.");
+  }
+  if (items.some((item) => item.action === "keep-linked")) {
+    nextSteps.push("Keep linked issues open until their active pull requests are resolved.");
+  }
+  if (items.some((item) => item.action === "keep-untracked")) {
+    nextSteps.push("Reproduce or inspect untracked issues before prioritizing or closing them.");
+  }
+  if (!items.length && !seedLimitReached && !cappedOut.length && !fetchFailures.length) {
+    nextSteps.push(
+      "Dogfood the product and inspect repository intent before proposing the next direction.",
+    );
+  }
   return {
     schemaVersion: RECONCILE_SCHEMA_VERSION,
     repo: options.repo,
@@ -315,20 +437,13 @@ export function buildReconcileReport(
     items,
     limits: {
       seedLimit: options.seedLimit,
-      seedLimitReached: options.seeds.length >= options.seedLimit,
+      seedLimitReached,
       nodeCap: options.nodeCap,
       nodesObserved: nodes.size,
-      fetchFailures: [...nodes.values()]
-        .filter((node) => !node.fetched)
-        .map((node) => node.key)
-        .sort(),
-      cappedOut: [...options.cappedOut].sort(),
+      fetchFailures,
+      cappedOut,
     },
-    nextSteps: [
-      "Verify candidates against current main, acceptance criteria, and live behavior before changing GitHub state.",
-      "Run the repository review gate on every PR selected for merge.",
-      "If no actionable work remains, dogfood the product and inspect the codebase before proposing a direction.",
-    ],
+    nextSteps,
   };
 }
 
@@ -353,7 +468,9 @@ export function renderReconcile(report: ReconcileReport): string {
     for (const item of items) {
       out.push(`- [${item.key}](${item.url}) ${item.title}`);
       out.push(`  - Confidence: ${item.confidence}`);
-      for (const evidence of item.evidence) out.push(`  - Evidence: ${evidence}`);
+      for (const evidence of item.evidence) {
+        out.push(`  - Evidence [${evidence.code}]: ${evidence.summary}`);
+      }
       out.push(`  - Next: ${item.recommendedAction}`);
     }
   }
