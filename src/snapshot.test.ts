@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { diffSnapshots } from "./snapshot.js";
+import type { ReconcileSnapshot } from "./snapshot.js";
+import { diffReconcileSnapshots, diffSnapshots, reconcileSnapshotDir } from "./snapshot.js";
 import type { Snapshot } from "./types.js";
 
 const snap = (ts: string, nodes: Snapshot["nodes"]): Snapshot => ({ ts, nodes });
@@ -38,5 +39,81 @@ describe("diffSnapshots", () => {
     ]);
     const now = snap("t1", []);
     expect(diffSnapshots(prev, now)).toContain("No longer referenced");
+  });
+});
+
+describe("reconcile history", () => {
+  test("uses a stable repository directory independent of seeds", () => {
+    expect(reconcileSnapshotDir("o", "r")).toEndWith("/.xref/reconcile-o-r");
+  });
+
+  test("reports safe deltas and suppresses resolved items when coverage regresses", () => {
+    const prev: ReconcileSnapshot = {
+      schemaVersion: 1,
+      generatedAt: "2026-08-13T00:00:00.000Z",
+      repo: "o/r",
+      items: [
+        { key: "o/r#1", action: "keep-untracked" },
+        { key: "o/r#2", action: "review-open-pr" },
+      ],
+      coverageComplete: true,
+    };
+    const now: ReconcileSnapshot = {
+      schemaVersion: 1,
+      generatedAt: "2026-08-14T00:00:00.000Z",
+      repo: "o/r",
+      items: [
+        { key: "o/r#1", action: "verify-completed" },
+        { key: "o/r#3", action: "keep-untracked" },
+      ],
+      coverageComplete: false,
+    };
+    expect(diffReconcileSnapshots(prev, now)).toEqual({
+      previousGeneratedAt: prev.generatedAt,
+      added: [{ key: "o/r#3", action: "keep-untracked" }],
+      changed: [{ key: "o/r#1", from: "keep-untracked", to: "verify-completed" }],
+      resolved: [],
+      coverageChange: "regressed",
+    });
+  });
+
+  test("reports resolved items when the current coverage is complete", () => {
+    const prev: ReconcileSnapshot = {
+      schemaVersion: 1,
+      generatedAt: "2026-08-13T00:00:00.000Z",
+      repo: "o/r",
+      items: [{ key: "o/r#2", action: "review-open-pr" }],
+      coverageComplete: true,
+    };
+    const now: ReconcileSnapshot = {
+      ...prev,
+      generatedAt: "2026-08-14T00:00:00.000Z",
+      items: [],
+    };
+    expect(diffReconcileSnapshots(prev, now).resolved).toEqual([
+      { key: "o/r#2", previousAction: "review-open-pr" },
+    ]);
+  });
+
+  test("reports recovered coverage without inventing action changes", () => {
+    const prev: ReconcileSnapshot = {
+      schemaVersion: 1,
+      generatedAt: "2026-08-13T00:00:00.000Z",
+      repo: "o/r",
+      items: [],
+      coverageComplete: false,
+    };
+    const now: ReconcileSnapshot = {
+      ...prev,
+      generatedAt: "2026-08-14T00:00:00.000Z",
+      coverageComplete: true,
+      items: [{ key: "o/r#1", action: "keep-untracked" }],
+    };
+    expect(diffReconcileSnapshots(prev, now)).toMatchObject({
+      added: [],
+      changed: [],
+      resolved: [],
+      coverageChange: "recovered",
+    });
   });
 });

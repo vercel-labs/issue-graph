@@ -1,12 +1,26 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { ReconcileAction, ReconcileHistory, ReconcileReport } from "./reconcile.js";
 import type { GraphNode, NodeKey, Snapshot } from "./types.js";
+
+export interface ReconcileSnapshot {
+  schemaVersion: 1;
+  generatedAt: string;
+  repo: string;
+  items: Array<{ key: NodeKey; action: ReconcileAction }>;
+  coverageComplete: boolean;
+}
 
 /** Per-seed-set directory under ~/.xref where snapshots are persisted. */
 export function snapshotDir(owner: string, repo: string, seedKeys: NodeKey[]): string {
   const id = `${owner}-${repo}-${seedKeys.map((k) => k.split("#")[1]).join("_")}`.slice(0, 80);
   return path.join(os.homedir(), ".xref", id.replace(/[^\w.-]/g, "_"));
+}
+
+export function reconcileSnapshotDir(owner: string, repo: string): string {
+  const id = `reconcile-${owner}-${repo}`.replace(/[^\w.-]/g, "_");
+  return path.join(os.homedir(), ".xref", id);
 }
 
 /** Prior snapshot filenames for a seed set, oldest first. */
@@ -50,6 +64,74 @@ export function writeSnapshot(dir: string, snap: Snapshot): string {
   const file = path.join(dir, `${snap.ts.replace(/[:.]/g, "-")}.json`);
   fs.writeFileSync(file, JSON.stringify(snap, null, 2));
   return file;
+}
+
+export function toReconcileSnapshot(report: ReconcileReport): ReconcileSnapshot {
+  return {
+    schemaVersion: 1,
+    generatedAt: report.generatedAt,
+    repo: report.repo,
+    items: report.items.map((item) => ({ key: item.key, action: item.action })),
+    coverageComplete:
+      !report.limits.seedLimitReached &&
+      !report.limits.fetchFailures.length &&
+      !report.limits.cappedOut.length,
+  };
+}
+
+export function readReconcileSnapshot(file: string): ReconcileSnapshot | null {
+  try {
+    const value = JSON.parse(fs.readFileSync(file, "utf8")) as ReconcileSnapshot;
+    if (value.schemaVersion !== 1 || !Array.isArray(value.items)) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+export function writeReconcileSnapshot(dir: string, snap: ReconcileSnapshot): string {
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${snap.generatedAt.replace(/[:.]/g, "-")}.json`);
+  fs.writeFileSync(file, JSON.stringify(snap, null, 2));
+  return file;
+}
+
+export function diffReconcileSnapshots(
+  prev: ReconcileSnapshot,
+  now: ReconcileSnapshot,
+): ReconcileHistory {
+  const prevItems = new Map(prev.items.map((item) => [item.key, item.action]));
+  const nowItems = new Map(now.items.map((item) => [item.key, item.action]));
+  const added = prev.coverageComplete
+    ? now.items
+        .filter((item) => !prevItems.has(item.key))
+        .sort((a, b) => a.key.localeCompare(b.key))
+    : [];
+  const changed = now.items
+    .flatMap((item) => {
+      const from = prevItems.get(item.key);
+      return from && from !== item.action ? [{ key: item.key, from, to: item.action }] : [];
+    })
+    .sort((a, b) => a.key.localeCompare(b.key));
+  const resolved = now.coverageComplete
+    ? prev.items
+        .filter((item) => !nowItems.has(item.key))
+        .map((item) => ({ key: item.key, previousAction: item.action }))
+        .sort((a, b) => a.key.localeCompare(b.key))
+    : [];
+  const coverageChange =
+    prev.coverageComplete === now.coverageComplete
+      ? "unchanged"
+      : now.coverageComplete
+        ? "recovered"
+        : "regressed";
+  return {
+    previousGeneratedAt: prev.generatedAt,
+    added,
+    changed,
+    resolved,
+    coverageChange,
+  };
 }
 
 /** Markdown diff between two snapshots: new/removed nodes, state changes, new edges. */

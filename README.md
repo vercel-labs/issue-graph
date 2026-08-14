@@ -74,6 +74,12 @@ Every run is saved. The next run over the same starting points diffs against it 
 xref 260 --repo owner/repo --depth 2   # again, a day later
 ```
 
+Repository reconciliation keeps a separate history keyed only by `owner/repo`, so the comparison survives a changing open backlog. Its `history` object reports new items, action changes, resolved items, and whether crawl coverage regressed or recovered. It suppresses unsafe new or resolved claims when the relevant comparison side had incomplete coverage.
+
+```bash
+xref reconcile --repo owner/repo   # again, after the queue changes
+```
+
 ## What the output looks like
 
 Three sections carry most of the value. All of the output below is real, from a
@@ -158,9 +164,9 @@ Each run produces:
 
 The `--json` file additionally includes the computed `components`, `overlaps`, and `priorities` so downstream tooling does not recompute them.
 
-`xref reconcile --repo owner/repo` searches open issues and pull requests up to the configured node limit, crawls their reference graph, and groups them into deterministic actions such as `verify-completed`, `close-superseded`, `resolve-competing`, `repair-closing-link`, and `keep-untracked`. Evidence is structured as `{ code, summary, related }` so agents can branch on stable reasons without parsing prose. It reports seed truncation, omitted references, and fetch failures before item-specific next steps. A graph relationship is evidence, not proof of working behavior, so every close candidate requires verification against current `main`, acceptance criteria, and the live product.
+`xref reconcile --repo owner/repo` searches open issues and pull requests up to the configured node limit, crawls their reference graph, and groups them into deterministic actions such as `verify-completed`, `close-superseded`, `resolve-competing`, `repair-closing-link`, and `keep-untracked`. Evidence is structured as `{ code, summary, related }` so agents can branch on stable reasons without parsing prose. Repository-keyed history reports action deltas even as the open seed set changes, including the transition to an empty backlog. It reports seed truncation, omitted references, and fetch failures before item-specific next steps. A graph relationship is evidence, not proof of working behavior, so every close candidate requires verification against current `main`, acceptance criteria, and the live product.
 
-The command never mutates GitHub. It saves a local snapshot under `~/.xref/` unless `--no-snapshot` is set. `xref schema` reports GitHub mutations and local writes separately so automated callers can enforce their own state boundary.
+The command never mutates GitHub. It saves repository history under `~/.xref/reconcile-owner-repo/` unless `--no-snapshot` is set. `xref schema` reports GitHub mutations and local writes separately so automated callers can enforce their own state boundary.
 
 ## HTML explorer
 

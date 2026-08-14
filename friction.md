@@ -11,3 +11,4 @@
 - The schema described reconcile as non-mutating while snapshots were written by default. GitHub mutations and local filesystem writes are separate contract dimensions.
 - Reconcile snapshots inherit the changing open seed set, so repeated repository sweeps do not share history. Repository-keyed action deltas are the next slice after the report contract is stable.
 - A live Petdex reconciliation needed roughly one node query per graph node and reached the node cap. Pagination and bounded concurrency remain a later scale slice so they do not blur the protocol change.
+- Repository deltas cannot call an absent item resolved when the current crawl is incomplete, or call an observed item new when the previous crawl was incomplete. Coverage gates both claims.

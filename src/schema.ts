@@ -21,7 +21,8 @@ export const XREF_SCHEMA = {
       localWrites: ["~/.xref snapshots unless --no-snapshot is set"],
       outputSchemaVersion: 1,
       formats: ["json", "markdown"],
-      description: "Inventory an open repository backlog and derive verification actions.",
+      description:
+        "Inventory an open repository backlog and derive verification actions plus repository-level deltas.",
     },
     schema: {
       githubMutations: false,
