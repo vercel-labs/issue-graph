@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { labelSeeds, makeFetchNode, parseNodeResponse, type RawNodeItem } from "./github.js";
+import {
+  labelSeeds,
+  makeFetchNode,
+  openBacklogSeeds,
+  parseNodeResponse,
+  type RawNodeItem,
+} from "./github.js";
 import type { GhTransport } from "./transport.js";
 
 const ISSUE: RawNodeItem = {
@@ -120,5 +126,11 @@ describe("makeFetchNode", () => {
 describe("labelSeeds", () => {
   test("returns the issue numbers the search matched", async () => {
     expect(await labelSeeds(fakeTransport(null, [4, 8, 15]), "o/r", "bug")).toEqual([4, 8, 15]);
+  });
+});
+
+describe("openBacklogSeeds", () => {
+  test("returns every open issue or PR number matched by search", async () => {
+    expect(await openBacklogSeeds(fakeTransport(null, [3, 5, 8]), "o/r")).toEqual([3, 5, 8]);
   });
 });
