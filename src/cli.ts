@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { classify, fillMentionedBy } from "./classify.js";
 import { clusterPayload, clusterPrompt, runAgent } from "./cluster.js";
 import { components, crawl } from "./crawl.js";
-import { labelSeeds, makeFetchNode } from "./github.js";
+import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
 import { type ClustersConfig, renderHtml } from "./html.js";
 import { fileOverlaps } from "./overlaps.js";
 import { prioritize, renderPriority } from "./priority.js";
+import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
+import { XREF_SCHEMA } from "./schema.js";
 import {
   diffSnapshots,
   listSnapshots,
@@ -19,11 +21,13 @@ import {
 } from "./snapshot.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
-import type { Seed } from "./types.js";
+import type { NodeKey, Seed } from "./types.js";
 
 const USAGE = `usage: xref <url|number> --repo owner/repo [options]
        xref --seeds 1,2,3 --repo owner/repo [options]
        xref --label bug --repo owner/repo [options]
+       xref reconcile --repo owner/repo [options]
+       xref schema
 
   --repo owner/repo   required for a bare number, --seeds, or --label
   --depth N           same-repo recursion depth (default 2); cross-repo refs
@@ -40,10 +44,12 @@ const USAGE = `usage: xref <url|number> --repo owner/repo [options]
   --json PATH         write the machine-readable graph
   --html PATH         write a self-contained HTML explorer
   --clusters PATH     group the explorer by agent-named clusters
+  --format F          reconcile output: auto, json, or markdown (default auto)
   --no-snapshot       do not persist this run to ~/.xref/
   -h, --help          show this`;
 
 interface Args {
+  command: "graph" | "reconcile" | "schema";
   seed: string;
   repo: string;
   depth: number;
@@ -58,11 +64,17 @@ interface Args {
   clusterRun: string;
   noSnapshot: boolean;
   prioritize: boolean;
+  format: "auto" | "json" | "markdown";
   help: boolean;
 }
 
+export class UsageError extends Error {}
+
 export function parseArgs(argv: string[]): Args {
+  const command = argv[0] === "reconcile" || argv[0] === "schema" ? argv[0] : "graph";
+  const start = command === "graph" ? 0 : 1;
   const a: Args = {
+    command,
     seed: "",
     repo: "",
     depth: 2,
@@ -77,9 +89,10 @@ export function parseArgs(argv: string[]): Args {
     clusterRun: "",
     noSnapshot: false,
     prioritize: false,
+    format: "auto",
     help: false,
   };
-  for (let i = 0; i < argv.length; i++) {
+  for (let i = start; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") a.help = true;
     else if (arg === "--repo") a.repo = argv[++i];
@@ -91,7 +104,13 @@ export function parseArgs(argv: string[]): Args {
     else if (arg === "--label") a.label = argv[++i];
     else if (arg === "--max-nodes") a.maxNodes = Number(argv[++i]);
     else if (arg === "--hub-threshold") a.hubThreshold = Number(argv[++i]);
-    else if (arg === "--prioritize") a.prioritize = true;
+    else if (arg === "--format") {
+      const format = argv[++i];
+      if (format !== "auto" && format !== "json" && format !== "markdown") {
+        throw new UsageError(`unknown format: ${format}\n\n${USAGE}`);
+      }
+      a.format = format;
+    } else if (arg === "--prioritize") a.prioritize = true;
     else if (arg === "--cluster") a.cluster = true;
     else if (arg === "--cluster-run") {
       a.cluster = true;
@@ -99,7 +118,7 @@ export function parseArgs(argv: string[]): Args {
     } else if (arg === "--no-snapshot") a.noSnapshot = true;
     // An unrecognized flag used to fall through to the seed, so a typo became
     // "Cannot parse seed: --hlep" — and `--help` crashed the same way.
-    else if (arg.startsWith("-")) throw new Error(`unknown flag: ${arg}\n\n${USAGE}`);
+    else if (arg.startsWith("-")) throw new UsageError(`unknown flag: ${arg}\n\n${USAGE}`);
     else a.seed = arg;
   }
   return a;
@@ -107,15 +126,22 @@ export function parseArgs(argv: string[]): Args {
 
 async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
   if (a.label) {
-    if (!a.repo) throw new Error("--label needs --repo");
+    if (!a.repo) throw new UsageError("--label needs --repo");
     const [owner, repo] = a.repo.split("/");
     const numbers = await labelSeeds(transport, a.repo, a.label);
     return numbers.map((number) => ({ owner, repo, number }));
   }
   if (a.seedsCsv) {
-    if (!a.repo) throw new Error("--seeds needs --repo");
+    if (!a.repo) throw new UsageError("--seeds needs --repo");
     const [owner, repo] = a.repo.split("/");
     return a.seedsCsv.split(",").map((s) => ({ owner, repo, number: Number(s.trim()) }));
+  }
+  if (a.command === "reconcile") {
+    if (!a.repo) throw new UsageError("reconcile needs --repo");
+    const [owner, repo] = a.repo.split("/");
+    if (!owner || !repo) throw new UsageError("--repo must be owner/repo");
+    const numbers = await openBacklogSeeds(transport, a.repo, Math.min(a.maxNodes, 100));
+    return numbers.map((number) => ({ owner, repo, number }));
   }
   return [parseSeed(a.seed, a.repo)];
 }
@@ -124,40 +150,70 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   if (!argv.length) {
     console.error(USAGE);
-    process.exit(1);
+    process.exitCode = 2;
+    return;
   }
   const args = parseArgs(argv);
   if (args.help) {
     console.log(USAGE);
     return;
   }
+  if (args.command === "schema") {
+    console.log(JSON.stringify(XREF_SCHEMA, null, 2));
+    return;
+  }
   const transport = shellTransport();
   const seeds = await resolveSeeds(args, transport);
-  if (!seeds.length) {
+  if (!seeds.length && args.command !== "reconcile") {
     console.error("no seeds resolved");
     process.exit(1);
   }
 
-  const primary = { owner: seeds[0].owner, repo: seeds[0].repo };
+  const [fallbackOwner, fallbackRepo] = args.repo.split("/");
+  const primary = seeds[0]
+    ? { owner: seeds[0].owner, repo: seeds[0].repo }
+    : { owner: fallbackOwner, repo: fallbackRepo };
   const multi = seeds.length > 1;
   process.stderr.write(
-    `crawling ${seeds.length} seed(s) in ${primary.owner}/${primary.repo} (depth ${args.depth}, max ${args.maxNodes} nodes, hub>${args.hubThreshold})\n`,
+    seeds.length
+      ? `crawling ${seeds.length} seed(s) in ${primary.owner}/${primary.repo} (depth ${args.depth}, max ${args.maxNodes} nodes, hub>${args.hubThreshold})\n`
+      : `backlog empty in ${primary.owner}/${primary.repo}; no graph crawl needed\n`,
   );
 
-  const { nodes, cappedOut } = await crawl(
-    seeds,
-    {
-      maxDepth: args.depth,
-      maxNodes: args.maxNodes,
-      hubThreshold: args.hubThreshold,
-      primaryRepo: primary,
-    },
-    makeFetchNode(transport),
-  );
+  const { nodes, cappedOut } = seeds.length
+    ? await crawl(
+        seeds,
+        {
+          maxDepth: args.depth,
+          maxNodes: args.maxNodes,
+          hubThreshold: args.hubThreshold,
+          primaryRepo: primary,
+        },
+        makeFetchNode(transport),
+      )
+    : { nodes: new Map(), cappedOut: new Set<NodeKey>() };
   classify(nodes);
   fillMentionedBy(nodes);
 
   const seedKeys = seeds.map((s) => `${s.owner}/${s.repo}#${s.number}`);
+  if (args.command === "reconcile") {
+    const report = buildReconcileReport(nodes, {
+      repo: `${primary.owner}/${primary.repo}`,
+      seeds: seedKeys,
+      seedLimit: Math.min(args.maxNodes, 100),
+      nodeCap: args.maxNodes,
+      cappedOut,
+    });
+    const format =
+      args.format === "auto" ? (process.stdout.isTTY ? "markdown" : "json") : args.format;
+    console.log(format === "json" ? JSON.stringify(report, null, 2) : renderReconcile(report));
+    if (!args.noSnapshot && seeds.length) {
+      const dir = snapshotDir(primary.owner, primary.repo, seedKeys);
+      const file = writeSnapshot(dir, toSnapshot(nodes, report.generatedAt));
+      process.stderr.write(`\nsnapshot saved: ${file}\n`);
+    }
+    return;
+  }
   let md = render(nodes, seedKeys, multi);
 
   const priorities = prioritize(nodes, new Date());
@@ -258,6 +314,6 @@ if (import.meta.main) {
     // A transport failure must not look like an empty backlog: exit non-zero so
     // a scripted caller notices.
     console.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
+    process.exit(err instanceof UsageError ? 2 : 1);
   });
 }

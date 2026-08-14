@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseArgs } from "./cli.js";
+import { parseArgs, UsageError } from "./cli.js";
 
 describe("parseArgs", () => {
   test("parses a seed with repo and depth", () => {
@@ -27,6 +27,24 @@ describe("parseArgs", () => {
     expect(parseArgs(["--label", "bug", "--repo", "o/r"]).label).toBe("bug");
   });
 
+  test("parses reconcile and its output format", () => {
+    const a = parseArgs(["reconcile", "--repo", "o/r", "--format", "json"]);
+    expect(a.command).toBe("reconcile");
+    expect(a.repo).toBe("o/r");
+    expect(a.seed).toBe("");
+    expect(a.format).toBe("json");
+  });
+
+  test("parses schema without treating it as a seed", () => {
+    const a = parseArgs(["schema"]);
+    expect(a.command).toBe("schema");
+    expect(a.seed).toBe("");
+  });
+
+  test("rejects an unknown reconcile format", () => {
+    expect(() => parseArgs(["reconcile", "--format", "xml"])).toThrow(UsageError);
+  });
+
   // `--help` used to fall through to the seed and die in parseSeed with
   // "Cannot parse seed: --help", which is a poor first impression.
   test("--help and -h ask for usage instead of becoming the seed", () => {
@@ -36,7 +54,7 @@ describe("parseArgs", () => {
   });
 
   test("an unknown flag is an error, not a seed", () => {
-    expect(() => parseArgs(["--hlep"])).toThrow(/unknown flag: --hlep/);
-    expect(() => parseArgs(["352", "--repo", "o/r", "--depht", "2"])).toThrow(/unknown flag/);
+    expect(() => parseArgs(["--hlep"])).toThrow(UsageError);
+    expect(() => parseArgs(["352", "--repo", "o/r", "--depht", "2"])).toThrow(UsageError);
   });
 });

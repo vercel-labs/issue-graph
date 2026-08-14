@@ -1,6 +1,6 @@
 ---
 name: xref
-description: Snapshot the reference graph of a GitHub PR or issue and trace every linked PR, cross-referenced issue, and mention across repos. Use before working an issue/PR to see its whole graph first (the review-full-pr-issue-graph rule); to find orphan, superseded, competing, or duplicate PRs; to see who mentioned or linked it; to survey a backlog by root-cause cluster; to rank a backlog by discussion heat (comments, participants, reactions, inbound links, time open) and pick the most impactful issue to fix next; to spot two PRs that touch the same files; to catch a PR that says "fixes #N" but won't auto-close; or to re-check what changed since the last snapshot. Trigger words include xref, map this PR/issue, trace references, what links to this, who mentioned this, find orphans, duplicate PRs, survey backlog, prioritize backlog, what to fix first, most impactful issues.
+description: Snapshot the reference graph of a GitHub PR or issue and trace every linked PR, cross-referenced issue, and mention across repos. Use before working an issue/PR to see its whole graph first (the review-full-pr-issue-graph rule); to reconcile an unlabeled backlog read-only; to find orphan, superseded, competing, or duplicate PRs; to see who mentioned or linked it; to survey a backlog by root-cause cluster; to rank a backlog by discussion heat (comments, participants, reactions, inbound links, time open) and pick the most impactful issue to fix next; to spot two PRs that touch the same files; to catch a PR that says "fixes #N" but won't auto-close; or to re-check what changed since the last snapshot. Trigger words include xref, reconcile backlog, clean backlog, map this PR/issue, trace references, what links to this, who mentioned this, find orphans, duplicate PRs, survey backlog, prioritize backlog, what to fix first, most impactful issues.
 compatibility: Requires the `xref` command on PATH. Not published to a registry: install from source with `gh repo clone vercel-labs/xref && cd xref && bun install && bun link` (repo is internal to the Vercel org). Also needs `gh` (authenticated), `bun`, and network access for the GitHub API. Snapshots persist under ~/.xref/. Clustering runs in the calling agent's context, or shells out to `claude`/`codex` with --cluster-run.
 ---
 
@@ -25,6 +25,7 @@ Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan*
    | "what should I fix first", "most impactful issues" | `xref --label <label> --repo <o/r> --prioritize` |
    | "which PRs are duplicating each other" | `xref --seeds <n,n,n> --repo <o/r>` and read the overlap section |
    | "which issues have no PR" / "which have competing PRs" | `xref --label <label> --repo <o/r>` and read the orphan checklist and flags |
+   | "clean/reconcile the whole backlog", including repos without labels | `xref reconcile --repo <o/r> --format markdown` |
    | "cluster my backlog by root cause" | `xref --seeds <n,n,n> --repo <o/r> --cluster` |
    | "what changed since last time" | re-run the same seeds; the snapshot diff is automatic |
 
@@ -46,6 +47,23 @@ Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan*
 
 7. **Report what changed.** If a "Since last snapshot" diff is present, relay the new nodes, state changes, and new mentions/links with who made them.
 
+## Reconcile mode
+
+Use `xref reconcile --repo owner/repo --format json` when another tool or agent will consume the result. Add `--no-snapshot` when the caller must leave local state unchanged. The JSON carries `schemaVersion`, counts, ordered items, structured evidence, crawl limits, and contextual next steps. Each evidence object has a stable `code`, a human `summary`, and exact `related` node keys. Run `xref schema` before building a durable integration and inspect both `githubMutations` and `localWrites`.
+
+Treat its actions as a verification queue:
+
+- `close-superseded`: verify scope parity, credit the contributor, then close if fully covered.
+- `verify-superseded`: compare both implementations before deciding.
+- `resolve-competing`: select one implementation path and respond to every contributor.
+- `repair-closing-link`: correct the GitHub closing relationship before merge.
+- `verify-completed`: check current `main`, acceptance criteria, and live behavior before closing the issue.
+- `review-open-pr`: run the repository's exact-SHA review gate.
+- `keep-linked`: leave it open while linked work is active.
+- `keep-untracked`: reproduce or inspect before prioritizing.
+
+If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limits.fetchFailures` is non-empty, report the incomplete coverage. Increase `--max-nodes`, re-seed the omitted neighborhood, or retry failed nodes before claiming the backlog was fully reconciled.
+
 ## Flags
 
 - `--repo owner/repo` — required for bare numbers, `--seeds`, `--label`.
@@ -54,6 +72,7 @@ Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan*
 - `--max-nodes N` (80), `--hub-threshold N` (12) — crawl guards.
 - `--prioritize` — rank open nodes by discussion heat (comments, participants, reactions, inbound refs, time open); the ranking is also always present in `--json` output as `priorities`.
 - `--cluster` emits the prompt for you; `--cluster-run claude|codex` shells out.
+- `reconcile --repo owner/repo` inventories the open backlog without labels; `--format auto|json|markdown` controls its versioned output.
 - `--json out.json` writes the machine-readable graph (now includes `components` and `overlaps`); `--no-snapshot` skips persistence.
 - `--html out.html` writes a self-contained master–detail explorer (Geist-styled, no server — `open` it). `--clusters clusters.json` groups the explorer by agent-named clusters and pins a **Cleanup** checklist as the default view. The file is either `[{label, root_cause?, members:[{key, verdict?}]}]` or `{clusters:[…], cleanup:[{key?, text}]}` — the same shape the `--cluster` step produces, so feed your whole triage (clusters + the close/credit cleanup list) back into the UI.
 
@@ -66,10 +85,11 @@ Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan*
 - **Derived triage.** Open PRs are marked superseded when they share a closing target with merged work, or possibly superseded when they are structurally linked to an issue closed by a later merged PR. `competing` (>1 open PR closes an issue) and `claims-close-no-link` (a `fixes #N` that won't auto-close) are computed and attached per node.
 - **Attribution.** Each node carries its author and who mentioned it; each edge carries the actor and date.
 - **State is fetched live per node** (OPEN/CLOSED/MERGED), never trusted from a cross-reference event, which can be stale.
-- **Snapshot + diff.** Every run persists to `~/.xref/`; the next run diffs against the last one.
+- **Snapshot + diff.** Every run persists to `~/.xref/` unless `--no-snapshot` is set; the next run over the same seeds diffs against the last one.
 
 ## Guardrails
 
 - Report the graph to the user; they act on it. Never post a comment, review, or edit to GitHub (the no-public-github-comments rule).
+- A merged relationship is not behavioral proof. Never close an issue from `verify-completed` without checking current code and behavior.
 - Before opening a PR for an issue, run xref on it first: an existing open PR, a superseded one, or a file-overlap pair means the work may already be done — coordinate and credit instead of duplicating.
 - Cross-repo refs are fetched one hop and shown; external non-GitHub links are collected, with loopback/example/CI hosts filtered as noise.

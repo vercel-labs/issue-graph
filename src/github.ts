@@ -220,3 +220,12 @@ export async function labelSeeds(
   const hits = await transport.search(`repo:${repo} label:"${label}" is:open`, limit);
   return hits.map((h) => h.number);
 }
+
+export async function openBacklogSeeds(
+  transport: GhTransport,
+  repo: string,
+  limit = 100,
+): Promise<number[]> {
+  const hits = await transport.search(`repo:${repo} is:open`, limit);
+  return hits.map((hit) => hit.number);
+}

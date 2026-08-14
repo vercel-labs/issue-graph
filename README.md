@@ -44,6 +44,15 @@ The orphan checklist names the untracked issues; the `competing` flag marks an i
 xref --label bug --repo owner/repo
 ```
 
+**"Which open issues and PRs can I clean up safely?"**
+Inventories the whole open backlog without requiring labels, then emits evidence-backed actions. It never changes GitHub state.
+
+```bash
+xref reconcile --repo owner/repo
+```
+
+Interactive terminals receive Markdown. Pipes and agents receive versioned JSON by default. Every item includes stable evidence codes, human summaries, and related node keys. Use `--format markdown|json` to choose explicitly, and `xref schema` to inspect the machine contract and local-write behavior.
+
 **"What should I fix first?"**
 Ranks open nodes by discussion heat, so triage is by impact rather than by inbox order.
 
@@ -131,6 +140,7 @@ the case for ranking by heat instead of by date.
 | `--json path` | none | Write the graph as JSON (includes `components` and `overlaps`) |
 | `--html path` | none | Write a self-contained master–detail explorer (Geist-styled, no server) |
 | `--clusters path` | none | JSON of agent-named clusters to group the explorer by; falls back to connected components |
+| `--format auto\|json\|markdown` | `auto` | Output for `reconcile`. Auto selects Markdown for a TTY and JSON otherwise |
 | `--no-snapshot` | off | Do not save this run |
 
 ## Output
@@ -147,6 +157,10 @@ Each run produces:
 - a diff from the previous snapshot, including new nodes, state changes, and new references
 
 The `--json` file additionally includes the computed `components`, `overlaps`, and `priorities` so downstream tooling does not recompute them.
+
+`xref reconcile --repo owner/repo` searches open issues and pull requests up to the configured node limit, crawls their reference graph, and groups them into deterministic actions such as `verify-completed`, `close-superseded`, `resolve-competing`, `repair-closing-link`, and `keep-untracked`. Evidence is structured as `{ code, summary, related }` so agents can branch on stable reasons without parsing prose. It reports seed truncation, omitted references, and fetch failures before item-specific next steps. A graph relationship is evidence, not proof of working behavior, so every close candidate requires verification against current `main`, acceptance criteria, and the live product.
+
+The command never mutates GitHub. It saves a local snapshot under `~/.xref/` unless `--no-snapshot` is set. `xref schema` reports GitHub mutations and local writes separately so automated callers can enforce their own state boundary.
 
 ## HTML explorer
 
