@@ -7,8 +7,8 @@
  * entry point (`@vercel-labs/xref/transport/shell`) and never reachable from the core.
  */
 
-import { execFileSync } from "node:child_process";
-import { type GhTransport, GhTransportError, type SeedRef } from "../transport.js";
+import { execFile, execFileSync } from "node:child_process";
+import { type GhTransport, GhTransportError, paginate, type SeedRef } from "../transport.js";
 
 /**
  * Run `gh` and return stdout. Throws on non-zero exit.
@@ -22,6 +22,23 @@ export function gh(args: string[]): string {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+export function ghAsync(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "gh",
+      args,
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(Object.assign(error, { stdout, stderr }));
+          return;
+        }
+        resolve(stdout);
+      },
+    );
   });
 }
 
@@ -72,7 +89,7 @@ export function shellTransport(): GhTransport {
         args.push(typeof v === "number" ? "-F" : "-f", `${k}=${v}`);
       }
       try {
-        return JSON.parse(gh(args));
+        return JSON.parse(await ghAsync(args));
       } catch (err) {
         // `gh api graphql` exits non-zero for a GraphQL-level error too, and
         // "Could not resolve to an issue with the number of N" is an ordinary
@@ -87,20 +104,23 @@ export function shellTransport(): GhTransport {
 
     async search(query, limit) {
       const q = encodeURIComponent(query);
-      const per = Math.min(limit, 100);
-      let raw: string;
-      try {
-        raw = gh(["api", `search/issues?q=${q}&per_page=${per}`]);
-      } catch (err) {
-        throw new GhTransportError(`gh api search failed: ${describe(err)}`);
-      }
-      const items = (JSON.parse(raw) as { items?: SearchItem[] }).items ?? [];
+      const items = await paginate(limit, async (page, perPage) => {
+        try {
+          const raw = await ghAsync([
+            "api",
+            `search/issues?q=${q}&per_page=${perPage}&page=${page}`,
+          ]);
+          return (JSON.parse(raw) as { items?: SearchItem[] }).items ?? [];
+        } catch (err) {
+          throw new GhTransportError(`gh api search failed: ${describe(err)}`);
+        }
+      });
       const out: SeedRef[] = [];
       for (const item of items) {
         const or = ownerRepoFromItem(item);
         if (or && item.number != null) out.push({ ...or, number: item.number });
       }
-      return out.slice(0, limit);
+      return out;
     },
   };
 }

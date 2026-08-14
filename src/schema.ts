@@ -1,6 +1,12 @@
 export const XREF_SCHEMA = {
   name: "xref",
   schemaVersion: 1,
+  crawl: {
+    maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+    concurrency: { default: 4, minimum: 1, maximum: 32 },
+    searchPageSize: 100,
+    searchResultLimit: 1000,
+  },
   exitCodes: {
     success: 0,
     runtimeFailure: 1,

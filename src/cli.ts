@@ -43,6 +43,7 @@ const USAGE = `usage: xref <url|number> --repo owner/repo [options]
   --hub-threshold N   fetch but do not expand a node with more refs than this
                       (default 12), so one tracking issue cannot pull the
                       whole tracker
+  --concurrency N     GitHub node requests in flight (default 4, max 32)
   --prioritize        rank open nodes by discussion heat
   --cluster           print a root-cause clustering prompt for your agent
   --cluster-run A     run that prompt through 'claude' or 'codex' instead
@@ -65,6 +66,7 @@ interface Args {
   label: string;
   maxNodes: number;
   hubThreshold: number;
+  concurrency: number;
   cluster: boolean;
   clusterRun: string;
   noSnapshot: boolean;
@@ -90,6 +92,7 @@ export function parseArgs(argv: string[]): Args {
     label: "",
     maxNodes: 80,
     hubThreshold: 12,
+    concurrency: 4,
     cluster: false,
     clusterRun: "",
     noSnapshot: false,
@@ -109,6 +112,7 @@ export function parseArgs(argv: string[]): Args {
     else if (arg === "--label") a.label = argv[++i];
     else if (arg === "--max-nodes") a.maxNodes = Number(argv[++i]);
     else if (arg === "--hub-threshold") a.hubThreshold = Number(argv[++i]);
+    else if (arg === "--concurrency") a.concurrency = Number(argv[++i]);
     else if (arg === "--format") {
       const format = argv[++i];
       if (format !== "auto" && format !== "json" && format !== "markdown") {
@@ -126,6 +130,12 @@ export function parseArgs(argv: string[]): Args {
     else if (arg.startsWith("-")) throw new UsageError(`unknown flag: ${arg}\n\n${USAGE}`);
     else a.seed = arg;
   }
+  if (!Number.isInteger(a.maxNodes) || a.maxNodes < 1 || a.maxNodes > 1000) {
+    throw new UsageError("--max-nodes must be an integer from 1 to 1000");
+  }
+  if (!Number.isInteger(a.concurrency) || a.concurrency < 1 || a.concurrency > 32) {
+    throw new UsageError("--concurrency must be an integer from 1 to 32");
+  }
   return a;
 }
 
@@ -133,7 +143,7 @@ async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
   if (a.label) {
     if (!a.repo) throw new UsageError("--label needs --repo");
     const [owner, repo] = a.repo.split("/");
-    const numbers = await labelSeeds(transport, a.repo, a.label);
+    const numbers = await labelSeeds(transport, a.repo, a.label, Math.min(a.maxNodes, 1000));
     return numbers.map((number) => ({ owner, repo, number }));
   }
   if (a.seedsCsv) {
@@ -145,7 +155,7 @@ async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
     if (!a.repo) throw new UsageError("reconcile needs --repo");
     const [owner, repo] = a.repo.split("/");
     if (!owner || !repo) throw new UsageError("--repo must be owner/repo");
-    const numbers = await openBacklogSeeds(transport, a.repo, Math.min(a.maxNodes, 100));
+    const numbers = await openBacklogSeeds(transport, a.repo, Math.min(a.maxNodes, 1000));
     return numbers.map((number) => ({ owner, repo, number }));
   }
   return [parseSeed(a.seed, a.repo)];
@@ -181,7 +191,7 @@ async function main(): Promise<void> {
   const multi = seeds.length > 1;
   process.stderr.write(
     seeds.length
-      ? `crawling ${seeds.length} seed(s) in ${primary.owner}/${primary.repo} (depth ${args.depth}, max ${args.maxNodes} nodes, hub>${args.hubThreshold})\n`
+      ? `crawling ${seeds.length} seed(s) in ${primary.owner}/${primary.repo} (depth ${args.depth}, max ${args.maxNodes} nodes, concurrency ${args.concurrency}, hub>${args.hubThreshold})\n`
       : `backlog empty in ${primary.owner}/${primary.repo}; no graph crawl needed\n`,
   );
 
@@ -192,6 +202,7 @@ async function main(): Promise<void> {
           maxDepth: args.depth,
           maxNodes: args.maxNodes,
           hubThreshold: args.hubThreshold,
+          concurrency: args.concurrency,
           primaryRepo: primary,
         },
         makeFetchNode(transport),
@@ -205,7 +216,7 @@ async function main(): Promise<void> {
     const report = buildReconcileReport(nodes, {
       repo: `${primary.owner}/${primary.repo}`,
       seeds: seedKeys,
-      seedLimit: Math.min(args.maxNodes, 100),
+      seedLimit: Math.min(args.maxNodes, 1000),
       nodeCap: args.maxNodes,
       cappedOut,
     });

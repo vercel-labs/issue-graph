@@ -8,7 +8,7 @@
  * than no report. Every failure this cannot retry away is thrown.
  */
 
-import { type GhTransport, GhTransportError, type SeedRef } from "../transport.js";
+import { type GhTransport, GhTransportError, paginate, type SeedRef } from "../transport.js";
 
 const API = "https://api.github.com";
 
@@ -161,19 +161,21 @@ export function httpTransport(opts: HttpTransportOptions): GhTransport {
     },
 
     async search(query, limit) {
-      const per = Math.min(limit, 100);
-      const payload = (await request(
-        `/search/issues?q=${encodeURIComponent(query)}&per_page=${per}`,
-      )) as { items?: Array<{ number?: number; repository_url?: string; html_url?: string }> };
+      const items = await paginate(limit, async (page, perPage) => {
+        const payload = (await request(
+          `/search/issues?q=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}`,
+        )) as { items?: Array<{ number?: number; repository_url?: string; html_url?: string }> };
+        return payload.items ?? [];
+      });
 
       const out: SeedRef[] = [];
-      for (const item of payload.items ?? []) {
+      for (const item of items) {
         const api = item.repository_url?.match(/\/repos\/([^/]+)\/([^/]+)$/);
         const html = item.html_url?.match(/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/\d+/);
         const m = api ?? html;
         if (m && item.number != null) out.push({ owner: m[1], repo: m[2], number: item.number });
       }
-      return out.slice(0, limit);
+      return out;
     },
   };
 }

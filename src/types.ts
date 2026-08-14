@@ -100,6 +100,7 @@ export interface CrawlOptions {
   maxDepth: number;
   maxNodes: number;
   hubThreshold: number;
+  concurrency?: number;
   /** The seeds' repo; same-repo refs recurse, cross-repo refs are one hop. */
   primaryRepo: { owner: string; repo: string };
 }

@@ -138,8 +138,9 @@ the case for ranking by heat instead of by date.
 | `--depth N` | `2` | Same-repository crawl depth. Cross-repository references are fetched one hop and not expanded |
 | `--seeds a,b,c` | none | Starting points for a multi-seed graph. Output includes connected components |
 | `--label L` | none | Use every open issue with this label as a starting point |
-| `--max-nodes N` | `80` | Stop after this many nodes |
+| `--max-nodes N` | `80` | Stop after this many nodes, from 1 through 1000 |
 | `--hub-threshold N` | `12` | Fetch high-degree non-seed nodes, but do not expand them |
+| `--concurrency N` | `4` | Bound GitHub node requests in flight, from 1 through 32 |
 | `--prioritize` | off | Rank open nodes by discussion heat: `comments×3 + participants×2 + reactions×2 + inbound refs×2 + min(12, daysOpen/30)` |
 | `--cluster` | off | Print a clustering prompt for the calling agent |
 | `--cluster-run claude\|codex` | none | Run a headless agent to cluster the graph |
@@ -164,7 +165,7 @@ Each run produces:
 
 The `--json` file additionally includes the computed `components`, `overlaps`, and `priorities` so downstream tooling does not recompute them.
 
-`xref reconcile --repo owner/repo` searches open issues and pull requests up to the configured node limit, crawls their reference graph, and groups them into deterministic actions such as `verify-completed`, `close-superseded`, `resolve-competing`, `repair-closing-link`, and `keep-untracked`. Evidence is structured as `{ code, summary, related }` so agents can branch on stable reasons without parsing prose. Repository-keyed history reports action deltas even as the open seed set changes, including the transition to an empty backlog. It reports seed truncation, omitted references, and fetch failures before item-specific next steps. A graph relationship is evidence, not proof of working behavior, so every close candidate requires verification against current `main`, acceptance criteria, and the live product.
+`xref reconcile --repo owner/repo` searches open issues and pull requests up to the configured node limit, paginates seed discovery beyond GitHub's 100-item page, crawls reference-graph levels with bounded concurrency, and groups them into deterministic actions such as `verify-completed`, `close-superseded`, `resolve-competing`, `repair-closing-link`, and `keep-untracked`. Evidence is structured as `{ code, summary, related }` so agents can branch on stable reasons without parsing prose. Repository-keyed history reports action deltas even as the open seed set changes, including the transition to an empty backlog. It reports seed truncation, omitted references, and fetch failures before item-specific next steps. A graph relationship is evidence, not proof of working behavior, so every close candidate requires verification against current `main`, acceptance criteria, and the live product.
 
 The command never mutates GitHub. It saves repository history under `~/.xref/reconcile-owner-repo/` unless `--no-snapshot` is set. `xref schema` reports GitHub mutations and local writes separately so automated callers can enforce their own state boundary.
 

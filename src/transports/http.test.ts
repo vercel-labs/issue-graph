@@ -83,6 +83,22 @@ describe("httpTransport", () => {
     ]);
   });
 
+  test("search follows pagination", async () => {
+    const first = Array.from({ length: 100 }, (_, index) => ({
+      number: index + 1,
+      repository_url: "https://api.github.com/repos/o/r",
+    }));
+    const second = Array.from({ length: 20 }, (_, index) => ({
+      number: index + 101,
+      repository_url: "https://api.github.com/repos/o/r",
+    }));
+    const { calls } = scriptFetch([ok({ items: first }), ok({ items: second })]);
+    const result = await httpTransport({ token: "x" }).search("repo:o/r is:open", 120);
+    expect(result).toHaveLength(120);
+    expect(calls[0].url).toContain("page=1");
+    expect(calls[1].url).toContain("page=2");
+  });
+
   test("resolves a function token per request", async () => {
     scriptFetch([ok({ data: 1 })]);
     let resolved = 0;
