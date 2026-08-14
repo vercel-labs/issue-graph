@@ -231,4 +231,4 @@ bun run scripts/verify-transports.ts <number> <owner/repo> <depth>
 
 ## License
 
-MIT
+Apache-2.0

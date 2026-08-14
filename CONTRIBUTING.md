@@ -2,6 +2,9 @@
 
 Issues and focused pull requests are welcome.
 
+Unless explicitly stated otherwise, contributions submitted for inclusion in
+this project are licensed under Apache-2.0.
+
 ## Setup
 
 ```bash
