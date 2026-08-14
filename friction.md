@@ -1,5 +1,11 @@
 # Friction
 
+## 2026-08-14 · reconciliation scale
+
+- GitHub search pages cap at 100 items and search results cap at 1000. Reconciliation now paginates to the requested node limit and refuses larger values instead of implying complete coverage.
+- Shell transport used synchronous child processes, so the crawl's apparent parallelism was serial in CLI usage. Node requests now use async child processes and a configurable bounded worker pool.
+- Default concurrency is 4. The CLI accepts 1 through 32, while the HTTP transport retains its own secondary-rate-limit gate.
+
 - The CLI has no command-level schema and graph mode always prints Markdown. Reconciliation needs a stable machine contract without changing legacy output.
 - Graph evidence can nominate completed or superseded candidates, but it cannot prove code or live behavior. Recommendations must require verification.
 - Repositories without labels still need useful cleanup. Reconciliation should derive state from the live reference graph instead of requiring taxonomy.

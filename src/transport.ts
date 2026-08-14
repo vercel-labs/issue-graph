@@ -15,6 +15,21 @@ export interface SeedRef {
   number: number;
 }
 
+export async function paginate<T>(
+  limit: number,
+  fetchPage: (page: number, perPage: number) => Promise<T[]>,
+): Promise<T[]> {
+  const target = Math.max(0, Math.min(Math.floor(limit), 1000));
+  const results: T[] = [];
+  for (let page = 1; results.length < target; page++) {
+    const perPage = Math.min(100, target - results.length);
+    const items = await fetchPage(page, perPage);
+    results.push(...items.slice(0, perPage));
+    if (items.length < perPage) break;
+  }
+  return results.slice(0, target);
+}
+
 export interface GhTransport {
   /**
    * Run a GraphQL query and return the raw `{data, errors}` envelope. The

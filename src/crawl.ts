@@ -1,6 +1,24 @@
 import type { FetchNode } from "./github.js";
 import type { CrawlOptions, CrawlResult, GraphNode, NodeKey, Seed } from "./types.js";
 
+export async function mapConcurrent<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let cursor = 0;
+  const limit = Math.max(1, Math.floor(concurrency) || 1);
+  const workers = Array.from({ length: Math.min(limit, values.length) }, async () => {
+    while (cursor < values.length) {
+      const index = cursor++;
+      results[index] = await mapper(values[index]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 /**
  * Breadth-first crawl from one or more seeds. Same-repo references recurse to
  * `maxDepth`; cross-repo references are fetched one hop and not expanded. Two
@@ -43,8 +61,8 @@ export async function crawl(
       admitted.push({ ...cur, key });
     }
 
-    const fetched = await Promise.all(
-      admitted.map((cur) => fetch(cur.owner, cur.repo, cur.number, cur.depth)),
+    const fetched = await mapConcurrent(admitted, opts.concurrency ?? 4, (cur) =>
+      fetch(cur.owner, cur.repo, cur.number, cur.depth),
     );
 
     const next: Array<Seed & { depth: number }> = [];

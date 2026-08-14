@@ -9,4 +9,10 @@ describe("XREF_SCHEMA", () => {
     ]);
     expect(XREF_SCHEMA.commands.schema.localWrites).toEqual([]);
   });
+
+  test("publishes bounded crawl limits", () => {
+    expect(XREF_SCHEMA.crawl.concurrency).toEqual({ default: 4, minimum: 1, maximum: 32 });
+    expect(XREF_SCHEMA.crawl.maxNodes.maximum).toBe(1000);
+    expect(XREF_SCHEMA.crawl.searchPageSize).toBe(100);
+  });
 });

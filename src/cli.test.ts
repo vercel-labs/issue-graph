@@ -28,11 +28,12 @@ describe("parseArgs", () => {
   });
 
   test("parses reconcile and its output format", () => {
-    const a = parseArgs(["reconcile", "--repo", "o/r", "--format", "json"]);
+    const a = parseArgs(["reconcile", "--repo", "o/r", "--format", "json", "--concurrency", "6"]);
     expect(a.command).toBe("reconcile");
     expect(a.repo).toBe("o/r");
     expect(a.seed).toBe("");
     expect(a.format).toBe("json");
+    expect(a.concurrency).toBe(6);
   });
 
   test("parses schema without treating it as a seed", () => {
@@ -56,5 +57,10 @@ describe("parseArgs", () => {
   test("an unknown flag is an error, not a seed", () => {
     expect(() => parseArgs(["--hlep"])).toThrow(UsageError);
     expect(() => parseArgs(["352", "--repo", "o/r", "--depht", "2"])).toThrow(UsageError);
+  });
+
+  test("rejects unsafe crawl limits", () => {
+    expect(() => parseArgs(["1", "--repo", "o/r", "--max-nodes", "1001"])).toThrow(UsageError);
+    expect(() => parseArgs(["1", "--repo", "o/r", "--concurrency", "0"])).toThrow(UsageError);
   });
 });

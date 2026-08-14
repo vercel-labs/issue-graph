@@ -29,6 +29,7 @@ const opts = (over: Partial<Parameters<typeof crawl>[1]> = {}) => ({
   maxDepth: 2,
   maxNodes: 80,
   hubThreshold: 12,
+  concurrency: 4,
   primaryRepo: { owner: "o", repo: "r" },
   ...over,
 });
@@ -77,6 +78,37 @@ describe("crawl", () => {
     const { nodes } = await crawl([{ owner: "o", repo: "r", number: 1 }], opts(), fetch);
     expect(nodes.has("other/x#9")).toBe(true); // fetched
     expect(nodes.has("other/x#10")).toBe(false); // not expanded
+  });
+
+  test("bounds node requests in flight", async () => {
+    let active = 0;
+    let peak = 0;
+    const fetch: FetchNode = async (owner, repo, number, depth) => {
+      active++;
+      peak = Math.max(peak, active);
+      await Bun.sleep(5);
+      active--;
+      return {
+        key: `${owner}/${repo}#${number}`,
+        owner,
+        repo,
+        number,
+        kind: "Issue",
+        title: String(number),
+        state: "OPEN",
+        url: "",
+        depth,
+        edges: [],
+        externalLinks: [],
+        fetched: true,
+      };
+    };
+    await crawl(
+      Array.from({ length: 9 }, (_, index) => ({ owner: "o", repo: "r", number: index + 1 })),
+      opts({ concurrency: 3 }),
+      fetch,
+    );
+    expect(peak).toBe(3);
   });
 });
 
