@@ -1,7 +1,7 @@
 ---
 name: xref
-description: Snapshot the reference graph of a GitHub PR or issue and trace every linked PR, cross-referenced issue, and mention across repos. Use before working an issue/PR to see its whole graph first (the review-full-pr-issue-graph rule); to reconcile an unlabeled backlog read-only; to find orphan, superseded, competing, or duplicate PRs; to see who mentioned or linked it; to survey a backlog by root-cause cluster; to rank a backlog by discussion heat (comments, participants, reactions, inbound links, time open) and pick the most impactful issue to fix next; to spot two PRs that touch the same files; to catch a PR that says "fixes #N" but won't auto-close; or to re-check what changed since the last snapshot. Trigger words include xref, reconcile backlog, clean backlog, map this PR/issue, trace references, what links to this, who mentioned this, find orphans, duplicate PRs, survey backlog, prioritize backlog, what to fix first, most impactful issues.
-compatibility: Requires the `xref` command on PATH. Not published to a registry: install from source with `gh repo clone vercel-labs/xref && cd xref && bun install && bun link` (repo is internal to the Vercel org). Also needs `gh` (authenticated), `bun`, and network access for the GitHub API. Snapshots persist under ~/.xref/. Clustering runs in the calling agent's context, or shells out to `claude`/`codex` with --cluster-run.
+description: Snapshot the reference graph of a GitHub PR or issue and trace every linked PR, cross-referenced issue, and mention across repos. Use before working on an issue or PR; to reconcile an unlabeled backlog read-only; to find orphan, superseded, competing, or duplicate PRs; to see who mentioned or linked it; to survey a backlog by root-cause cluster; to rank a backlog by discussion heat and pick the most impactful issue to fix next; to spot two PRs that touch the same files; to catch a PR that says "fixes #N" but will not auto-close; or to re-check what changed since the last snapshot. Trigger words include xref, reconcile backlog, clean backlog, map this PR or issue, trace references, what links to this, who mentioned this, find orphans, duplicate PRs, survey backlog, prioritize backlog, what to fix first, and most impactful issues.
+compatibility: Requires the `xref` command on PATH. Install from source with `gh repo clone vercel-labs/xref && cd xref && bun install --frozen-lockfile && bun link`. Also needs an authenticated `gh`, Bun, and network access to the GitHub API. Snapshots persist under ~/.xref/. Clustering runs in the calling agent's context, or shells out to `claude` or `codex` with `--cluster-run`.
 ---
 
 # xref
@@ -89,7 +89,7 @@ If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limit
 
 ## Guardrails
 
-- Report the graph to the user; they act on it. Never post a comment, review, or edit to GitHub (the no-public-github-comments rule).
+- Report the graph to the user. Never post a comment, review, edit, or other mutation to GitHub.
 - A merged relationship is not behavioral proof. Never close an issue from `verify-completed` without checking current code and behavior.
 - Before opening a PR for an issue, run xref on it first: an existing open PR, a superseded one, or a file-overlap pair means the work may already be done — coordinate and credit instead of duplicating.
 - Cross-repo refs are fetched one hop and shown; external non-GitHub links are collected, with loopback/example/CI hosts filtered as noise.

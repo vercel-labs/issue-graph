@@ -22,7 +22,7 @@ export function parseSeed(input: string, repoFlag?: string): Seed {
 
 /**
  * A URL that describes the bug (loopback, localhost, example, private range,
- * tailnet placeholder, CI/preview, a test fixture host) rather than a resource
+ * tailnet placeholder, or a test fixture host) rather than a resource
  * worth tracing. Kept out of the orphan checklist.
  */
 export function isNoiseUrl(raw: string): boolean {
@@ -37,7 +37,6 @@ export function isNoiseUrl(raw: string): boolean {
   if (/^127\.|^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
   if (/(^|\.)example\.(com|org|net)$/.test(host) || host.endsWith(".example")) return true;
   if (host.endsWith(".ts.net")) return true;
-  if (/(^|\.)vercel\.(com|dev|live|link|app)$/.test(host)) return true;
   if (/^(a|b|other-page|admin\.example)\.com$/.test(host)) return true;
   if (/(^|\.)(httpbin\.org|speed\.cloudflare\.com|catbox\.moe)$/.test(host)) return true;
   if (raw.endsWith(".svg") || raw.endsWith(".css") || raw.endsWith(".gif")) return true;

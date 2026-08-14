@@ -48,7 +48,6 @@ describe("isNoiseUrl", () => {
     "https://admin.example.com",
     "https://a.com",
     "https://httpbin.org/get",
-    "https://portless-git-fix.vercel.app",
     "https://vercel.com/x/status/ready.svg",
   ])("treats %s as noise", (u) => {
     expect(isNoiseUrl(u)).toBe(true);
@@ -58,6 +57,8 @@ describe("isNoiseUrl", () => {
     "https://nodejs.org/api/dns.html",
     "https://cursor.com",
     "https://tailscale.com/kb/funnel",
+    "https://project.vercel.app",
+    "https://vercel.com/docs",
   ])("keeps %s", (u) => {
     expect(isNoiseUrl(u)).toBe(false);
   });

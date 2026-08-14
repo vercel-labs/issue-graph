@@ -262,6 +262,9 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .cleanup-pill{margin-top:8px;width:100%;height:36px;border:1px solid var(--warn-fg);border-radius:var(--radius);background:var(--warn-bg);color:var(--warn-fg);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;text-align:left;padding:0 12px}
 .cleanup-pill:hover,.cleanup-pill.active{background:var(--warn-fg);color:#fff}
 .cleanup-pill.active .muted{color:#fff}
+.view-toggle{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:12px;padding:3px;background:var(--bg2);border:1px solid var(--border);border-radius:9px}
+.view-btn{height:30px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer}
+.view-btn:hover{color:var(--fg)}.view-btn.active{background:var(--bg);color:var(--fg);box-shadow:var(--shadow)}
 .cleanlist{display:flex;flex-direction:column;gap:2px;margin-top:12px}
 .clean{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)}
 .clean input{margin-top:3px;flex-shrink:0}
@@ -302,6 +305,41 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 svg .lbl{font-family:var(--mono);font-size:10px;fill:var(--fg)}
 svg .center{font-weight:600}
+.impact{max-width:1120px;margin:0 auto}
+.impact-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:20px}
+.impact-head h1{font-size:22px;letter-spacing:-.02em;margin:0 0 4px}
+.impact-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.impact-card{position:relative;min-width:0;min-height:150px;padding:14px;border:1px solid var(--border2);border-radius:var(--radius-md);background:var(--bg);color:var(--fg);text-align:left;font-family:var(--sans);cursor:pointer;overflow:hidden;transition:opacity .2s ease,border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+.impact-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.impact-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent),0 12px 32px rgba(0,107,255,.14)}
+.impact-card.affected{border-color:var(--warn-fg);background:var(--warn-bg);animation:impact-pulse .55s ease both}
+.impact-card.dim{opacity:.28}
+.impact-card.selected::after{content:"";position:absolute;inset:50%;border-radius:999px;border:2px solid var(--accent);animation:impact-burst .65s ease-out both;pointer-events:none}
+.impact-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.impact-num{font-family:var(--mono);font-size:32px;font-weight:600;line-height:1;letter-spacing:-.05em;color:var(--accent)}
+.impact-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+.impact-key{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.impact-title{font-size:13px;font-weight:500;line-height:18px;margin-top:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.impact-meta{font-size:11px;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.impact-group{font-size:10px;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.impact-panel{position:relative;padding:18px;margin-bottom:18px;border:1px solid var(--accent);border-radius:var(--radius-md);background:color-mix(in srgb,var(--accent) 5%,var(--bg));overflow:hidden}
+.impact-panel h2{font-size:18px;margin:0 0 4px}
+.impact-panel-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.impact-total{font-family:var(--mono);font-size:34px;font-weight:600;color:var(--accent);line-height:1}
+.impact-total-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:right}
+.impact-breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px}
+.impact-bucket{padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)}
+.impact-bucket strong{display:block;font-family:var(--mono);font-size:18px}
+.impact-bucket span{font-size:11px;color:var(--muted)}
+.impact-links{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.impact-link{border:1px solid var(--border2);border-radius:999px;background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:11px;padding:4px 8px;cursor:pointer}
+.impact-link:hover{border-color:var(--accent);color:var(--accent)}
+.impact-actions{display:flex;gap:8px;margin-top:14px}
+.impact-action{height:32px;padding:0 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer}
+.impact-action:hover{border-color:var(--accent);color:var(--accent)}
+@keyframes impact-pulse{0%{transform:scale(.94);box-shadow:0 0 0 0 color-mix(in srgb,var(--warn-fg) 45%,transparent)}70%{transform:scale(1.025);box-shadow:0 0 0 9px transparent}100%{transform:scale(1)}}
+@keyframes impact-burst{0%{inset:50%;opacity:.8}100%{inset:-55%;opacity:0}}
+@media(max-width:820px){.impact-head{flex-direction:column}.impact-breakdown{grid-template-columns:1fr 1fr}.main{padding:24px 16px 60px}}
 `;
 
 const APP = `
@@ -312,6 +350,8 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const short=k=>{const n=String(k).split('#')[1];return n?'#'+n:k};
 const tone=s=>s==='OPEN'?'open':s==='MERGED'?'merged':s==='CLOSED'?'closed':'muted';
 let sel=null;
+let view='explore';
+let impactSel=null;
 
 function sidebar(){
   const s=DATA.stats;
@@ -335,6 +375,7 @@ function sidebar(){
   return '<div class="side"><div class="side-top">'+
     '<div class="brand"><span class="logo">◆</span> xref <span class="muted">· '+esc(DATA.repo)+'</span></div>'+
     '<div class="tiles">'+tiles.map(t=>'<div class="tile"><div class="tile-n '+t[2]+'">'+t[1]+'</div><div class="tile-l">'+t[0]+'</div></div>').join('')+'</div>'+
+    '<div class="view-toggle"><button class="view-btn active" id="explore-view">Explore</button><button class="view-btn" id="impact-view">Impact</button></div>'+
     '<input class="filter" id="filter" placeholder="Filter by #, title, author…"/>'+cleanupBtn+'</div>'+
     '<div class="tree">'+groups+'</div></div>';
 }
@@ -409,6 +450,7 @@ function inspector(k){
 }
 
 function cleanupView(){
+  setView('explore');
   const items=DATA.cleanup.map(c=>{
     const link=c.key&&N[c.key]?' <a class="rellink" data-key="'+esc(c.key)+'">'+short(c.key)+'</a>':(c.key?' '+esc(short(c.key)):'');
     return '<label class="clean"><input type="checkbox"/><span>'+esc(c.text)+link+'</span></label>';
@@ -420,10 +462,133 @@ function cleanupView(){
   const cb=document.getElementById('cleanup-btn');if(cb)cb.classList.add('active');
   location.hash='cleanup';sel='cleanup';
 }
-function select(k){sel=k;location.hash=encodeURIComponent(k);const cb=document.getElementById('cleanup-btn');if(cb)cb.classList.remove('active');inspector(k);}
+function select(k){setView('explore');sel=k;location.hash=encodeURIComponent(k);const cb=document.getElementById('cleanup-btn');if(cb)cb.classList.remove('active');inspector(k);}
+
+function neighbors(k){
+  const n=N[k],out=new Set();
+  if(!n)return out;
+  n.out.forEach(e=>{if(N[e.to])out.add(e.to)});
+  n.in.forEach(e=>{if(N[e.from])out.add(e.from)});
+  n.overlaps.forEach(o=>{if(N[o.with])out.add(o.with)});
+  return out;
+}
+
+function blastRadius(k){
+  const n=N[k];
+  const raw={resolves:new Set(),prs:new Set(),overlaps:new Set(),followups:new Set(),related:new Set()};
+  if(!n)return {...raw,keys:[],total:0,issues:0,prCount:0};
+
+  if(n.kind==='PullRequest'){
+    for(const e of n.out){
+      if(e.via!=='closes'||!N[e.to])continue;
+      raw.resolves.add(e.to);
+      for(const incoming of N[e.to].in){
+        if(incoming.via==='closes'&&incoming.from!==k&&N[incoming.from]?.state==='OPEN')raw.prs.add(incoming.from);
+      }
+    }
+    n.overlaps.forEach(o=>{if(N[o.with]?.state==='OPEN')raw.overlaps.add(o.with)});
+  }else if(n.kind==='Issue'){
+    for(const incoming of n.in){
+      if(incoming.via==='closes'&&N[incoming.from]?.state==='OPEN')raw.prs.add(incoming.from);
+    }
+    for(const pr of raw.prs){
+      N[pr].overlaps.forEach(o=>{if(N[o.with]?.state==='OPEN')raw.overlaps.add(o.with)});
+    }
+  }
+
+  for(const linked of neighbors(k)){
+    const target=N[linked];
+    if(!target||target.state!=='OPEN')continue;
+    if(target.kind==='Issue')raw.followups.add(linked);
+    else if(target.kind==='PullRequest'&&/^POSSIBLY SUPERSEDED|^SUPERSEDED/.test(target.verdict||''))raw.prs.add(linked);
+    else raw.related.add(linked);
+  }
+
+  const seen=new Set([k]);
+  const ordered=['resolves','prs','overlaps','followups','related'];
+  for(const bucket of ordered){
+    for(const key of [...raw[bucket]]){
+      if(seen.has(key))raw[bucket].delete(key);else seen.add(key);
+    }
+  }
+  const keys=[...seen].filter(x=>x!==k);
+  const issues=keys.filter(x=>N[x]?.kind==='Issue').length;
+  const prCount=keys.filter(x=>N[x]?.kind==='PullRequest').length;
+  return {...raw,keys,total:keys.length,issues,prCount};
+}
+
+function groupLabels(){
+  const labels={};
+  DATA.groups.forEach(g=>g.members.forEach(k=>{labels[k]=g.label}));
+  return labels;
+}
+
+function impactCard(k,rank,active){
+  const n=N[k],blast=blastRadius(k),labels=groupLabels();
+  const affected=active&&blastRadius(active).keys.includes(k);
+  const cls=active===k?'selected':affected?'affected':active?'dim':'';
+  const delay=affected?' style="animation-delay:'+Math.min(rank*24,240)+'ms"':'';
+  return '<button class="impact-card '+cls+'" data-impact="'+esc(k)+'"'+delay+'>'+
+    '<div class="impact-top"><div><div class="impact-num">'+blast.total+'</div><div class="impact-label">nodes affected</div></div>'+
+    '<span class="impact-key">'+short(k)+'</span></div>'+
+    '<div class="impact-title">'+esc(n.title||'(no title)')+'</div>'+
+    '<div class="impact-meta">'+blast.issues+' issue'+(blast.issues===1?'':'s')+' · '+blast.prCount+' PR'+(blast.prCount===1?'':'s')+'</div>'+
+    '<div class="impact-group">'+esc(labels[k]||'Ungrouped')+'</div></button>';
+}
+
+function bucket(label,set){
+  return '<div class="impact-bucket"><strong>'+set.size+'</strong><span>'+label+'</span></div>';
+}
+
+function impactPanel(k){
+  if(!k||!N[k])return '';
+  const n=N[k],blast=blastRadius(k);
+  const links=blast.keys.map(x=>'<button class="impact-link" data-open-impact="'+esc(x)+'">'+short(x)+'</button>').join('');
+  return '<div class="impact-panel"><div class="impact-panel-top"><div><h2>'+short(k)+' · '+esc(n.title)+'</h2>'+
+    '<div class="muted">Projected blast radius if this '+(n.kind==='PullRequest'?'PR ships':'issue is resolved')+'. Derived from the current reference graph and shared files.</div></div>'+
+    '<div><div class="impact-total">'+blast.total+'</div><div class="impact-total-label">affected nodes</div></div></div>'+
+    '<div class="impact-breakdown">'+bucket('issues resolved',blast.resolves)+bucket('PRs to reconcile',blast.prs)+
+    bucket('overlaps affected',blast.overlaps)+bucket('follow-ups touched',blast.followups)+'</div>'+
+    (links?'<div class="impact-links">'+links+'</div>':'<div class="muted" style="margin-top:14px">No downstream effect is visible in this snapshot.</div>')+
+    '<div class="impact-actions"><button class="impact-action" id="inspect-impact">Inspect evidence</button><button class="impact-action" id="clear-impact">Clear selection</button></div></div>';
+}
+
+function impactView(k){
+  if(k!==undefined)impactSel=k;
+  setView('impact');
+  const candidates=Object.keys(N).filter(key=>N[key].state==='OPEN').sort((a,b)=>{
+    const x=blastRadius(a),y=blastRadius(b);
+    return y.total-x.total||y.resolves.size-x.resolves.size||y.prs.size-x.prs.size||a.localeCompare(b);
+  });
+  const cards=candidates.map((key,i)=>impactCard(key,i,impactSel)).join('');
+  app.querySelector('.main').innerHTML='<div class="impact">'+
+    '<div class="impact-head"><div><h1>Impact</h1><div class="muted">Click a node to simulate its blast radius. Highest leverage appears first.</div></div>'+
+    '<span class="badge b-muted">projection, not proof</span></div>'+
+    impactPanel(impactSel)+'<div class="impact-grid">'+cards+'</div></div>';
+  for(const b of app.querySelectorAll('.item'))b.classList.remove('sel');
+  const cb=document.getElementById('cleanup-btn');if(cb)cb.classList.remove('active');
+  for(const b of app.querySelectorAll('.impact-card'))b.onclick=()=>impactView(b.dataset.impact);
+  for(const b of app.querySelectorAll('[data-open-impact]'))b.onclick=()=>select(b.dataset.openImpact);
+  const inspect=document.getElementById('inspect-impact');if(inspect)inspect.onclick=()=>select(impactSel);
+  const clear=document.getElementById('clear-impact');if(clear)clear.onclick=()=>{impactSel=null;impactView()};
+  location.hash=impactSel?'impact:'+encodeURIComponent(impactSel):'impact';sel='impact';
+}
+
+function setView(next){
+  view=next;
+  const explore=document.getElementById('explore-view'),impact=document.getElementById('impact-view');
+  if(explore)explore.classList.toggle('active',view==='explore');
+  if(impact)impact.classList.toggle('active',view==='impact');
+}
 
 function wire(){
   const cb=document.getElementById('cleanup-btn');if(cb)cb.onclick=cleanupView;
+  document.getElementById('explore-view').onclick=()=>{
+    if(sel&&sel!=='impact'&&sel!=='cleanup'&&N[sel])select(sel);
+    else if(DATA.cleanup.length)cleanupView();
+    else{setView('explore');app.querySelector('.main').innerHTML='<div class="empty">Select a node to inspect its relationships</div>';location.hash=''}
+  };
+  document.getElementById('impact-view').onclick=()=>impactView();
   for(const b of app.querySelectorAll('.item'))b.onclick=()=>select(b.dataset.key);
   app.addEventListener('click',e=>{const r=e.target.closest('.rellink');if(r&&r.dataset.key){e.preventDefault();
     const g=[...app.querySelectorAll('.grp')].find(d=>[...d.querySelectorAll('.item')].some(i=>i.dataset.key===r.dataset.key));
@@ -441,6 +606,8 @@ app.innerHTML='<div class="shell">'+sidebar()+'<div class="main"><div class="emp
 wire();
 const initial=decodeURIComponent(location.hash.slice(1));
 if(initial==='cleanup'&&DATA.cleanup.length)cleanupView();
+else if(initial==='impact')impactView();
+else if(initial.startsWith('impact:')&&N[initial.slice(7)])impactView(initial.slice(7));
 else if(initial&&N[initial])select(initial);
 else if(DATA.cleanup.length)cleanupView();
 `;

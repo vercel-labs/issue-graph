@@ -1,7 +1,9 @@
 {
   "name": "@vercel-labs/xref",
   "version": "0.6.0",
-  "description": "Snapshot and trace the full reference graph of a GitHub PR or issue — comments, linked PRs, cross-referenced issues, closing refs, and external links, recursively across repos.",
+  "private": true,
+  "description": "Map the complete reference graph around GitHub issues, pull requests, and repository backlogs.",
+  "packageManager": "bun@1.3.14",
   "type": "module",
   "bin": {
     "xref": "./src/cli.ts"
@@ -30,7 +32,7 @@
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
     "format": "biome format --write src",
-    "prepublishOnly": "bun run lint && bun run typecheck && bun test && bun run build"
+    "check": "bun run lint && bun run typecheck && bun test && bun run build"
   },
   "engines": {
     "node": ">=20"
@@ -49,7 +51,8 @@
     "issue",
     "reference-graph",
     "agent",
-    "triage"
+    "triage",
+    "software-factory"
   ],
   "license": "MIT",
   "repository": {
@@ -59,9 +62,6 @@
   "homepage": "https://github.com/vercel-labs/xref#readme",
   "bugs": {
     "url": "https://github.com/vercel-labs/xref/issues"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

@@ -51,6 +51,8 @@ describe("renderHtml", () => {
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain('id="data"');
     expect(html).toContain("o/r#2");
+    expect(html).toContain('id="impact-view"');
+    expect(html).toContain("Click a node to simulate its blast radius");
     // no raw </script> break-out from data
     expect(html.split('<script id="data"')[1].split("</script>")[0]).not.toContain("</script");
   });
@@ -73,5 +75,23 @@ describe("renderHtml", () => {
     const html = renderHtml(nodes, ["o/r#1"], "o/r");
     expect(html).not.toContain("<script>alert(1)");
     expect(html).toContain("\\u003cscript>alert(1)");
+  });
+
+  test("includes graph-derived impact projection behavior", () => {
+    const nodes = asMap([
+      node("o/r#1", { depth: 0 }),
+      node("o/r#2", {
+        kind: "PullRequest",
+        flags: ["claims to close o/r#1 but no closing link"],
+        edges: [{ to: "o/r#1", via: "cross-ref" }],
+        pr: meta(["src/a.ts"]),
+      }),
+    ]);
+    const html = renderHtml(nodes, ["o/r#1"], "o/r");
+    expect(html).toContain("function blastRadius(k)");
+    expect(html).toContain("function neighbors(k)");
+    expect(html).toContain("issues resolved");
+    expect(html).toContain("PRs to reconcile");
+    expect(html).toContain("projection, not proof");
   });
 });
