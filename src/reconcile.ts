@@ -32,6 +32,16 @@ export interface ReconcileEvidence {
   related: NodeKey[];
 }
 
+export type ReconcileCoverageChange = "first-run" | "unchanged" | "regressed" | "recovered";
+
+export interface ReconcileHistory {
+  previousGeneratedAt: string | null;
+  added: Array<{ key: NodeKey; action: ReconcileAction }>;
+  changed: Array<{ key: NodeKey; from: ReconcileAction; to: ReconcileAction }>;
+  resolved: Array<{ key: NodeKey; previousAction: ReconcileAction }>;
+  coverageChange: ReconcileCoverageChange;
+}
+
 export interface ReconcileItem {
   key: NodeKey;
   kind: "Issue" | "PullRequest";
@@ -62,6 +72,7 @@ export interface ReconcileReport {
     fetchFailures: NodeKey[];
     cappedOut: NodeKey[];
   };
+  history: ReconcileHistory;
   nextSteps: string[];
 }
 
@@ -443,6 +454,13 @@ export function buildReconcileReport(
       fetchFailures,
       cappedOut,
     },
+    history: {
+      previousGeneratedAt: null,
+      added: [],
+      changed: [],
+      resolved: [],
+      coverageChange: "first-run",
+    },
     nextSteps,
   };
 }
@@ -472,6 +490,29 @@ export function renderReconcile(report: ReconcileReport): string {
         out.push(`  - Evidence [${evidence.code}]: ${evidence.summary}`);
       }
       out.push(`  - Next: ${item.recommendedAction}`);
+    }
+  }
+  out.push("", "## Since previous reconciliation", "");
+  if (!report.history.previousGeneratedAt) {
+    out.push("- First repository reconciliation; no action deltas yet.");
+  } else {
+    out.push(`- Previous report: ${report.history.previousGeneratedAt}`);
+    out.push(`- Coverage: ${report.history.coverageChange}`);
+    if (
+      !report.history.added.length &&
+      !report.history.changed.length &&
+      !report.history.resolved.length
+    ) {
+      out.push("- No action changes.");
+    }
+    for (const item of report.history.added) {
+      out.push(`- New: ${item.key} → ${item.action}`);
+    }
+    for (const item of report.history.changed) {
+      out.push(`- Changed: ${item.key} ${item.from} → ${item.to}`);
+    }
+    for (const item of report.history.resolved) {
+      out.push(`- Resolved: ${item.key} was ${item.previousAction}`);
     }
   }
   out.push("", "## Guardrail", "", ...report.nextSteps.map((step) => `- ${step}`));

@@ -12,11 +12,16 @@ import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
 import { XREF_SCHEMA } from "./schema.js";
 import {
+  diffReconcileSnapshots,
   diffSnapshots,
   listSnapshots,
+  readReconcileSnapshot,
   readSnapshot,
+  reconcileSnapshotDir,
   snapshotDir,
+  toReconcileSnapshot,
   toSnapshot,
+  writeReconcileSnapshot,
   writeSnapshot,
 } from "./snapshot.js";
 import type { GhTransport } from "./transport.js";
@@ -204,12 +209,17 @@ async function main(): Promise<void> {
       nodeCap: args.maxNodes,
       cappedOut,
     });
+    const dir = reconcileSnapshotDir(primary.owner, primary.repo);
+    const previousFiles = listSnapshots(dir);
+    const previousFile = previousFiles.at(-1);
+    const previous = previousFile ? readReconcileSnapshot(`${dir}/${previousFile}`) : null;
+    const snapshot = toReconcileSnapshot(report);
+    if (previous) report.history = diffReconcileSnapshots(previous, snapshot);
     const format =
       args.format === "auto" ? (process.stdout.isTTY ? "markdown" : "json") : args.format;
     console.log(format === "json" ? JSON.stringify(report, null, 2) : renderReconcile(report));
-    if (!args.noSnapshot && seeds.length) {
-      const dir = snapshotDir(primary.owner, primary.repo, seedKeys);
-      const file = writeSnapshot(dir, toSnapshot(nodes, report.generatedAt));
+    if (!args.noSnapshot) {
+      const file = writeReconcileSnapshot(dir, snapshot);
       process.stderr.write(`\nsnapshot saved: ${file}\n`);
     }
     return;

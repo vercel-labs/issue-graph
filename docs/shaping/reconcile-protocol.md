@@ -123,7 +123,7 @@ B1 is not part of A1-A3 because it changes snapshot identity and persistence sem
 | # | Slice | Requirements | Demo |
 | --- | --- | --- | --- |
 | V1 | Trustworthy agent protocol | R0-R7 | Pipe an empty and an actionable repository to JSON, branch on evidence codes, inspect contextual next steps, and confirm `--no-snapshot` writes nothing. |
-| V2 | Continuous repository radar | R8-R9 | Reconcile the same repo after its open set changes and see action transitions against the previous report. |
+| V2 | Continuous repository radar | R8-R9 | Reconcile the same repo after its open set changes and see action transitions against the previous report, including the transition to zero open items. |
 | V3 | Scale without semantic drift | R0-R9 | Reconcile a large backlog with complete pagination and bounded concurrency while preserving the same report contract. |
 
 ## Fit check

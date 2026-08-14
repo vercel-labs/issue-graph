@@ -182,5 +182,20 @@ describe("renderReconcile", () => {
     expect(markdown).toContain("## Untracked open issues");
     expect(markdown).toContain("Evidence [no-related-pr]");
     expect(markdown).toContain("Reproduce or inspect untracked issues");
+    expect(markdown).toContain("First repository reconciliation");
+  });
+
+  test("renders repository-level action deltas", () => {
+    const result = report([node("o/r#1", "Issue", "OPEN")]);
+    result.history = {
+      previousGeneratedAt: "2026-08-13T00:00:00.000Z",
+      added: [{ key: "o/r#1", action: "keep-untracked" }],
+      changed: [],
+      resolved: [{ key: "o/r#2", previousAction: "review-open-pr" }],
+      coverageChange: "unchanged",
+    };
+    const markdown = renderReconcile(result);
+    expect(markdown).toContain("New: o/r#1 → keep-untracked");
+    expect(markdown).toContain("Resolved: o/r#2 was review-open-pr");
   });
 });

@@ -49,7 +49,7 @@ Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan*
 
 ## Reconcile mode
 
-Use `xref reconcile --repo owner/repo --format json` when another tool or agent will consume the result. Add `--no-snapshot` when the caller must leave local state unchanged. The JSON carries `schemaVersion`, counts, ordered items, structured evidence, crawl limits, and contextual next steps. Each evidence object has a stable `code`, a human `summary`, and exact `related` node keys. Run `xref schema` before building a durable integration and inspect both `githubMutations` and `localWrites`.
+Use `xref reconcile --repo owner/repo --format json` when another tool or agent will consume the result. Add `--no-snapshot` when the caller must leave local state unchanged. The JSON carries `schemaVersion`, counts, ordered items, structured evidence, crawl limits, repository-level history, and contextual next steps. Each evidence object has a stable `code`, a human `summary`, and exact `related` node keys. `history` compares against the previous report for the same repository and exposes added, changed, and resolved actions plus coverage regression or recovery. Run `xref schema` before building a durable integration and inspect both `githubMutations` and `localWrites`.
 
 Treat its actions as a verification queue:
 
@@ -85,7 +85,7 @@ If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limit
 - **Derived triage.** Open PRs are marked superseded when they share a closing target with merged work, or possibly superseded when they are structurally linked to an issue closed by a later merged PR. `competing` (>1 open PR closes an issue) and `claims-close-no-link` (a `fixes #N` that won't auto-close) are computed and attached per node.
 - **Attribution.** Each node carries its author and who mentioned it; each edge carries the actor and date.
 - **State is fetched live per node** (OPEN/CLOSED/MERGED), never trusted from a cross-reference event, which can be stale.
-- **Snapshot + diff.** Every run persists to `~/.xref/` unless `--no-snapshot` is set; the next run over the same seeds diffs against the last one.
+- **Snapshot + diff.** Graph runs compare the same seeds. Reconcile runs compare the repository even when its open seed set changes, including a transition to zero open items. Incomplete coverage suppresses unsafe new or resolved claims. Every run persists to `~/.xref/` unless `--no-snapshot` is set.
 
 ## Guardrails
 
