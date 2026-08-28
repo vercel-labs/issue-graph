@@ -26,6 +26,7 @@ Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan*
    | "which PRs are duplicating each other" | `xref --seeds <n,n,n> --repo <o/r>` and read the overlap section |
    | "which issues have no PR" / "which have competing PRs" | `xref --label <label> --repo <o/r>` and read the orphan checklist and flags |
    | "clean/reconcile the whole backlog", including repos without labels | `xref reconcile --repo <o/r> --format markdown` |
+   | "what should happen next until the backlog is empty" | `xref plan --repo <o/r> --format markdown` |
    | "cluster my backlog by root cause" | `xref --seeds <n,n,n> --repo <o/r> --cluster` |
    | "what changed since last time" | re-run the same seeds; the snapshot diff is automatic |
 
@@ -64,6 +65,12 @@ Treat its actions as a verification queue:
 
 If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limits.fetchFailures` is non-empty, report the incomplete coverage. Increase `--max-nodes`, re-seed the omitted neighborhood, or retry failed nodes before claiming the backlog was fully reconciled.
 
+## Plan mode
+
+Use `xref plan --repo owner/repo --format json` when a human or agent needs the next safe backlog action. It returns a ready execution queue, an investigation queue, blocked work, a single `next` item when coverage permits, and a structured `decision` for its observed neighborhood. Competing pull requests include comparable draft, review, mergeability, diff, file-count, and update signals. A `reviewFirst` value orders inspection only; it never proves correctness or chooses the winning implementation. Failed neighbor references are quarantined to their affected items. The ordering is deterministic and uses reconcile action, PR readiness, discussion heat, and visible inbound references.
+
+The MVP does not infer semantic dependencies from issue prose. Treat `blockedBy` as visible graph evidence only, and re-run after each merge or closure.
+
 ## Flags
 
 - `--repo owner/repo` — required for bare numbers, `--seeds`, `--label`.
@@ -73,6 +80,7 @@ If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limit
 - `--prioritize` — rank open nodes by discussion heat (comments, participants, reactions, inbound refs, time open); the ranking is also always present in `--json` output as `priorities`.
 - `--cluster` emits the prompt for you; `--cluster-run claude|codex` shells out.
 - `reconcile --repo owner/repo` inventories the open backlog without labels; `--format auto|json|markdown` controls its versioned output.
+- `plan --repo owner/repo` turns that reconciliation into execution, investigation, and blocked queues without writing snapshots.
 - `--json out.json` writes the machine-readable graph (now includes `components` and `overlaps`); `--no-snapshot` skips persistence.
 - `--html out.html` writes a self-contained master–detail explorer (Geist-styled, no server — `open` it). `--clusters clusters.json` groups the explorer by agent-named clusters and pins a **Cleanup** checklist as the default view. The file is either `[{label, root_cause?, members:[{key, verdict?}]}]` or `{clusters:[…], cleanup:[{key?, text}]}` — the same shape the `--cluster` step produces, so feed your whole triage (clusters + the close/credit cleanup list) back into the UI.
 

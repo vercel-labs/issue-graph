@@ -16,6 +16,7 @@ export * from "./crawl.js";
 export * from "./github.js";
 export * from "./html.js";
 export * from "./overlaps.js";
+export * from "./plan.js";
 export * from "./priority.js";
 export * from "./reconcile.js";
 export * from "./refs.js";

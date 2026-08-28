@@ -36,6 +36,19 @@ describe("parseArgs", () => {
     expect(a.concurrency).toBe(6);
   });
 
+  test("parses plan as a repository backlog command", () => {
+    const a = parseArgs(["plan", "--repo", "o/r", "--format", "markdown"]);
+    expect(a.command).toBe("plan");
+    expect(a.repo).toBe("o/r");
+    expect(a.format).toBe("markdown");
+  });
+
+  test("rejects HTML output for plan", () => {
+    expect(() => parseArgs(["plan", "--repo", "o/r", "--html", "/tmp/plan.html"])).toThrow(
+      "plan does not support --html",
+    );
+  });
+
   test("parses schema without treating it as a seed", () => {
     const a = parseArgs(["schema"]);
     expect(a.command).toBe("schema");

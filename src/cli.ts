@@ -6,6 +6,7 @@ import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
 import { type ClustersConfig, renderHtml } from "./html.js";
 import { fileOverlaps } from "./overlaps.js";
+import { buildPlanReport, renderPlan } from "./plan.js";
 import { prioritize, renderPriority } from "./priority.js";
 import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
@@ -32,6 +33,7 @@ const USAGE = `usage: xref <url|number> --repo owner/repo [options]
        xref --seeds 1,2,3 --repo owner/repo [options]
        xref --label bug --repo owner/repo [options]
        xref reconcile --repo owner/repo [options]
+       xref plan --repo owner/repo [options]
        xref schema
 
   --repo owner/repo   required for a bare number, --seeds, or --label
@@ -48,14 +50,14 @@ const USAGE = `usage: xref <url|number> --repo owner/repo [options]
   --cluster           print a root-cause clustering prompt for your agent
   --cluster-run A     run that prompt through 'claude' or 'codex' instead
   --json PATH         write the machine-readable graph
-  --html PATH         write a self-contained HTML explorer
+  --html PATH         graph only: write a self-contained HTML explorer
   --clusters PATH     group the explorer by agent-named clusters
-  --format F          reconcile output: auto, json, or markdown (default auto)
+  --format F          reconcile/plan output: auto, json, or markdown (default auto)
   --no-snapshot       do not persist this run to ~/.xref/
   -h, --help          show this`;
 
 interface Args {
-  command: "graph" | "reconcile" | "schema";
+  command: "graph" | "reconcile" | "plan" | "schema";
   seed: string;
   repo: string;
   depth: number;
@@ -78,7 +80,8 @@ interface Args {
 export class UsageError extends Error {}
 
 export function parseArgs(argv: string[]): Args {
-  const command = argv[0] === "reconcile" || argv[0] === "schema" ? argv[0] : "graph";
+  const command =
+    argv[0] === "reconcile" || argv[0] === "plan" || argv[0] === "schema" ? argv[0] : "graph";
   const start = command === "graph" ? 0 : 1;
   const a: Args = {
     command,
@@ -136,6 +139,9 @@ export function parseArgs(argv: string[]): Args {
   if (!Number.isInteger(a.concurrency) || a.concurrency < 1 || a.concurrency > 32) {
     throw new UsageError("--concurrency must be an integer from 1 to 32");
   }
+  if (a.command === "plan" && a.htmlOut) {
+    throw new UsageError("plan does not support --html");
+  }
   return a;
 }
 
@@ -151,8 +157,8 @@ async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
     const [owner, repo] = a.repo.split("/");
     return a.seedsCsv.split(",").map((s) => ({ owner, repo, number: Number(s.trim()) }));
   }
-  if (a.command === "reconcile") {
-    if (!a.repo) throw new UsageError("reconcile needs --repo");
+  if (a.command === "reconcile" || a.command === "plan") {
+    if (!a.repo) throw new UsageError(`${a.command} needs --repo`);
     const [owner, repo] = a.repo.split("/");
     if (!owner || !repo) throw new UsageError("--repo must be owner/repo");
     const numbers = await openBacklogSeeds(transport, a.repo, Math.min(a.maxNodes, 1000));
@@ -179,7 +185,7 @@ async function main(): Promise<void> {
   }
   const transport = shellTransport();
   const seeds = await resolveSeeds(args, transport);
-  if (!seeds.length && args.command !== "reconcile") {
+  if (!seeds.length && args.command !== "reconcile" && args.command !== "plan") {
     console.error("no seeds resolved");
     process.exit(1);
   }
@@ -212,7 +218,7 @@ async function main(): Promise<void> {
   fillMentionedBy(nodes);
 
   const seedKeys = seeds.map((s) => `${s.owner}/${s.repo}#${s.number}`);
-  if (args.command === "reconcile") {
+  if (args.command === "reconcile" || args.command === "plan") {
     const report = buildReconcileReport(nodes, {
       repo: `${primary.owner}/${primary.repo}`,
       seeds: seedKeys,
@@ -220,18 +226,23 @@ async function main(): Promise<void> {
       nodeCap: args.maxNodes,
       cappedOut,
     });
-    const dir = reconcileSnapshotDir(primary.owner, primary.repo);
-    const previousFiles = listSnapshots(dir);
-    const previousFile = previousFiles.at(-1);
-    const previous = previousFile ? readReconcileSnapshot(`${dir}/${previousFile}`) : null;
-    const snapshot = toReconcileSnapshot(report);
-    if (previous) report.history = diffReconcileSnapshots(previous, snapshot);
     const format =
       args.format === "auto" ? (process.stdout.isTTY ? "markdown" : "json") : args.format;
-    console.log(format === "json" ? JSON.stringify(report, null, 2) : renderReconcile(report));
-    if (!args.noSnapshot) {
-      const file = writeReconcileSnapshot(dir, snapshot);
-      process.stderr.write(`\nsnapshot saved: ${file}\n`);
+    if (args.command === "plan") {
+      const plan = buildPlanReport(report, nodes, prioritize(nodes, new Date()));
+      console.log(format === "json" ? JSON.stringify(plan, null, 2) : renderPlan(plan));
+    } else {
+      const dir = reconcileSnapshotDir(primary.owner, primary.repo);
+      const previousFiles = listSnapshots(dir);
+      const previousFile = previousFiles.at(-1);
+      const previous = previousFile ? readReconcileSnapshot(`${dir}/${previousFile}`) : null;
+      const snapshot = toReconcileSnapshot(report);
+      if (previous) report.history = diffReconcileSnapshots(previous, snapshot);
+      console.log(format === "json" ? JSON.stringify(report, null, 2) : renderReconcile(report));
+      if (!args.noSnapshot) {
+        const file = writeReconcileSnapshot(dir, snapshot);
+        process.stderr.write(`\nsnapshot saved: ${file}\n`);
+      }
     }
     return;
   }
