@@ -7,6 +7,8 @@ describe("XREF_SCHEMA", () => {
     expect(XREF_SCHEMA.commands.reconcile.localWrites).toEqual([
       "~/.xref snapshots unless --no-snapshot is set",
     ]);
+    expect(XREF_SCHEMA.commands.plan.localWrites).toEqual([]);
+    expect(XREF_SCHEMA.commands.plan.formats).toEqual(["json", "markdown"]);
     expect(XREF_SCHEMA.commands.schema.localWrites).toEqual([]);
   });
 

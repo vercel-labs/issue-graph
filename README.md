@@ -64,6 +64,12 @@ Reconcile the whole open backlog, including repositories without labels:
 xref reconcile --repo owner/repo
 ```
 
+Turn that backlog into a deterministic next-action queue:
+
+```bash
+xref plan --repo owner/repo
+```
+
 Interactive terminals receive Markdown. Pipes and agents receive versioned JSON
 by default. Use `--format markdown|json` to choose explicitly, and `xref schema`
 to inspect the machine contract and local-write behavior.
@@ -117,6 +123,34 @@ criteria, and live behavior.
 The command never mutates GitHub. It saves local repository history under
 `~/.xref/reconcile-owner-repo/` unless `--no-snapshot` is set.
 
+## Plan the backlog
+
+`xref plan` reuses the live reconciliation and discussion signals to separate
+the backlog into:
+
+- a ready execution queue
+- an investigation queue for issues without enough evidence
+- blocked work such as draft or conflicting pull requests and issues with
+  active related work
+
+Cleanup and verification actions come before implementation review. Within
+each lane, xref uses readiness, discussion heat, and visible inbound references
+as deterministic sort keys. Missing open seeds or capped crawl neighborhoods
+make the queue provisional and suppress the single `next` recommendation.
+Failed neighbor references are quarantined to the affected items so unrelated
+work can still proceed.
+
+When the next action involves competing pull requests, the report includes a
+structured `decision` object. It labels each relationship, compares draft,
+review, mergeability, diff size, changed files, and update time, and may name a
+pull request to review first. That ordering is a review shortcut, not a claim
+that the pull request is correct or should win. Acceptance criteria and
+repository-specific behavior still require human or review-gate verification.
+
+The MVP does not infer product dependencies from prose. Its `blockedBy` entries
+come only from visible active GitHub relationships. Re-run the command after
+each merge or closure to refresh the queue.
+
 ## Built for software factories
 
 Use graph mode as a preflight before an agent plans or implements one issue:
@@ -129,6 +163,12 @@ Use reconcile mode for repository maintenance:
 
 ```bash
 xref reconcile --repo owner/repo --format json --no-snapshot
+```
+
+Use plan mode to select the next safe action:
+
+```bash
+xref plan --repo owner/repo --format json
 ```
 
 A factory can use the evidence to:

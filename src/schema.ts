@@ -30,6 +30,14 @@ export const XREF_SCHEMA = {
       description:
         "Inventory an open repository backlog and derive verification actions plus repository-level deltas.",
     },
+    plan: {
+      githubMutations: false,
+      localWrites: [],
+      outputSchemaVersion: 1,
+      formats: ["json", "markdown"],
+      description:
+        "Turn a live repository reconciliation into a deterministic execution, investigation, and blocked queue.",
+    },
     schema: {
       githubMutations: false,
       localWrites: [],
