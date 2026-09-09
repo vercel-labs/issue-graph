@@ -24,7 +24,7 @@ The protocol must expose stable actions, structured reasons, explicit coverage l
 - xref does not comment, label, close, approve, merge, or otherwise mutate GitHub.
 - xref does not decide product direction or replace human maintainer judgment.
 - xref does not claim a merged relationship proves correctness.
-- Organization-wide orchestration belongs to the caller.
+- Organization-wide orchestration belongs to the caller. Status can aggregate an explicit caller-supplied repository list; it does not discover organization scope.
 - A visual cockpit is optional and follows a trustworthy protocol, not the other way around.
 
 ## Current sequence

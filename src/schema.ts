@@ -38,6 +38,25 @@ export const XREF_SCHEMA = {
       description:
         "Turn a live repository reconciliation into a deterministic execution, investigation, and blocked queue.",
     },
+    status: {
+      githubMutations: false,
+      localWrites: [],
+      outputSchemaVersion: 1,
+      formats: ["table", "markdown", "json"],
+      views: ["authors", "projects", "prs"],
+      defaultView: "authors",
+      defaultFormat: { tty: "table", pipe: "json" },
+      required: ["--repo owner/repo (repeatable)", "--author login[,login] (repeatable)"],
+      pageSize: 50,
+      maxPages: { default: 100, minimum: 1, maximum: 1000 },
+      concurrency: { default: 4, minimum: 1, maximum: 32 },
+      exitCodes: { complete: 0, incompleteOrFailure: 1, usageError: 2 },
+      countShape: { count: "number | null", prIds: "string[]", unknownIds: "string[]" },
+      reviewStates: ["required", "changes-requested", "approved", "not-required", "unknown"],
+      jsonFlag: "--json emits the report on stdout; unlike graph --json PATH, takes no path",
+      description:
+        "Inventory explicit repositories and authors, with count provenance and incomplete coverage. Drafts, conflicts and assignment are independent of review state. No graph crawl or snapshots.",
+    },
     schema: {
       githubMutations: false,
       localWrites: [],

@@ -1,5 +1,17 @@
 # Friction
 
+## 2026-09-09 · deterministic status table
+
+- Contract origin is mixed: report/UX are defined here; GitHub PR metadata was verified live during the portfolio audit and is read through the existing transport. Scope and invariants are in `docs/shaping/status.md`.
+- Preserve source distribution and the runtime-agnostic library. No new dependencies, package metadata, registry configuration, or global skill installation are needed.
+- Cligentic live `detect`, `style`, and `banner` blocks were inspected. Detect/style are hybrid patterns: explicit CLI-injected TTY/NO_COLOR and padding before styling keep process/fs/os imports out of core. The stock detect block's FORCE_COLOR can override pipes and NO_JSON can override machine output, which conflicts with this contract. The banner wordmark is rejected in favor of a compact TTY-only progress heading on stderr. Mutation/audit/secret/job blocks are out: this command only reads GitHub.
+- Legacy graph `--json PATH` is published. It remains untouched; status has its own parser with boolean `--json` and `--format json`, with errors for conflicting formats or unexpected path operands.
+- The selected direction permits caller-supplied multi-repository aggregation, not organization enumeration. The earlier repository-scoped restriction still applies to graph/reconcile/plan.
+- Review decisions partition open PRs, while drafts, conflicts, and missing assignees overlap. Null GitHub reviewDecision is separate from missing metadata. Mergeability UNKNOWN must not look conflict-free.
+- Repository cursor pagination avoids the search ceiling. Assignment and reviewer connections are also paginated; caps, malformed responses, count drift, and inaccessible repositories are explicit coverage failures.
+- Default output prioritizes the table over verbose metadata. JSON keeps full evidence; the PR view exposes titles, heads, reviewer requests, and graph commands. Live timestamps describe a query window, not an atomic transaction.
+- Verification and implementation receipt will be recorded in `docs/shaping/status.md`. No commits, pushes, release changes, or GitHub mutations are part of this request.
+
 ## 2026-08-14 · reconciliation scale
 
 - GitHub search pages cap at 100 items and search results cap at 1000. Reconciliation now paginates to the requested node limit and refuses larger values instead of implying complete coverage.

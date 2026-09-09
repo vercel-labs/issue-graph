@@ -12,6 +12,18 @@ describe("XREF_SCHEMA", () => {
     expect(XREF_SCHEMA.commands.schema.localWrites).toEqual([]);
   });
 
+  test("publishes the read-only status surface and its uncertainty contract", () => {
+    const status = XREF_SCHEMA.commands.status;
+    expect(status.githubMutations).toBe(false);
+    expect(status.localWrites).toEqual([]);
+    expect(status.outputSchemaVersion).toBe(1);
+    expect(status.views).toEqual(["authors", "projects", "prs"]);
+    expect(status.formats).toEqual(["table", "markdown", "json"]);
+    expect(status.defaultFormat).toEqual({ tty: "table", pipe: "json" });
+    expect(status.exitCodes.incompleteOrFailure).toBe(1);
+    expect(status.countShape.count).toBe("number | null");
+  });
+
   test("publishes bounded crawl limits", () => {
     expect(XREF_SCHEMA.crawl.concurrency).toEqual({ default: 4, minimum: 1, maximum: 32 });
     expect(XREF_SCHEMA.crawl.maxNodes.maximum).toBe(1000);

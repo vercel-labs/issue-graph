@@ -48,6 +48,25 @@ Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan*
 
 7. **Report what changed.** If a "Since last snapshot" diff is present, relay the new nodes, state changes, and new mentions/links with who made them.
 
+## Status mode
+
+Use `xref status` for counts of open PRs by explicit repository and author, not graph discovery or prioritization. Do not reconstruct these counts through ad hoc queries when this command is available.
+
+```bash
+xref status --repo vercel-labs/agent-browser --repo vercel-labs/wterm --author ctate,Railly
+xref status --repo vercel-labs/agent-browser --author ctate,Railly --view projects
+xref status --repo vercel-labs/agent-browser --author ctate --view prs
+xref status --repo vercel-labs/agent-browser --author ctate,Railly --json
+```
+
+The default author view retains zero rows. `projects` summarizes each repository; `prs` provides titles, URLs, exact heads, assignees, reviewer requests, and runnable graph commands. Repeated `--repo` and repeated/comma-separated `--author` define scope; matching is case-insensitive. Never silently widen that scope to an organization.
+
+TTY output is a table, pipes default to versioned JSON. `--format table|markdown|json` overrides it. In status only, `--json` is boolean and does not write a file. Legacy graph `--json PATH` is unchanged. `NO_COLOR` disables styling. Status does not write snapshots or mutate GitHub; `--no-snapshot` is an accepted no-op.
+
+Every metric includes `count`, `prIds`, and `unknownIds`. Null counts and `?` mean unknown; known IDs can be lower bounds. Check `coverageComplete` and per-repository `coverage` before claiming complete totals. Exit 1 means incomplete/runtime failure, not an empty backlog; exit 2 means usage error. Complete sibling repositories remain useful after another repository fails. Review states partition open PRs; drafts, conflicts, and unassigned are overlapping flags. Approval is not merge readiness. Unknown mergeability is not conflict-free. This version does not inspect CI checks or bot review threads.
+
+Pagination uses PR connections rather than the search ceiling. Defaults: 50 PRs per page, 100 pages per connection, 4 concurrent repositories. `--max-pages 1..1000` and `--concurrency 1..32` bound work; caps and detectable pagination drift appear as incomplete coverage. Assignee/reviewer connections are also paginated. Treat timestamps as a query window, not an atomic snapshot.
+
 ## Reconcile mode
 
 Use `xref reconcile --repo owner/repo --format json` when another tool or agent will consume the result. Add `--no-snapshot` when the caller must leave local state unchanged. The JSON carries `schemaVersion`, counts, ordered items, structured evidence, crawl limits, repository-level history, and contextual next steps. Each evidence object has a stable `code`, a human `summary`, and exact `related` node keys. `history` compares against the previous report for the same repository and exposes added, changed, and resolved actions plus coverage regression or recovery. Run `xref schema` before building a durable integration and inspect both `githubMutations` and `localWrites`.

@@ -22,5 +22,7 @@ export * from "./reconcile.js";
 export * from "./refs.js";
 export * from "./render.js";
 export * from "./schema.js";
+export * from "./status.js";
+export * from "./status-render.js";
 export * from "./transport.js";
 export * from "./types.js";

@@ -81,6 +81,39 @@ xref 260 --repo owner/repo --json graph.json --html graph.html
 open graph.html
 ```
 
+## PR status by author and project
+
+Count open PRs without a graph crawl:
+
+```bash
+xref status \
+  --repo vercel-labs/agent-browser \
+  --repo vercel-labs/wterm \
+  --repo vercel-labs/portless \
+  --repo vercel-labs/emulate \
+  --repo vercel-labs/json-render \
+  --author ctate,Railly
+```
+
+The default human view groups rows by repository and author, including zero rows. Use `--view projects` for project totals and per-author open counts, or `--view prs` for the underlying PRs, titles, URLs, heads, assignees, and requested reviewers. Filter by supplying fewer repositories or authors. Author matching and scope deduplication are case-insensitive.
+
+```bash
+xref status --repo vercel-labs/agent-browser --author ctate,Railly --view projects
+xref status --repo vercel-labs/agent-browser --author ctate --view prs
+xref status --repo vercel-labs/agent-browser --author ctate,Railly --format markdown
+xref status --repo vercel-labs/agent-browser --author ctate,Railly --json
+```
+
+TTY output defaults to an aligned table, with narrow-terminal fallback and `NO_COLOR` support. Piped output defaults to JSON; `--format table|markdown|json` overrides it. Progress and the TTY heading go to stderr. In **status only**, `--json` takes no filename and prints JSON on stdout; graph's existing `--json PATH` still writes a file.
+
+Review-required, changes-requested, approved, no-review-required, and unknown review states partition open PRs. Drafts, conflicts, and unassigned PRs are independent indicators. Approval is not a promise of merge readiness. The command does not infer organization membership from authors or read CI checks or coding-review threads.
+
+Status paginates repository PR connections directly, not search results. `--concurrency` bounds concurrent repositories (default 4, maximum 32). `--max-pages` bounds each connection (default 100, maximum 1000; 50 PRs per repository page). Assignees and review requests are also paginated. Caps, access failures, malformed responses, and detectable inventory drift are reported explicitly.
+
+JSON schema version 1 includes scope, query timestamps, per-repository coverage, PR evidence, author rows, project rows, totals, and runnable next steps. Each metric carries `{ count, prIds, unknownIds }`: `count: null` means unknown, while `prIds` retains known matches as a lower bound. Human views display `?`, never a fabricated zero. Failed repositories invalidate their own aggregate counts and portfolio totals, not complete sibling repositories. The query window is not an atomic GitHub snapshot.
+
+Exit codes: 0 for complete inventory, 1 for incomplete inventory/runtime failures, 2 for invalid arguments. Status never mutates GitHub or writes snapshots; `--no-snapshot` is accepted as a no-op. The same captured evidence produces the same ordering and aggregation without a model. See [the contract](docs/shaping/status.md).
+
 ## What it finds
 
 - Text mentions in issue and pull request bodies and comments

@@ -25,6 +25,7 @@ import {
   writeReconcileSnapshot,
   writeSnapshot,
 } from "./snapshot.js";
+import { runStatus, StatusUsageError } from "./status-cli.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
 import type { NodeKey, Seed } from "./types.js";
@@ -34,8 +35,10 @@ const USAGE = `usage: xref <url|number> --repo owner/repo [options]
        xref --label bug --repo owner/repo [options]
        xref reconcile --repo owner/repo [options]
        xref plan --repo owner/repo [options]
+       xref status --repo owner/repo --author login[,login] [options]
        xref schema
 
+  status --help      PR counts by author/project and an evidence ledger
   --repo owner/repo   required for a bare number, --seeds, or --label
   --depth N           same-repo recursion depth (default 2); cross-repo refs
                       are fetched one hop and not expanded
@@ -172,6 +175,17 @@ async function main(): Promise<void> {
   if (!argv.length) {
     console.error(USAGE);
     process.exitCode = 2;
+    return;
+  }
+  if (argv[0] === "status") {
+    process.exitCode = await runStatus(argv.slice(1), shellTransport(), {
+      isTTY: Boolean(process.stdout.isTTY),
+      noColor: process.env.NO_COLOR !== undefined,
+      ci: Boolean(process.env.CI),
+      width: process.stdout.columns,
+      stdout: (value) => process.stdout.write(value),
+      stderr: (value) => process.stderr.write(value),
+    });
     return;
   }
   const args = parseArgs(argv);
@@ -346,6 +360,6 @@ if (import.meta.main) {
     // A transport failure must not look like an empty backlog: exit non-zero so
     // a scripted caller notices.
     console.error(err instanceof Error ? err.message : String(err));
-    process.exit(err instanceof UsageError ? 2 : 1);
+    process.exit(err instanceof UsageError || err instanceof StatusUsageError ? 2 : 1);
   });
 }
