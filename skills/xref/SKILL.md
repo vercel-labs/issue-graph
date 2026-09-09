@@ -1,12 +1,26 @@
 ---
 name: xref
-description: Snapshot the reference graph of a GitHub PR or issue and trace every linked PR, cross-referenced issue, and mention across repos. Use before working on an issue or PR; to reconcile an unlabeled backlog read-only; to find orphan, superseded, competing, or duplicate PRs; to see who mentioned or linked it; to survey a backlog by root-cause cluster; to rank a backlog by discussion heat and pick the most impactful issue to fix next; to spot two PRs that touch the same files; to catch a PR that says "fixes #N" but will not auto-close; or to re-check what changed since the last snapshot. Trigger words include xref, reconcile backlog, clean backlog, map this PR or issue, trace references, what links to this, who mentioned this, find orphans, duplicate PRs, survey backlog, prioritize backlog, what to fix first, and most impactful issues.
+description: Read-only GitHub PR status and reference graphs for maintainers and agents. Use whenever the user asks for PR counts or status by author, project, repository, or review state; approved, changes-requested, conflicting, draft, ready-for-review, or unassigned PRs; a compact portfolio table; or counts for named contributors, even without naming xref. Spanish triggers include cuantas PRs, conteo por autor, tabla por proyecto, pendientes de revision, conflictos, and sin asignar. Also use before working an issue or PR, tracing references, finding duplicate or superseded work, reconciling an unlabeled backlog, prioritizing issues, and checking changes since a snapshot. Route counts to xref status, references to graph, and backlog actions to reconcile or plan. Never infer code correctness or merge readiness from counts.
 compatibility: Requires the `xref` command on PATH. Install from source with `gh repo clone vercel-labs/xref && cd xref && bun install --frozen-lockfile && bun link`. Also needs an authenticated `gh`, Bun, and network access to the GitHub API. Snapshots persist under ~/.xref/. Clustering runs in the calling agent's context, or shells out to `claude` or `codex` with `--cluster-run`.
 ---
 
 # xref
 
 Take a **snapshot** of everything a GitHub PR/issue connects to, so no **orphan** gets left behind — and so you never open a PR that duplicates work already in flight. The CLI is the hands (crawls, guards, classifies, attributes, persists); you are the brain (read the graph, run the one semantic step it hands back). `xref` is a globally-installed command (if it is missing, install it per compatibility above).
+
+## Choose the command first
+
+For PR counts or status tables, go directly to **Status mode** below; skip the graph steps. Resolve explicit repository and author scope from the request and available context, rather than enumerating an entire organization or guessing its members. Run `xref status --help` if the installed CLI contract is uncertain. If status is unavailable, report the version mismatch instead of fabricating counts.
+
+| Request | Route |
+|---|---|
+| PR counts by author/project/state, including ready-for-review or unassigned PRs | `xref status --repo owner/repo --author login,other --format markdown` |
+| Underlying PRs, assignees, or requested reviewers | Same scope with `--view prs` |
+| Project-level summary | Same scope with `--view projects` |
+| Linked work, competing fixes, or reference graph | Graph steps below |
+| Full backlog reconciliation or next-action queue | `xref reconcile --repo owner/repo` or `xref plan --repo owner/repo`; inspect their `--help` before use |
+
+Ready-for-review means non-draft, not approved or merge-ready. For a ready-for-review/unassigned intersection, filter `pullRequests` from `--json` using `isDraft === false` and an explicitly empty `assignees` array. Do not subtract independent totals or treat unknown metadata as empty. The status command does not inspect bot review findings or CI checks; those need a separate review inspection.
 
 ## Steps
 
