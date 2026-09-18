@@ -77,7 +77,7 @@ export function httpTransport(opts: HttpTransportOptions): GhTransport {
     maxRetries = 3,
     concurrency = 5,
     maxBackoffMs = 60_000,
-    userAgent = "xref",
+    userAgent = "issue-graph",
   } = opts;
   const limit = gate(concurrency);
   const resolveToken = async () =>

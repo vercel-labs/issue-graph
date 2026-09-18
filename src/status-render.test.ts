@@ -107,7 +107,7 @@ describe("renderStatus authors", () => {
     const output = renderStatus(fixture());
     const header = output.split("\n\n")[0].split("\n");
     expect(header).toHaveLength(3);
-    expect(header[0]).toBe("xref status · Owner: acme · 2 repos · Authors: alice, bob");
+    expect(header[0]).toBe("issue-graph status · Owner: acme · 2 repos · Authors: alice, bob");
     expect(header[1]).toBe(`Query window: ${start} → ${end} · Coverage: complete`);
     expect(header[2]).toContain("Totals: Open 6 · Drafts ? (≥1 known) · Unassigned ? (≥1 known)");
     expect(header[2]).toContain("Merge unknown 1");
@@ -226,11 +226,11 @@ describe("renderStatus authors", () => {
     ]);
     expect(output).not.toContain("count details");
     expect(output).not.toContain("scanned");
-    const command = `xref status ${repos.map((repo) => `--repo ${repo}`).join(" ")} --author alice,bob --view prs`;
+    const command = `issue-graph status ${repos.map((repo) => `--repo ${repo}`).join(" ")} --author alice,bob --view prs`;
     const unwrapped = output.replaceAll("\\\n", "");
     expect(unwrapped).toContain(command);
     expect(output).toContain("alice,bob --view prs");
-    expect(unwrapped.match(/xref status --repo/g)).toHaveLength(1);
+    expect(unwrapped.match(/issue-graph status --repo/g)).toHaveLength(1);
     for (const line of output.split("\n")) expect(line.length).toBeLessThanOrEqual(120);
     expect(stripColor(renderStatus(report, { color: true }))).toBe(output);
   });
@@ -326,15 +326,17 @@ describe("renderStatus authors", () => {
 
   test("compact summary retains custom next steps without narrowing scope", () => {
     const report = fixture();
-    const custom = "xref status --repo acme/app --author alice --max-pages 20";
+    const custom = "issue-graph status --repo acme/app --author alice --max-pages 20";
     report.nextSteps.push(custom);
     for (const format of ["table", "markdown"] as const) {
       const output = renderStatus(report, { format });
       expect(output).toContain(
-        "xref status --repo acme/api --repo acme/app --author alice,bob --view prs",
+        "issue-graph status --repo acme/api --repo acme/app --author alice,bob --view prs",
       );
       expect(output).toContain(custom);
-      expect(output).not.toContain("xref status --repo acme/app --author alice,bob --view prs");
+      expect(output).not.toContain(
+        "issue-graph status --repo acme/app --author alice,bob --view prs",
+      );
     }
   });
 
@@ -512,7 +514,9 @@ describe("renderStatus projects and PRs", () => {
     for (const item of report.pullRequests) {
       expect(output).toContain(`URL: ${item.url}`);
       expect(output).toContain(`ID: ${item.id}`);
-      expect(output).toContain(`xref ${item.number} --repo ${item.repo} --depth 1 --no-snapshot`);
+      expect(output).toContain(
+        `issue-graph ${item.number} --repo ${item.repo} --depth 1 --no-snapshot`,
+      );
     }
     for (const step of report.nextSteps) expect(output).toContain(step);
     expect(body(renderStatus(report))).toBe(
@@ -596,7 +600,9 @@ describe("presentation and safety", () => {
     for (const line of output.split("\n")) expect(line.length).toBeLessThanOrEqual(40);
     const ledger = renderStatus(report, { view: "prs", width: 40 });
     expect(ledger.replaceAll("\n", "")).toContain(safeStatusText(report.pullRequests[0].title));
-    expect(ledger.replaceAll("\n", "")).toContain(`xref 1 --repo ${repo} --depth 1 --no-snapshot`);
+    expect(ledger.replaceAll("\n", "")).toContain(
+      `issue-graph 1 --repo ${repo} --depth 1 --no-snapshot`,
+    );
     expect(renderStatus(report, { width: Number.NaN })).toBe(renderStatus(report));
   });
 
@@ -608,7 +614,7 @@ describe("presentation and safety", () => {
         requestedReviewers: ["team|injected", "[bad](https://evil.test)"],
       }),
     ]);
-    report.nextSteps.push("xref status --repo acme/app; [bad](javascript:alert(1))");
+    report.nextSteps.push("issue-graph status --repo acme/app; [bad](javascript:alert(1))");
     const output = renderStatus(report, { view: "prs", format: "markdown" });
     expect(output).not.toContain(esc);
     expect(output).not.toContain("<img");
@@ -625,10 +631,10 @@ describe("presentation and safety", () => {
 
   test("Markdown keeps commands copyable inside safe code spans and metadata on separate lines", () => {
     const report = fixture();
-    const step = "xref status ``` [not a link](javascript:alert(1))";
+    const step = "issue-graph status ``` [not a link](javascript:alert(1))";
     report.nextSteps.push(step);
     const output = renderStatus(report, { view: "prs", format: "markdown" });
-    expect(output).toContain("- Graph: ` xref 1 --repo acme/app --depth 1 --no-snapshot `");
+    expect(output).toContain("- Graph: ` issue-graph 1 --repo acme/app --depth 1 --no-snapshot `");
     expect(output).toContain(`- \`\`\`\` ${step} \`\`\`\``);
     expect(output).toContain("Coverage: complete  \n");
     for (const command of report.nextSteps) expect(output).toContain(command);
@@ -649,7 +655,7 @@ describe("presentation and safety", () => {
       const output = renderStatus(report, { view, format: "markdown" });
       expect(output).not.toContain(esc);
       expect(output).toContain("ERROR: safe message");
-      expect(output).not.toContain("xref 6 ");
+      expect(output).not.toContain("issue-graph 6 ");
     }
     expect(renderStatus(report, { view: "prs" })).toContain(
       "Graph: Unavailable: invalid PR identity",

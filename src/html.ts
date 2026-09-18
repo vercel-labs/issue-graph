@@ -211,7 +211,7 @@ export function renderHtml(
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>xref · ${repo.replace(/</g, "&lt;")}</title>
+<title>issue-graph · ${repo.replace(/</g, "&lt;")}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>${CSS}</style>
@@ -373,7 +373,7 @@ function sidebar(){
     ? '<button id="cleanup-btn" class="cleanup-pill">⚑ Cleanup <span class="muted">('+DATA.cleanup.length+')</span></button>'
     : '';
   return '<div class="side"><div class="side-top">'+
-    '<div class="brand"><span class="logo">◆</span> xref <span class="muted">· '+esc(DATA.repo)+'</span></div>'+
+    '<div class="brand"><span class="logo">◆</span> issue-graph <span class="muted">· '+esc(DATA.repo)+'</span></div>'+
     '<div class="tiles">'+tiles.map(t=>'<div class="tile"><div class="tile-n '+t[2]+'">'+t[1]+'</div><div class="tile-l">'+t[0]+'</div></div>').join('')+'</div>'+
     '<div class="view-toggle"><button class="view-btn active" id="explore-view">Explore</button><button class="view-btn" id="impact-view">Impact</button></div>'+
     '<input class="filter" id="filter" placeholder="Filter by #, title, author…"/>'+cleanupBtn+'</div>'+

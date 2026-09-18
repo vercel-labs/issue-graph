@@ -8,8 +8,8 @@ this project are licensed under Apache-2.0.
 ## Setup
 
 ```bash
-gh repo clone vercel-labs/xref
-cd xref
+gh repo clone vercel-labs/issue-graph
+cd issue-graph
 bun install --frozen-lockfile
 ```
 

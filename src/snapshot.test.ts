@@ -44,7 +44,7 @@ describe("diffSnapshots", () => {
 
 describe("reconcile history", () => {
   test("uses a stable repository directory independent of seeds", () => {
-    expect(reconcileSnapshotDir("o", "r")).toEndWith("/.xref/reconcile-o-r");
+    expect(reconcileSnapshotDir("o", "r")).toEndWith("/.issue-graph/reconcile-o-r");
   });
 
   test("reports safe deltas and suppresses resolved items when coverage regresses", () => {

@@ -11,7 +11,7 @@ import { prioritize, renderPriority } from "./priority.js";
 import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
-import { XREF_SCHEMA } from "./schema.js";
+import { ISSUE_GRAPH_SCHEMA } from "./schema.js";
 import {
   diffReconcileSnapshots,
   diffSnapshots,
@@ -30,13 +30,13 @@ import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
 import type { NodeKey, Seed } from "./types.js";
 
-const USAGE = `usage: xref <url|number> --repo owner/repo [options]
-       xref --seeds 1,2,3 --repo owner/repo [options]
-       xref --label bug --repo owner/repo [options]
-       xref reconcile --repo owner/repo [options]
-       xref plan --repo owner/repo [options]
-       xref status --repo owner/repo --author login[,login] [options]
-       xref schema
+const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
+       issue-graph --seeds 1,2,3 --repo owner/repo [options]
+       issue-graph --label bug --repo owner/repo [options]
+       issue-graph reconcile --repo owner/repo [options]
+       issue-graph plan --repo owner/repo [options]
+       issue-graph status --repo owner/repo --author login[,login] [options]
+       issue-graph schema
 
   status --help      PR counts by author/project and an evidence ledger
   --repo owner/repo   required for a bare number, --seeds, or --label
@@ -56,7 +56,7 @@ const USAGE = `usage: xref <url|number> --repo owner/repo [options]
   --html PATH         graph only: write a self-contained HTML explorer
   --clusters PATH     group the explorer by agent-named clusters
   --format F          reconcile/plan output: auto, json, or markdown (default auto)
-  --no-snapshot       do not persist this run to ~/.xref/
+  --no-snapshot       do not persist this run to ~/.issue-graph/
   -h, --help          show this`;
 
 interface Args {
@@ -194,7 +194,7 @@ async function main(): Promise<void> {
     return;
   }
   if (args.command === "schema") {
-    console.log(JSON.stringify(XREF_SCHEMA, null, 2));
+    console.log(JSON.stringify(ISSUE_GRAPH_SCHEMA, null, 2));
     return;
   }
   const transport = shellTransport();
@@ -278,7 +278,7 @@ async function main(): Promise<void> {
   if (hubs.length) {
     md += "\n## Hubs not expanded — re-seed to explore\n\n";
     for (const h of hubs) {
-      md += `- ${h.key} (${h.edges.length} refs) → \`xref ${h.number} --repo ${h.owner}/${h.repo} --depth 1\`\n`;
+      md += `- ${h.key} (${h.edges.length} refs) → \`issue-graph ${h.number} --repo ${h.owner}/${h.repo} --depth 1\`\n`;
     }
   }
 

@@ -12,15 +12,15 @@ export interface ReconcileSnapshot {
   coverageComplete: boolean;
 }
 
-/** Per-seed-set directory under ~/.xref where snapshots are persisted. */
+/** Per-seed-set directory under ~/.issue-graph where snapshots are persisted. */
 export function snapshotDir(owner: string, repo: string, seedKeys: NodeKey[]): string {
   const id = `${owner}-${repo}-${seedKeys.map((k) => k.split("#")[1]).join("_")}`.slice(0, 80);
-  return path.join(os.homedir(), ".xref", id.replace(/[^\w.-]/g, "_"));
+  return path.join(os.homedir(), ".issue-graph", id.replace(/[^\w.-]/g, "_"));
 }
 
 export function reconcileSnapshotDir(owner: string, repo: string): string {
   const id = `reconcile-${owner}-${repo}`.replace(/[^\w.-]/g, "_");
-  return path.join(os.homedir(), ".xref", id);
+  return path.join(os.homedir(), ".issue-graph", id);
 }
 
 /** Prior snapshot filenames for a seed set, oldest first. */

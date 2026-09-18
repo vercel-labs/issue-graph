@@ -49,6 +49,8 @@ describe("renderHtml", () => {
     ]);
     const html = renderHtml(nodes, ["o/r#1"], "o/r");
     expect(html.startsWith("<!doctype html>")).toBe(true);
+    expect(html).toContain("<title>issue-graph · o/r</title>");
+    expect(html).toContain('class="logo">◆</span> issue-graph');
     expect(html).toContain('id="data"');
     expect(html).toContain("o/r#2");
     expect(html).toContain('id="impact-view"');

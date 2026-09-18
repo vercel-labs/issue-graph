@@ -163,7 +163,7 @@ function countDetail(count: StatusCount): string {
 function graphCommand(pr: StatusPullRequest): string | null {
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/.test(pr.repo)) return null;
   if (!Number.isSafeInteger(pr.number) || pr.number < 1) return null;
-  return `xref ${pr.number} --repo ${pr.repo} --depth 1 --no-snapshot`;
+  return `issue-graph ${pr.number} --repo ${pr.repo} --depth 1 --no-snapshot`;
 }
 
 export function renderStatus(
@@ -215,7 +215,7 @@ export function renderStatus(
     safeStatusText(!markdown && owner ? repo.slice(repo.indexOf("/") + 1) : repo);
 
   heading(
-    `xref status${owner ? ` · Owner: ${text(owner)}` : ""} · ${report.scope.repos.length} repos · Authors: ${report.scope.authors.map(text).join(", ")}`,
+    `issue-graph status${owner ? ` · Owner: ${text(owner)}` : ""} · ${report.scope.repos.length} repos · Authors: ${report.scope.authors.map(text).join(", ")}`,
   );
   line(
     `Query window: ${text(report.startedAt)} → ${text(report.generatedAt)} · Coverage: ${report.coverageComplete ? "complete" : "INCOMPLETE"}`,
@@ -439,13 +439,13 @@ export function renderStatus(
     scope.authors.every((author) => /^[A-Za-z0-9][A-Za-z0-9-]*$/.test(author));
   const defaults = new Set(
     scope.repos.map(
-      (repo) => `xref status --repo ${repo} --author ${scope.authors.join(",")} --view prs`,
+      (repo) => `issue-graph status --repo ${repo} --author ${scope.authors.join(",")} --view prs`,
     ),
   );
   const steps =
     view !== "prs" && validScope
       ? [
-          `xref status ${scope.repos.map((repo) => `--repo ${repo}`).join(" ")} --author ${scope.authors.join(",")} --view prs`,
+          `issue-graph status ${scope.repos.map((repo) => `--repo ${repo}`).join(" ")} --author ${scope.authors.join(",")} --view prs`,
           ...report.nextSteps.filter((step) => !defaults.has(step)),
         ]
       : report.nextSteps;

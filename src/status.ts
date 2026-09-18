@@ -246,7 +246,7 @@ export function buildStatusReport(
     .filter((project) => project.counts.open.prIds.length > 0 || project.counts.open.count === null)
     .map(
       (project) =>
-        `xref status --repo ${project.repo} --author ${scope.authors.join(",")} --view prs`,
+        `issue-graph status --repo ${project.repo} --author ${scope.authors.join(",")} --view prs`,
     );
   return {
     schemaVersion: STATUS_SCHEMA_VERSION,

@@ -4,7 +4,7 @@
  * holds the credentials the user logged in with.
  *
  * Importing this module pulls in `node:child_process`, so it is a separate
- * entry point (`@vercel-labs/xref/transport/shell`) and never reachable from the core.
+ * entry point (`@vercel-labs/issue-graph/transport/shell`) and never reachable from the core.
  */
 
 import { execFile, execFileSync } from "node:child_process";

@@ -5,12 +5,17 @@ import {
   type StatusOptions,
   type StatusView,
 } from "./status.js";
+import { inspectStatusHistory } from "./status-history.js";
+import { renderStatusHistory } from "./status-history-render.js";
+import type { StatusHistoryOutput, StatusSnapshot } from "./status-history-types.js";
 import { renderStatus, safeStatusText } from "./status-render.js";
+import { toStatusSnapshot } from "./status-snapshot.js";
+import { latestStatusSnapshot, readStatusSnapshot, writeStatusSnapshot } from "./status-store.js";
 import type { GhTransport } from "./transport.js";
 
-export const STATUS_USAGE = `usage: xref status --repo owner/repo --author login[,login] [options]
+export const STATUS_USAGE = `usage: issue-graph status --repo owner/repo --author login[,login] [options]
 
-Count open PRs by repository and author without a graph crawl or local writes.
+Count open PRs by repository and author without a graph crawl. Local writes are opt-in.
 
   --repo owner/repo       repeat for each repository (required)
   --author login[,login]  repeat or comma-separate authors (required)
@@ -19,7 +24,9 @@ Count open PRs by repository and author without a graph crawl or local writes.
   --json                 JSON on stdout; no filename (status only)
   --concurrency N        repositories in flight, 1..32 (default 4)
   --max-pages N          pages per connection, 1..1000 (default 100)
-  --no-snapshot          accepted; status never writes snapshots
+  --save                 save an immutable capture under ISSUE_GRAPH_HOME (default ~/.issue-graph)
+  --since last|PATH      compare with a matching-scope snapshot or exported JSON
+  --no-snapshot          forbid snapshot writes; incompatible with --save
   -h, --help             show this help
 
 Auto output: terminal table for TTY, JSON for pipes. NO_COLOR disables color.
@@ -27,9 +34,11 @@ Exit 0: complete inventory; 1: incomplete/runtime failure; 2: invalid arguments.
 Unknown counts are ?, not 0. Conflicts and drafts overlap review states.
 
 Examples:
-  xref status --repo vercel-labs/agent-browser --author ctate,Railly
-  xref status --repo vercel-labs/wterm --author ctate --view prs
-  xref status --repo vercel-labs/emulate --author ctate --json`;
+  issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly
+  issue-graph status --repo vercel-labs/wterm --author ctate --view prs
+  issue-graph status --repo vercel-labs/emulate --author ctate --json
+  issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --save
+  issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --since last --save`;
 
 export class StatusUsageError extends Error {}
 
@@ -37,6 +46,9 @@ export interface StatusArgs extends StatusOptions {
   view: StatusView;
   format: StatusFormat;
   help: boolean;
+  save: boolean;
+  since: string | null;
+  noSnapshot: boolean;
 }
 
 export function parseStatusArgs(argv: string[]): StatusArgs {
@@ -48,6 +60,9 @@ export function parseStatusArgs(argv: string[]): StatusArgs {
     view: "authors",
     format: "auto",
     help: false,
+    save: false,
+    since: null,
+    noSnapshot: false,
   };
   let json = false;
   for (let i = 0; i < argv.length; i++) {
@@ -66,7 +81,9 @@ export function parseStatusArgs(argv: string[]): StatusArgs {
           .map((author) => author.trim()),
       );
     else if (flag === "--json") json = true;
-    else if (flag === "--no-snapshot") continue;
+    else if (flag === "--no-snapshot") args.noSnapshot = true;
+    else if (flag === "--save") args.save = true;
+    else if (flag === "--since") args.since = value();
     else if (flag === "--view") {
       const view = value();
       if (view !== "authors" && view !== "projects" && view !== "prs")
@@ -92,6 +109,8 @@ export function parseStatusArgs(argv: string[]): StatusArgs {
   if (json && args.format !== "auto" && args.format !== "json")
     throw new StatusUsageError("--json conflicts with --format table or markdown");
   if (json) args.format = "json";
+  if (args.save && args.noSnapshot)
+    throw new StatusUsageError("--save conflicts with --no-snapshot");
   if (!args.help) {
     try {
       Object.assign(args, normalizeStatusScope(args.repos, args.authors));
@@ -107,6 +126,7 @@ export interface StatusIO {
   noColor?: boolean;
   ci?: boolean;
   width?: number;
+  snapshotHome?: string;
   stdout: (value: string) => void;
   stderr: (value: string) => void;
 }
@@ -121,9 +141,39 @@ export async function runStatus(
     io.stdout(`${STATUS_USAGE}\n`);
     return 0;
   }
+  let previous: StatusSnapshot | null = null;
+  if (args.since) {
+    if (args.since === "last") {
+      const saved = latestStatusSnapshot(
+        { repos: args.repos, authors: args.authors },
+        io.snapshotHome,
+      );
+      if (!saved)
+        throw new Error(
+          `No prior status snapshot for this scope. First run: issue-graph status ${args.repos.map((repo) => `--repo ${repo}`).join(" ")} --author ${args.authors.join(",")} --save`,
+        );
+      previous = saved.snapshot;
+    } else previous = readStatusSnapshot(args.since);
+    const scopeKey = (scope: { repos: string[]; authors: string[] }) => {
+      const normalized = normalizeStatusScope(scope.repos, scope.authors);
+      return JSON.stringify({
+        repos: normalized.repos.map((value) => value.toLowerCase()),
+        authors: normalized.authors.map((value) => value.toLowerCase()),
+      });
+    };
+    if (scopeKey(previous.scope) !== scopeKey({ repos: args.repos, authors: args.authors }))
+      throw new StatusUsageError(
+        "Status history scope mismatch: use the same repositories and authors as the baseline.",
+      );
+    if (Date.parse(previous.generatedAt) > Date.now())
+      throw new StatusUsageError(
+        "Status history baseline is in the future; cannot compare it with a current capture.",
+      );
+  }
   const format = args.format === "auto" ? (io.isTTY ? "table" : "json") : args.format;
   const humanTTY = io.isTTY && format !== "json";
-  if (humanTTY) io.stderr(`xref status · read-only inventory · ${args.repos.length} repos\n`);
+  if (humanTTY)
+    io.stderr(`issue-graph status · read-only inventory · ${args.repos.length} repos\n`);
   const report = await collectStatus(transport, {
     ...args,
     onProgress: humanTTY
@@ -133,18 +183,37 @@ export async function runStatus(
           )
       : undefined,
   });
+  const extra: StatusHistoryOutput = {};
+  if (previous)
+    extra.history = await inspectStatusHistory(transport, previous, report, {
+      concurrency: args.concurrency,
+    });
+  if (args.save) {
+    const path = writeStatusSnapshot(toStatusSnapshot(report), io.snapshotHome);
+    extra.snapshot = { path, generatedAt: report.generatedAt };
+    if (format !== "json") io.stderr(`Snapshot saved: ${safeStatusText(path)}\n`);
+  }
   io.stdout(
     format === "json"
-      ? `${JSON.stringify(report, null, 2)}\n`
+      ? `${JSON.stringify({ ...report, ...extra }, null, 2)}\n`
       : renderStatus(report, {
           view: args.view,
           format,
           color: format === "table" && io.isTTY && !io.noColor && !io.ci,
           width: io.width,
-        }),
+        }) +
+          (extra.history
+            ? `\n${renderStatusHistory(extra.history, { format, width: io.width })}`
+            : ""),
   );
   if (!report.coverageComplete) {
     io.stderr("INCOMPLETE_INVENTORY: some counts are unknown; inspect coverage and rerun.\n");
+    return 1;
+  }
+  if (extra.history && !extra.history.coverageComplete) {
+    io.stderr(
+      "INCOMPLETE_HISTORY: some transitions could not be verified; inspect history.uncertain, departures and totals.\n",
+    );
     return 1;
   }
   return 0;

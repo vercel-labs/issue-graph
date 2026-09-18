@@ -1,32 +1,32 @@
-# xref
+# issue-graph
 
 Map the complete reference graph around a GitHub issue, pull request, or
 repository backlog before you start working on it.
 
-`xref` follows text mentions and GitHub's structural links across repositories,
+`issue-graph` follows text mentions and GitHub's structural links across repositories,
 then classifies the graph so humans and coding agents can see related work,
 duplicate pull requests, competing fixes, superseded work, and unresolved
 follow-ups.
 
 The crawl and classifications are deterministic. No model is required. An agent
-is only used when you explicitly ask `xref` to group the graph by root cause.
+is only used when you explicitly ask `issue-graph` to group the graph by root cause.
 
 ## Install from source
 
-`xref` is not published to a package registry yet. You need
+`issue-graph` is not published to a package registry yet. You need
 [Bun](https://bun.sh) and an authenticated [GitHub CLI](https://cli.github.com).
 
 ```bash
-gh repo clone vercel-labs/xref
-cd xref
+gh repo clone vercel-labs/issue-graph
+cd issue-graph
 bun install --frozen-lockfile
 bun link
 ```
 
-The `xref` command is now available on your `PATH`.
+The `issue-graph` command is now available on your `PATH`.
 
 ```bash
-xref --help
+issue-graph --help
 ```
 
 To update:
@@ -42,42 +42,42 @@ bun link
 Trace one issue or pull request:
 
 ```bash
-xref 260 --repo owner/repo
-xref https://github.com/owner/repo/pull/260
+issue-graph 260 --repo owner/repo
+issue-graph https://github.com/owner/repo/pull/260
 ```
 
 Survey several related items:
 
 ```bash
-xref --seeds 64,246,281 --repo owner/repo
+issue-graph --seeds 64,246,281 --repo owner/repo
 ```
 
 Survey all open issues with a label and rank them by discussion heat:
 
 ```bash
-xref --label bug --repo owner/repo --prioritize
+issue-graph --label bug --repo owner/repo --prioritize
 ```
 
 Reconcile the whole open backlog, including repositories without labels:
 
 ```bash
-xref reconcile --repo owner/repo
+issue-graph reconcile --repo owner/repo
 ```
 
 Turn that backlog into a deterministic next-action queue:
 
 ```bash
-xref plan --repo owner/repo
+issue-graph plan --repo owner/repo
 ```
 
 Interactive terminals receive Markdown. Pipes and agents receive versioned JSON
-by default. Use `--format markdown|json` to choose explicitly, and `xref schema`
+by default. Use `--format markdown|json` to choose explicitly, and `issue-graph schema`
 to inspect the machine contract and local-write behavior.
 
 Generate JSON and a self-contained HTML explorer:
 
 ```bash
-xref 260 --repo owner/repo --json graph.json --html graph.html
+issue-graph 260 --repo owner/repo --json graph.json --html graph.html
 open graph.html
 ```
 
@@ -86,7 +86,7 @@ open graph.html
 Count open PRs without a graph crawl:
 
 ```bash
-xref status \
+issue-graph status \
   --repo vercel-labs/agent-browser \
   --repo vercel-labs/wterm \
   --repo vercel-labs/portless \
@@ -98,10 +98,10 @@ xref status \
 The default human view groups rows by repository and author, including zero rows. Use `--view projects` for project totals and per-author open counts, or `--view prs` for the underlying PRs, titles, URLs, heads, assignees, and requested reviewers. Filter by supplying fewer repositories or authors. Author matching and scope deduplication are case-insensitive.
 
 ```bash
-xref status --repo vercel-labs/agent-browser --author ctate,Railly --view projects
-xref status --repo vercel-labs/agent-browser --author ctate --view prs
-xref status --repo vercel-labs/agent-browser --author ctate,Railly --format markdown
-xref status --repo vercel-labs/agent-browser --author ctate,Railly --json
+issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --view projects
+issue-graph status --repo vercel-labs/agent-browser --author ctate --view prs
+issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --format markdown
+issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --json
 ```
 
 TTY output defaults to an aligned table, with narrow-terminal fallback and `NO_COLOR` support. Piped output defaults to JSON; `--format table|markdown|json` overrides it. Progress and the TTY heading go to stderr. In **status only**, `--json` takes no filename and prints JSON on stdout; graph's existing `--json PATH` still writes a file.
@@ -112,7 +112,19 @@ Status paginates repository PR connections directly, not search results. `--conc
 
 JSON schema version 1 includes scope, query timestamps, per-repository coverage, PR evidence, author rows, project rows, totals, and runnable next steps. Each metric carries `{ count, prIds, unknownIds }`: `count: null` means unknown, while `prIds` retains known matches as a lower bound. Human views display `?`, never a fabricated zero. Failed repositories invalidate their own aggregate counts and portfolio totals, not complete sibling repositories. The query window is not an atomic GitHub snapshot.
 
-Exit codes: 0 for complete inventory, 1 for incomplete inventory/runtime failures, 2 for invalid arguments. Status never mutates GitHub or writes snapshots; `--no-snapshot` is accepted as a no-op. The same captured evidence produces the same ordering and aggregation without a model.
+Exit codes: 0 for complete inventory/comparison, 1 for incomplete evidence or runtime failures, 2 for invalid arguments. Status never mutates GitHub. Local writes are opt-in through `--save`; `--no-snapshot` forbids them and conflicts with `--save`. The same captured evidence produces the same ordering and aggregation without a model.
+
+### Compare with the previous capture
+
+```bash
+issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --save
+issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --since last --save
+issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --since /path/to/previous.json --json
+```
+
+`--save` stores immutable, private JSON under `~/.issue-graph/status/<scope-hash>/`; set `ISSUE_GRAPH_HOME` to use another root. `--since last` loads the latest capture for exactly the same repositories and authors before collecting or saving anything new. Different order/case is accepted, different scope is not. `--since PATH` also accepts an older exported status JSON report. A missing, corrupt, future, or mismatched baseline fails explicitly instead of claiming no changes.
+
+The Changes appendix shows review, draft, conflict, head, assignment, and reviewer-request transitions plus count deltas. JSON adds `history` when comparing and `snapshot` with the saved path when saving. Missing PRs are queried explicitly to distinguish merged, closed, and unverified; absence alone never means merged. Unknown metadata and incomplete prior captures remain uncertain. Reconstructed baselines carry their provenance rather than pretending to be live exports. This tracks observed state, not who authored a review or whether their comments were addressed.
 
 ## What it finds
 
@@ -133,7 +145,7 @@ attribution.
 
 ## Reconcile as an agent protocol
 
-`xref reconcile` searches the open backlog, paginates seed discovery, crawls
+`issue-graph reconcile` searches the open backlog, paginates seed discovery, crawls
 reference-graph levels with bounded concurrency, and produces deterministic
 actions such as:
 
@@ -154,11 +166,11 @@ candidates still require verification against current code, acceptance
 criteria, and live behavior.
 
 The command never mutates GitHub. It saves local repository history under
-`~/.xref/reconcile-owner-repo/` unless `--no-snapshot` is set.
+`~/.issue-graph/reconcile-owner-repo/` unless `--no-snapshot` is set.
 
 ## Plan the backlog
 
-`xref plan` reuses the live reconciliation and discussion signals to separate
+`issue-graph plan` reuses the live reconciliation and discussion signals to separate
 the backlog into:
 
 - a ready execution queue
@@ -167,7 +179,7 @@ the backlog into:
   active related work
 
 Cleanup and verification actions come before implementation review. Within
-each lane, xref uses readiness, discussion heat, and visible inbound references
+each lane, issue-graph uses readiness, discussion heat, and visible inbound references
 as deterministic sort keys. Missing open seeds or capped crawl neighborhoods
 make the queue provisional and suppress the single `next` recommendation.
 Failed neighbor references are quarantined to the affected items so unrelated
@@ -189,19 +201,19 @@ each merge or closure to refresh the queue.
 Use graph mode as a preflight before an agent plans or implements one issue:
 
 ```bash
-xref "$ISSUE_URL" --json /tmp/xref.json --no-snapshot
+issue-graph "$ISSUE_URL" --json /tmp/issue-graph.json --no-snapshot
 ```
 
 Use reconcile mode for repository maintenance:
 
 ```bash
-xref reconcile --repo owner/repo --format json --no-snapshot
+issue-graph reconcile --repo owner/repo --format json --no-snapshot
 ```
 
 Use plan mode to select the next safe action:
 
 ```bash
-xref plan --repo owner/repo --format json
+issue-graph plan --repo owner/repo --format json
 ```
 
 A factory can use the evidence to:
@@ -221,13 +233,13 @@ and a token.
 Print a compact root-cause clustering task for the calling agent:
 
 ```bash
-xref --seeds 64,246,281 --repo owner/repo --cluster
+issue-graph --seeds 64,246,281 --repo owner/repo --cluster
 ```
 
 For unattended use, `--cluster-run claude` and `--cluster-run codex` can run the
 same task through an installed headless agent.
 
-The repository also includes an agent skill in [`skills/xref`](skills/xref).
+The repository also includes an agent skill in [`skills/issue-graph`](skills/issue-graph).
 Copy or symlink it into your agent's skills directory after installing the CLI.
 
 ## HTML explorer
@@ -245,12 +257,12 @@ explorer never changes GitHub.
 
 ## Use as a library
 
-Registry publishing is intentionally disabled for now. To use `xref` as a local
+Registry publishing is intentionally disabled for now. To use `issue-graph` as a local
 dependency, build this checkout and reference it from a workspace or file
 dependency:
 
 ```bash
-cd path/to/xref
+cd path/to/issue-graph
 bun install --frozen-lockfile
 bun run build
 ```
@@ -258,14 +270,14 @@ bun run build
 ```json
 {
   "dependencies": {
-    "@vercel-labs/xref": "file:../xref"
+    "@vercel-labs/issue-graph": "file:../issue-graph"
   }
 }
 ```
 
 ```ts
-import { classify, crawl, fileOverlaps, makeFetchNode, prioritize } from "@vercel-labs/xref";
-import { httpTransport } from "@vercel-labs/xref/transport/http";
+import { classify, crawl, fileOverlaps, makeFetchNode, prioritize } from "@vercel-labs/issue-graph";
+import { httpTransport } from "@vercel-labs/issue-graph/transport/http";
 
 const repo = { owner: "owner", repo: "repo" };
 const transport = httpTransport({ token: process.env.GITHUB_TOKEN! });
@@ -285,9 +297,9 @@ Available entry points:
 
 | Import | Requirements |
 | --- | --- |
-| `@vercel-labs/xref` | Runtime-agnostic graph core |
-| `@vercel-labs/xref/transport/http` | `fetch` and a GitHub token |
-| `@vercel-labs/xref/transport/shell` | An authenticated `gh` on `PATH` |
+| `@vercel-labs/issue-graph` | Runtime-agnostic graph core |
+| `@vercel-labs/issue-graph/transport/http` | `fetch` and a GitHub token |
+| `@vercel-labs/issue-graph/transport/shell` | An authenticated `gh` on `PATH` |
 
 ## Development
 

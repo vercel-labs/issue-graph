@@ -1,5 +1,5 @@
-export const XREF_SCHEMA = {
-  name: "xref",
+export const ISSUE_GRAPH_SCHEMA = {
+  name: "issue-graph",
   schemaVersion: 1,
   crawl: {
     maxNodes: { default: 80, minimum: 1, maximum: 1000 },
@@ -16,7 +16,7 @@ export const XREF_SCHEMA = {
     graph: {
       githubMutations: false,
       localWrites: [
-        "~/.xref snapshots unless --no-snapshot is set",
+        "~/.issue-graph snapshots unless --no-snapshot is set",
         "explicit --json and --html output paths",
       ],
       formats: ["markdown"],
@@ -24,7 +24,7 @@ export const XREF_SCHEMA = {
     },
     reconcile: {
       githubMutations: false,
-      localWrites: ["~/.xref snapshots unless --no-snapshot is set"],
+      localWrites: ["~/.issue-graph snapshots unless --no-snapshot is set"],
       outputSchemaVersion: 1,
       formats: ["json", "markdown"],
       description:
@@ -40,7 +40,20 @@ export const XREF_SCHEMA = {
     },
     status: {
       githubMutations: false,
-      localWrites: [],
+      localWrites: [
+        "immutable snapshots under ISSUE_GRAPH_HOME/status (default ~/.issue-graph/status) only with --save",
+      ],
+      history: {
+        snapshotSchemaVersion: 1,
+        comparisonSchemaVersion: 1,
+        save: "--save opts into an immutable capture; default remains no writes",
+        since:
+          "--since last|PATH compares before saving; identical repository/author scope required",
+        noSnapshot: "--no-snapshot forbids writes and conflicts with --save",
+        jsonFields: ["history (with --since)", "snapshot (with --save)"],
+        terminalVerification:
+          "Missing PRs are queried explicitly; inaccessible or still-open PRs remain UNVERIFIED",
+      },
       outputSchemaVersion: 1,
       formats: ["table", "markdown", "json"],
       views: ["authors", "projects", "prs"],
@@ -55,7 +68,7 @@ export const XREF_SCHEMA = {
       reviewStates: ["required", "changes-requested", "approved", "not-required", "unknown"],
       jsonFlag: "--json emits the report on stdout; unlike graph --json PATH, takes no path",
       description:
-        "Inventory explicit repositories and authors, with count provenance and incomplete coverage. Drafts, conflicts and assignment are independent of review state. No graph crawl or snapshots.",
+        "Inventory explicit repositories and authors, with count provenance and incomplete coverage. Drafts, conflicts and assignment are independent of review state. No graph crawl; snapshots and comparison are opt-in.",
     },
     schema: {
       githubMutations: false,

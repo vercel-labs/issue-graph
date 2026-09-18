@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { parseStatusArgs } from "./status-cli.js";
 
-const skill = readFileSync(new URL("../skills/xref/SKILL.md", import.meta.url), "utf8");
+const skill = readFileSync(new URL("../skills/issue-graph/SKILL.md", import.meta.url), "utf8");
 
-describe("xref skill routing", () => {
+describe("issue-graph skill routing", () => {
   test("discovery description includes PR status and English/Spanish count requests", () => {
     const frontmatter = skill.split("---")[1];
     const description =
@@ -12,7 +12,7 @@ describe("xref skill routing", () => {
         .split("\n")
         .find((line) => line.startsWith("description: "))
         ?.slice(13) ?? "";
-    expect(frontmatter).toContain("name: xref");
+    expect(frontmatter).toContain("name: issue-graph");
     expect(description.length).toBeGreaterThan(0);
     expect(description.length).toBeLessThanOrEqual(1024);
     for (const intent of [
@@ -24,7 +24,7 @@ describe("xref skill routing", () => {
       "conteo por autor",
       "tabla por proyecto",
       "sin asignar",
-      "xref status",
+      "issue-graph status",
     ])
       expect(description).toContain(intent);
   });
@@ -39,7 +39,7 @@ describe("xref skill routing", () => {
   });
 
   test("all concrete status examples parse against the installed CLI contract", () => {
-    const commands = skill.split("\n").filter((line) => line.startsWith("xref status "));
+    const commands = skill.split("\n").filter((line) => line.startsWith("issue-graph status "));
     expect(commands.length).toBeGreaterThanOrEqual(4);
     for (const command of commands) {
       const args = parseStatusArgs(command.split(/\s+/).slice(2));

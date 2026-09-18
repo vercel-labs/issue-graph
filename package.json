@@ -1,12 +1,12 @@
 {
-  "name": "@vercel-labs/xref",
+  "name": "@vercel-labs/issue-graph",
   "version": "0.6.0",
   "private": true,
   "description": "Map the complete reference graph around GitHub issues, pull requests, and repository backlogs.",
   "packageManager": "bun@1.3.14",
   "type": "module",
   "bin": {
-    "xref": "./src/cli.ts"
+    "issue-graph": "./src/cli.ts"
   },
   "exports": {
     ".": {
@@ -57,11 +57,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vercel-labs/xref.git"
+    "url": "git+https://github.com/vercel-labs/issue-graph.git"
   },
-  "homepage": "https://github.com/vercel-labs/xref#readme",
+  "homepage": "https://github.com/vercel-labs/issue-graph#readme",
   "bugs": {
-    "url": "https://github.com/vercel-labs/xref/issues"
+    "url": "https://github.com/vercel-labs/issue-graph/issues"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

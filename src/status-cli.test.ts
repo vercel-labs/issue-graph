@@ -161,7 +161,9 @@ describe("status output contract", () => {
     });
     const data = JSON.parse(await new Response(schema.stdout).text());
     expect(await schema.exited).toBe(0);
-    expect(data.commands.status.localWrites).toEqual([]);
+    expect(data.commands.status.localWrites).toEqual([
+      "immutable snapshots under ISSUE_GRAPH_HOME/status (default ~/.issue-graph/status) only with --save",
+    ]);
     const bad = Bun.spawn(["bun", "run", "src/cli.ts", "status", "--repo", "o/r"], {
       stdout: "pipe",
       stderr: "pipe",
