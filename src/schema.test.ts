@@ -28,6 +28,19 @@ describe("ISSUE_GRAPH_SCHEMA", () => {
     expect(status.countShape.count).toBe("number | null");
   });
 
+  test("publishes offline version-matched skill discovery", () => {
+    const skills = ISSUE_GRAPH_SCHEMA.commands.skills;
+    expect(skills.githubMutations).toBe(false);
+    expect(skills.localWrites).toEqual([]);
+    expect(skills.network).toBe(false);
+    expect(skills.authentication).toBe(false);
+    expect(skills.outputSchemaVersion).toBe(1);
+    expect(skills.subcommands).toEqual(["list", "get core"]);
+    expect(skills.defaultCommand).toBe("list");
+    expect(skills.defaultFormat.pipe).toBe("text/markdown");
+    expect(skills.errorCodes).toEqual(["USAGE_ERROR", "SKILL_READ_FAILED"]);
+  });
+
   test("publishes bounded crawl limits", () => {
     expect(ISSUE_GRAPH_SCHEMA.crawl.concurrency).toEqual({ default: 4, minimum: 1, maximum: 32 });
     expect(ISSUE_GRAPH_SCHEMA.crawl.maxNodes.maximum).toBe(1000);

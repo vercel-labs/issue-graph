@@ -50,6 +50,7 @@
   "files": [
     "dist",
     "skills",
+    "skill-data",
     "README.md",
     "LICENSE",
     "SECURITY.md",

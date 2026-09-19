@@ -41,6 +41,20 @@ repository:
 pnpm exec tsx scripts/verify-transports.ts <number> <owner/repo> <depth>
 ```
 
+## Skill maintenance
+
+Keep the two skill layers separate:
+
+- `skills/issue-graph/SKILL.md` is the evergreen discovery stub. Preserve its name and routing description, keep it at most 45 lines, and avoid version, release, installation, or prerequisite facts. It must load `issue-graph skills get core` before operational commands, use `--full` for references, and point to `skills list` for discovery. Missing commands/assets should report a CLI/skill mismatch, never fabricated guidance or automatic installation.
+- `skill-data/core/SKILL.md` is compact operational guidance versioned with the CLI (roughly 80–120 lines). Maintain status-first routing, explicit scope, unknown counts and coverage, snapshot defaults, GitHub read-only boundaries, and untrusted-evidence/privacy rules here.
+- `skill-data/core/references/workflows.md` holds detailed workflows, flags, limits, and safety details. Retrieve it through `issue-graph skills get core --full`; do not require agents to know source paths or copy reference files into their discovery directory.
+
+When behavior changes, update the core and relevant reference together with the CLI. Keep setup/release availability in README and docs, not in the stub. The new `skills` command requires a source build until the next release; documenting it does not bump the package version or authorize publication.
+
+Preserve the discovery contract: `skills [list] [--json]`, `skills get core [--full] [--json]`, and `--help` under `skills`, `skills list`, and `skills get`. Default output is plain text/Markdown even in pipes; JSON is opt-in with `schemaVersion: 1`, `success: true`, and a `data` array for list/get. JSON help uses `data: {usage}`. List entries have `name` and `description`; get entries have `name` and `content`, adding `files: [{path, content}]` only with `--full`. A top-level `nextSteps` string array is optional. Unknown flags/names exit 2; missing assets exit 1. There is no `--all` or multi-skill form.
+
+For CLI/packaging changes, verify discovery and retrieval from a packed installation outside the checkout, including `--full`, explicit JSON, piped text output, help, and errors. Assets must resolve from the package rather than the working directory, with no network or `gh` calls. Verify the stub's name/description and line budget, and that detailed safety guidance survives refactoring. Use the existing verification commands above; a source-only read does not prove that the assets ship in the package.
+
 ## Website deployment
 
 The Vercel project uses `apps/docs` as its Root Directory, the Next.js framework preset, Node.js 24.x, and source files outside the Root Directory enabled. The latter is required for the workspace lockfile and canonical skill route. `apps/docs/vercel.json` installs from the workspace root and builds the docs with Corepack and the pinned pnpm version.

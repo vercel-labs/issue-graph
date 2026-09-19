@@ -2,11 +2,16 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { parseStatusArgs } from "./status-cli.js";
 
-const skill = readFileSync(new URL("../skills/issue-graph/SKILL.md", import.meta.url), "utf8");
+const stub = readFileSync(new URL("../skills/issue-graph/SKILL.md", import.meta.url), "utf8");
+const skill = readFileSync(
+  new URL("../skill-data/core/references/workflows.md", import.meta.url),
+  "utf8",
+);
+const core = readFileSync(new URL("../skill-data/core/SKILL.md", import.meta.url), "utf8");
 
 describe("issue-graph skill routing", () => {
   test("discovery description includes PR status and English/Spanish count requests", () => {
-    const frontmatter = skill.split("---")[1];
+    const frontmatter = stub.split("---")[1];
     const description =
       frontmatter
         .split("\n")
@@ -29,8 +34,28 @@ describe("issue-graph skill routing", () => {
       expect(description).toContain(intent);
   });
 
+  test("the discovery stub stays evergreen and delegates operational guidance", () => {
+    expect(stub.split("\n").length).toBeLessThanOrEqual(45);
+    expect(stub).toContain("issue-graph skills get core");
+    expect(stub).toContain("issue-graph skills get core --full");
+    expect(stub).toContain("issue-graph skills list");
+    expect(stub).not.toMatch(
+      /\b\d+\.\d+\.\d+\b|release candidate|publication.*pending|compatibility:/i,
+    );
+    expect(stub).not.toContain("## Steps");
+    expect(stub).not.toContain("## Flags");
+    expect(core).toContain("## Route status first");
+    expect(core).toContain("issue-graph skills get core --full");
+    expect(core).toContain("untrusted");
+    expect(core).toContain("isDraft === false");
+    expect(core).toContain("Status saves only with `--save`");
+  });
+
   test("count requests are routed before the graph workflow with honest filtering", () => {
-    expect(skill.indexOf("## Choose the command first")).toBeLessThan(skill.indexOf("## Steps"));
+    const routing = skill.indexOf("## Invocation and routing");
+    const graph = skill.indexOf("## Graph steps");
+    expect(routing).toBeGreaterThanOrEqual(0);
+    expect(graph).toBeGreaterThan(routing);
     expect(skill).toContain("skip the graph steps");
     expect(skill).toContain("isDraft === false");
     expect(skill).toContain("explicitly empty `assignees` array");

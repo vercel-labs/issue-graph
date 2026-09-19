@@ -10,6 +10,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -321,7 +322,7 @@ try {
   verifyArchive(tarball, sourceManifest, digest);
   const entries = run([tools.tar, "-tzf", tarball], repo, process.env).stdout.trim().split("\n");
   const files = entries.filter((name) => !name.endsWith("/"));
-  assert.equal(files.length, 61, "published file count must remain 61");
+  assert.equal(files.length, 65, "published file count must remain 65");
   assert.equal(new Set(files).size, files.length, "archive must not contain duplicate files");
   for (const entry of entries) {
     assert.ok(entry.startsWith("package/"), `unexpected archive root: ${entry}`);
@@ -332,7 +333,9 @@ try {
     assert.ok(
       /^(?:package\.json|README\.md|LICENSE|SECURITY\.md|CONTRIBUTING\.md)$/.test(name) ||
         /^dist\/.+\.(?:js|d\.ts)$/.test(name) ||
-        name === "skills/issue-graph/SKILL.md",
+        name === "skills/issue-graph/SKILL.md" ||
+        name === "skill-data/core/SKILL.md" ||
+        name === "skill-data/core/references/workflows.md",
       `unexpected published file (source, internal docs, or maps): ${name}`,
     );
     assert.ok(
@@ -351,6 +354,10 @@ try {
     "dist/transports/shell.js",
     "dist/transports/shell.d.ts",
     "skills/issue-graph/SKILL.md",
+    "dist/skills-cli.js",
+    "dist/skills-cli.d.ts",
+    "skill-data/core/SKILL.md",
+    "skill-data/core/references/workflows.md",
     "LICENSE",
     "README.md",
   ])
@@ -394,13 +401,75 @@ try {
   assert.match(invoke([], 2).stderr, /usage: issue-graph/);
   assert.match(invoke(["--not-a-real-option"], 2).stderr, /unknown flag/);
   assert.match(invoke(["status", "--repo", fixtureRepo], 2).stderr, /requires --repo and --author/);
-  assert.ok(!existsSync(env.PACKAGE_TEST_GH_LOG as string), "help/schema/usage must not invoke gh");
+  assert.match(invoke(["skills", "--help"]).stdout, /No network, GitHub authentication/);
+  assert.match(invoke(["skills", "list"]).stdout, /core {2}Status-first routing/);
+  const catalog = JSON.parse(invoke(["skills", "list", "--json"]).stdout);
+  assert.equal(catalog.schemaVersion, 1);
+  assert.equal(catalog.success, true);
+  assert.deepEqual(
+    catalog.data.map((skill: { name: string }) => skill.name),
+    ["core"],
+  );
+  const core = readFileSync(join(installed, "skill-data/core/SKILL.md"), "utf8");
+  const referencePath = join(installed, "skill-data/core/references/workflows.md");
+  const workflows = readFileSync(referencePath, "utf8");
+  assert.equal(core, readFileSync(join(repo, "skill-data/core/SKILL.md"), "utf8"));
+  assert.equal(
+    workflows,
+    readFileSync(join(repo, "skill-data/core/references/workflows.md"), "utf8"),
+  );
+  const decoy = join(consumer, "skill-data/core");
+  mkdirSync(decoy, { recursive: true });
+  writeFileSync(join(decoy, "SKILL.md"), "Wrong guide from caller working directory");
+  const guide = invoke(["skills", "get", "core"]);
+  assert.equal(guide.stdout, core);
+  assert.equal(guide.stderr, "");
+  const guideJson = JSON.parse(invoke(["skills", "get", "core", "--json"]).stdout);
+  assert.deepEqual(guideJson.data, [{ name: "core", content: core }]);
+  const fullText = `${core.trimEnd()}\n\n--- references/workflows.md ---\n\n${workflows.trimEnd()}\n`;
+  assert.equal(invoke(["skills", "get", "core", "--full"]).stdout, fullText);
+  const fullJson = JSON.parse(invoke(["skills", "get", "core", "--full", "--json"]).stdout);
+  assert.deepEqual(fullJson.data, [
+    {
+      name: "core",
+      content: core,
+      files: [{ path: "references/workflows.md", content: workflows }],
+    },
+  ]);
+  const invalid = invoke(["skills", "get", "missing", "--json"], 2);
+  assert.equal(JSON.parse(invalid.stdout).error.code, "USAGE_ERROR");
+  assert.equal(invalid.stderr, "");
+  assert.match(invoke(["skills", "get", "../core"], 2).stderr, /unknown skill/);
+  assert.match(invoke(["skills", "get", "core", "--oops"], 2).stderr, /unknown skills flag/);
+  assert.match(invoke(["skills", "get"], 2).stderr, /requires exactly one name/);
+  assert.match(invoke(["skills", "list", "--full"], 2).stderr, /list accepts only/);
+  for (const missingPath of [referencePath, join(installed, "skill-data/core/SKILL.md")]) {
+    renameSync(missingPath, `${missingPath}.unavailable`);
+    try {
+      const missingJson = invoke(["skills", "get", "core", "--full", "--json"], 1);
+      assert.equal(JSON.parse(missingJson.stdout).error.code, "SKILL_READ_FAILED");
+      assert.equal(missingJson.stderr, "");
+      const missingText = invoke(["skills", "get", "core", "--full"], 1);
+      assert.equal(missingText.stdout, "");
+      assert.match(missingText.stderr, /Cannot read bundled skill core/);
+    } finally {
+      renameSync(`${missingPath}.unavailable`, missingPath);
+    }
+  }
+  assert.ok(!existsSync(join(home, ".issue-graph")), "skills must not create graph snapshots");
+  assert.ok(!existsSync(statusHome), "skills must not create status snapshots");
+  assert.ok(
+    !existsSync(env.PACKAGE_TEST_GH_LOG as string),
+    "help/schema/skills/usage must not invoke gh",
+  );
 
   const dlx = (args: string[], expected = 0) =>
     run([pnpm, `--package=${tarball}`, "dlx", "issue-graph", ...args], dlxConsumer, env, expected);
   assert.match(dlx(["--help"]).stdout, /usage: issue-graph/);
   assert.deepEqual(JSON.parse(dlx(["schema"]).stdout), schema);
   assert.match(dlx(["--not-a-real-option"], 2).stderr, /unknown flag/);
+  assert.equal(dlx(["skills", "get", "core"]).stdout, core);
+  assert.deepEqual(JSON.parse(dlx(["skills", "get", "core", "--full", "--json"]).stdout), fullJson);
 
   const probe = join(consumer, "exports.mjs");
   writeFileSync(probe, exportProbe);
@@ -491,7 +560,7 @@ try {
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 26 : 27;
+  const expectedChecks = suppliedTarball ? 44 : 45;
   assert.equal(
     checks,
     expectedChecks,

@@ -55,13 +55,22 @@ describe("issue-graph identity", () => {
     expect(ISSUE_GRAPH_SCHEMA.schemaVersion).toBe(1);
   });
 
-  test("the only packaged skill has matching directory and frontmatter names", () => {
+  test("the discovery stub and bundled guide have distinct canonical identities", () => {
     expect(readdirSync(new URL("skills/", root))).toEqual(["issue-graph"]);
     const skill = readFileSync(new URL("skills/issue-graph/SKILL.md", root), "utf8");
     const metadata = parse(skill.split("---")[1]) as Record<string, unknown>;
     expect(metadata.name).toBe("issue-graph");
     expect(metadata.description).toBeTypeOf("string");
-    expect(metadata.compatibility).toBeTypeOf("string");
+    expect(metadata.compatibility).toBeUndefined();
+    expect(skill).toContain("issue-graph skills get core");
+    expect(readdirSync(new URL("skill-data/", root))).toEqual(["core"]);
+    const core = readFileSync(new URL("skill-data/core/SKILL.md", root), "utf8");
+    expect(parse(core.split("---")[1])).toMatchObject({
+      name: "core",
+      description: expect.any(String),
+    });
+    expect(core).toContain("Node.js 20 or later");
+    expect(pkg.files).toContain("skill-data");
   });
 
   test("graph and reconciliation use the canonical history directory", () => {

@@ -79,11 +79,24 @@ Status reports unknown counts as `?` or `null`, never a fabricated zero. Check c
 
 ## Agents and integrations
 
-The [repository skill](skills/issue-graph/SKILL.md) routes counts to status, linked work to graph mode, and backlog actions to reconcile or plan. After installing the CLI, copy or symlink `skills/issue-graph` into your agent's supported project skill directory, or ask the agent to read that file directly. Installing a skill does not install the CLI or authenticate GitHub.
+The [repository skill](skills/issue-graph/SKILL.md) is an evergreen discovery stub. It tells agents to load the operational guidance bundled with their CLI before running commands, so copied skills do not retain stale workflow instructions. The core routes counts to status, linked work to graph mode, and backlog actions to reconcile or plan.
 
-Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's data policy before using private repository evidence.
+**The new `skills` command requires a build from this source checkout until the next release.** No package version bump or release is implied. After building, use `node dist/bin.js skills get core`, or the following commands if `issue-graph` already points to that build:
 
-The library separates the runtime-agnostic core from shell (`gh`) and HTTP (`fetch` plus token) transports. Current source consumers use a built local file dependency named `issue-graph`. The same import names and transport subpaths will work from the registry only after the functional `0.2.0` release is confirmed.
+```bash
+issue-graph skills list
+issue-graph skills get core
+issue-graph skills get core --full
+issue-graph skills --help
+```
+
+`skills` alone lists available guidance. `get core` returns the compact core; `--full` includes its workflow references. These commands read package-relative assets, independent of the working directory, without network or `gh` access. Output stays plain text/Markdown even in a pipe; add `--json` for a versioned envelope. See [Agents](apps/docs/content/docs/agents.mdx) for the JSON contract and setup details.
+
+Copy or symlink only `skills/issue-graph` into your agent's supported project skill directory, checking for existing local changes first, or ask the agent to read that file directly. Installing a skill does not install the CLI or authenticate GitHub. If the command or bundled guidance is unavailable, report the CLI/skill mismatch rather than inventing instructions or automatically installing/upgrading anything.
+
+Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
+
+The library separates the runtime-agnostic core from shell (`gh`) and HTTP (`fetch` plus token) transports. Current source consumers use a built local file dependency named `issue-graph`. Registry availability must be verified separately; local builds and skill discovery are not evidence of publication.
 
 ## Documentation
 

@@ -70,6 +70,36 @@ export const ISSUE_GRAPH_SCHEMA = {
       description:
         "Inventory explicit repositories and authors, with count provenance and incomplete coverage. Drafts, conflicts and assignment are independent of review state. No graph crawl; snapshots and comparison are opt-in.",
     },
+    skills: {
+      githubMutations: false,
+      localWrites: [],
+      network: false,
+      authentication: false,
+      outputSchemaVersion: 1,
+      formats: ["text", "markdown", "json"],
+      defaultFormat: { tty: "text/markdown", pipe: "text/markdown" },
+      subcommands: ["list", "get core"],
+      defaultCommand: "list",
+      flags: ["--json", "--full (get only)", "--help"],
+      listShape: {
+        schemaVersion: 1,
+        success: true,
+        data: "{name, description}[]",
+        nextSteps: "string[]",
+      },
+      getShape: {
+        schemaVersion: 1,
+        success: true,
+        data: "{name, content, files?: {path, content}[]}[]",
+        nextSteps: "string[]",
+      },
+      helpShape: { schemaVersion: 1, success: true, data: "{usage}", nextSteps: "string[]" },
+      errorShape: { schemaVersion: 1, success: false, error: "{code, message, hint}" },
+      errorCodes: ["USAGE_ERROR", "SKILL_READ_FAILED"],
+      jsonFlag: "--json emits an envelope on stdout, including errors; takes no path",
+      description:
+        "Read guides bundled with the installed CLI, independent of the current directory. --full adds workflow references. Plain text/Markdown remains the default in pipes for direct agent loading.",
+    },
     schema: {
       githubMutations: false,
       localWrites: [],
