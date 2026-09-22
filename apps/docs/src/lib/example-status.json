@@ -1,0 +1,52 @@
+{
+  "command": "issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects --format table --no-snapshot",
+  "terminalOutput": "issue-graph status · Owner: vercel-labs · 1 repos · Authors: ctate, Railly\nQuery window: 2026-09-22T20:49:02.373Z → 2026-09-22T20:49:05.606Z · Coverage: complete\nTotals: Open 3 · Drafts 0 · Unassigned 3\n\nProjects\nProject   ctate (open)  Railly (open)  Open  Review  Changes  Approved  None  Unknown │ Conflicts\n────────  ────────────  ─────────────  ────  ──────  ───────  ────────  ────  ────────┼──────────\nportless             2              1     3       2        0         1     0        0 │         0\n────────  ────────────  ─────────────  ────  ──────  ───────  ────────  ────  ────────┼──────────\nTotal                                     3       2        0         1     0        0 │         0\n\nReview=required; None=not required; Unknown=review unknown; ?=unknown, not zero.\nFlags overlap review states. Approval does not imply merge readiness.\n",
+  "capturedAt": "2026-09-22T20:49:05.613284+00:00",
+  "captureStartedAt": "2026-09-22T20:49:02.331369+00:00",
+  "captureEndedAt": "2026-09-22T20:49:05.613284+00:00",
+  "cliVersion": "0.3.0",
+  "repository": "vercel-labs/portless",
+  "repositoryVisibility": "PUBLIC",
+  "visibilityCheckedAt": "2026-09-22T20:48:39.421206+00:00",
+  "coverage": {
+    "coverageComplete": true,
+    "scope": "Open PRs in vercel-labs/portless authored by ctate or Railly only.",
+    "queryStartedAt": "2026-09-22T20:49:02.373Z",
+    "queryEndedAt": "2026-09-22T20:49:05.606Z",
+    "source": "Same-run CLI stdout; no separate JSON query.",
+    "note": "Complete inventory for the requested repository and authors during this query window, not an atomic snapshot. Unknown counts are not zero. Review states and overlapping flags do not establish CI status, code correctness or merge readiness."
+  },
+  "terminalExcerpt": {
+    "source": "CLI stdout",
+    "sourceFile": "status-portless-projects.stdout.txt",
+    "receiptFile": "status-portless-projects.receipt.json",
+    "excerpt": true,
+    "lineNumbering": "1-based inclusive; raw UTF-8 stdout lines",
+    "lineRanges": [
+      {
+        "startLine": 1,
+        "endLine": 13
+      }
+    ],
+    "sourceLineCount": 14,
+    "excerptLineCount": 13,
+    "stdoutSha256": "e53947ecc63daa47fbf1e9e29fc4a5c6a55b97e2b63ac3070ba7e334c6ac9a79",
+    "excerptSha256": "0d5a85c8a9f3fa89afef52a18cbd19d0cd354b90e89a091d993cba162653675b",
+    "captureStartedAt": "2026-09-22T20:49:02.331369+00:00",
+    "captureEndedAt": "2026-09-22T20:49:05.613284+00:00",
+    "exitCode": 0,
+    "ansiStripped": false,
+    "transformations": [
+      "Selected the listed stdout line ranges in original order; no character changes or inserted ellipses. NO_COLOR=1 was set during capture."
+    ],
+    "omissions": [
+      {
+        "startLine": 14,
+        "endLine": 14,
+        "reason": "Optional drill-down command; counts, coverage and all printed interpretation caveats retained."
+      }
+    ],
+    "privacyReview": "Selected lines contain only the verified public repository, public issue/PR data and, for status, the explicitly requested public author handles. No cross-repository identifiers or links, email addresses, credentials or local user paths are included.",
+    "note": "Raw stdout, stderr and exact invocation receipts are retained privately outside the repository. Display command uses the published issue-graph executable name; receipt records the actual node invocation of the installed 0.3.0 dist/bin.js. Coverage notes are fixture metadata, not invented terminal output."
+  }
+}

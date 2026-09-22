@@ -6,9 +6,9 @@ import Home from "../src/app/page";
 import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
-import graph from "../src/lib/example-graph.json";
 import { landingTitle } from "../src/lib/landing-content";
 import { agentSetupPrompt, plannedInstallCommand } from "../src/lib/site";
+import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -82,14 +82,31 @@ describe("launch feedback", () => {
     expect(html).toContain('aria-label="Copy prompt"');
   });
 
-  test("renders a terminal window and accessible transcript without the explanatory footer", () => {
+  test("server-renders the catalog's three static terminal examples without replay chrome or metadata", () => {
     const html = renderToStaticMarkup(createElement(GraphProof));
-    expect(html).toContain('aria-label="issue-graph terminal demo"');
-    expect(html).toContain('aria-label="Replay terminal demo"');
-    expect(html).toContain('aria-label="Expand terminal"');
-    expect(html).toContain('class="ig-demo-transcript"');
-    expect(html).toContain(graph.terminalOutput);
-    expect(html).toContain(graph.command);
+    expect(html).toContain('aria-label="issue-graph terminal examples"');
+    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tabpanel"/g)).toHaveLength(3);
+    expect(html.match(/hidden=""/g)).toHaveLength(2);
+    const panels = html.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+    for (const [index, example] of terminalExampleCatalog.map(toTerminalExample).entries()) {
+      expect(html).toContain(`>${example.label}</button>`);
+      const code = panels[index]?.match(/<pre><code>[\s\S]*?<\/code><\/pre>/)?.[0];
+      expect(code).toBeDefined();
+      expect(renderToStaticMarkup(createElement(Home))).toContain(code);
+      expect(code?.replace(/<\/?span\b[^>]*>/g, "")).toBe(
+        renderToStaticMarkup(
+          createElement(
+            "pre",
+            null,
+            createElement("code", null, `$ ${example.command}\n\n${example.output}`),
+          ),
+        ),
+      );
+    }
+    expect(html).toContain("Approval does not imply merge readiness.");
+    expect(html).not.toMatch(/Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
+    expect(html).not.toMatch(/stdoutSha256|excerptSha256|receiptFile|lineRanges|captureStartedAt/);
     expect(html).not.toContain("not a live feed");
     expect(html).not.toContain("Sources and capture limits");
     expect(html).not.toContain("Reproduce this result");

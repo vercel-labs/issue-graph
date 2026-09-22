@@ -21,8 +21,6 @@
   "dependencies": {
     "@vercel/agent-readability": "0.7.0",
     "@vercel/geistdocs": "2.4.1",
-    "@wterm/dom": "0.5.0",
-    "@wterm/react": "0.5.0",
     "fumadocs-core": "16.2.2",
     "fumadocs-mdx": "14.0.4",
     "fumadocs-ui": "16.2.2",

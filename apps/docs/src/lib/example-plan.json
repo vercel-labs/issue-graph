@@ -1,0 +1,75 @@
+{
+  "command": "issue-graph plan --repo vercel-labs/wterm --depth 0 --max-nodes 60 --concurrency 2 --format markdown --no-snapshot",
+  "terminalOutput": "# Backlog plan: vercel-labs/wterm\n\n- Open items: 26\n- Ready actions: 9\n- Needs investigation: 11\n- Blocked: 6\n\n## Next\n\n- [vercel-labs/wterm#37](https://github.com/vercel-labs/wterm/pull/37) feat: add @wterm/search for grid and scrollback find\n   - review-open-pr · score 570.2 · heat 20.2 · visible impact 0\n   - Next: Run the repository review gate on the exact latest SHA.\n\n## Decision\n- The next action is independent in the observed graph.\n- Caveat: Validate repository-specific behavior before mutating GitHub.\n",
+  "capturedAt": "2026-09-22T20:49:19.496934+00:00",
+  "captureStartedAt": "2026-09-22T20:49:05.615086+00:00",
+  "captureEndedAt": "2026-09-22T20:49:19.496934+00:00",
+  "cliVersion": "0.3.0",
+  "repository": "vercel-labs/wterm",
+  "repositoryVisibility": "PUBLIC",
+  "visibilityCheckedAt": "2026-09-22T20:48:40.058025+00:00",
+  "coverage": {
+    "completeBacklog": false,
+    "cliReportedCoverage": "complete",
+    "cliReportedRecommendation": "safe from observed coverage gaps",
+    "depth": 0,
+    "maxNodes": 60,
+    "concurrency": 2,
+    "fetchedSeeds": 26,
+    "neighborNodesFetched": 0,
+    "crossRepositoryNodesFetched": 0,
+    "source": "Same-run CLI stdout and stderr; depth boundary verified in the installed crawl and plan handler.",
+    "note": "Depth-0 seed-only capture. The printed complete/safe labels describe the CLI-observed coverage gaps, not complete backlog relationships. No same-repository or cross-repository neighbors were fetched. Per-node API limits still apply. Unfetched references and relationships may change the decision; independent means only in the observed graph. Counts describe the capture window, not an atomic snapshot. Ready actions are review or investigation candidates, not merge readiness. Validate repository-specific behavior before acting."
+  },
+  "terminalExcerpt": {
+    "source": "CLI stdout",
+    "sourceFile": "plan-wterm-depth0.stdout.txt",
+    "receiptFile": "plan-wterm-depth0.receipt.json",
+    "excerpt": true,
+    "lineNumbering": "1-based inclusive; raw UTF-8 stdout lines",
+    "lineRanges": [
+      {
+        "startLine": 1,
+        "endLine": 6
+      },
+      {
+        "startLine": 9,
+        "endLine": 16
+      },
+      {
+        "startLine": 18,
+        "endLine": 19
+      }
+    ],
+    "sourceLineCount": 115,
+    "excerptLineCount": 16,
+    "stdoutSha256": "faeea60b939cb87085bc36ce95b405946e02580e121b6e748e448c7d227d5b5f",
+    "excerptSha256": "38106656d5bd5d9acb68540299132694cb250937165ad0f561ab31fd88355bde",
+    "captureStartedAt": "2026-09-22T20:49:05.615086+00:00",
+    "captureEndedAt": "2026-09-22T20:49:19.496934+00:00",
+    "exitCode": 0,
+    "ansiStripped": false,
+    "transformations": [
+      "Selected the listed stdout line ranges in original order; no character changes or inserted ellipses. NO_COLOR=1 was set during capture."
+    ],
+    "omissions": [
+      {
+        "startLine": 7,
+        "endLine": 8,
+        "reason": "Positive coverage and recommendation summary lines omitted from the depth-0 display to avoid unqualified completeness or safety claims. Original stdout and cliReported coverage metadata are retained unchanged."
+      },
+      {
+        "startLine": 17,
+        "endLine": 17,
+        "reason": "Blank line omitted for compact display."
+      },
+      {
+        "startLine": 20,
+        "endLine": 115,
+        "reason": "Remaining execution, investigation and blocked queues and general guardrails omitted for length. Summary counts, original next item, exact-SHA review instruction and decision caveat retained."
+      }
+    ],
+    "privacyReview": "Selected lines contain only the verified public repository, public issue/PR data and, for status, the explicitly requested public author handles. No cross-repository identifiers or links, email addresses, credentials or local user paths are included.",
+    "note": "Raw stdout, stderr and exact invocation receipts are retained privately outside the repository. Display command uses the published issue-graph executable name; receipt records the actual node invocation of the installed 0.3.0 dist/bin.js. Coverage notes are fixture metadata, not invented terminal output."
+  }
+}
