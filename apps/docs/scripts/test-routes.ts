@@ -77,6 +77,12 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
   const header = html.body.match(/<header\b[^>]*>[\s\S]*?<\/header>/)?.[0];
   assert.ok(header, `Navbar: ${path}`);
   assert.equal(
+    htmlAttribute(header, "a", "aria-label", "Vercel Labs", "href"),
+    "https://vercel.com/labs",
+    `Native Labs branding: ${path}`,
+  );
+  assert.ok(!header.includes('aria-label="Vercel Open Source"'), `No OSS brand: ${path}`);
+  assert.equal(
     htmlAttribute(header, "a", "aria-label", "GitHub repository", "href"),
     repositoryUrl,
     `Navbar GitHub destination: ${path}`,
@@ -200,7 +206,9 @@ assert.ok(Array.isArray(results) && results.length > 0, "Native search results")
 assert.ok(results.some((result: { url?: string }) => result.url?.startsWith("/docs")));
 const llms = await request("/llms.txt");
 assert.equal(llms.response.status, 200);
-assert.match(llms.body, /pending/i);
+assert.match(llms.body, /npm install -g issue-graph@latest/);
+assert.match(llms.body, /npx issue-graph@latest --help/);
+assert.doesNotMatch(llms.body, /release is pending/i);
 for (const slug of docsSlugs)
   assert.ok(llms.body.includes(canonicalUrl(slug ? `/docs/${slug}` : "/docs")));
 const sitemap = await request("/sitemap.xml");
@@ -229,6 +237,23 @@ const docsIndex = await request("/docs/index.md");
 assert.equal(docsIndex.response.status, 200);
 assert.equal(docsIndex.response.headers.get("link"), `<${canonicalUrl("/docs")}>; rel="canonical"`);
 checks += 7;
+const skillIndex = await request("/.well-known/skills/index.json", { accept: "application/json" });
+assert.equal(skillIndex.response.status, 200);
+assert.match(skillIndex.response.headers.get("content-type") ?? "", /application\/json/);
+const skillListing = JSON.parse(skillIndex.body);
+assert.deepEqual(
+  skillListing.skills.map((item: { name: string }) => item.name),
+  ["issue-graph"],
+);
+assert.deepEqual(skillListing.skills[0].files, ["SKILL.md"]);
+const publicSkill = await request("/.well-known/skills/issue-graph/SKILL.md", {
+  accept: "text/markdown",
+});
+assert.equal(publicSkill.response.status, 200);
+assert.match(publicSkill.body, /^---\nname: issue-graph\n/);
+assert.match(publicSkill.body, /https:\/\/issue-graph\.dev\/docs\/agents\.md/);
+assert.doesNotMatch(publicSkill.body, /skills get core/);
+checks += 2;
 console.log(
   `PASS: ${checks} route checks against ${origin.origin}${preview ? " (preview noindex)" : ""}`,
 );

@@ -5,7 +5,14 @@ import {
   landingTitle,
   workflows,
 } from "@/lib/landing-content";
-import { canonicalUrl, exampleCommand, siteDescription, siteName } from "@/lib/site";
+import {
+  agentSetupPrompt,
+  canonicalUrl,
+  exampleCommand,
+  plannedInstallCommand,
+  siteDescription,
+  siteName,
+} from "@/lib/site";
 import { textResponse } from "@/lib/text-response";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +34,18 @@ export function GET() {
       landingDescription,
       "",
       releaseNotice(),
+      "",
+      "## For humans",
+      "",
+      "```sh",
+      plannedInstallCommand,
+      "```",
+      "",
+      "## For agents",
+      "",
+      "```sh",
+      agentSetupPrompt,
+      "```",
       "",
       "Inspect references, competing fixes, status, and follow-ups before starting work. GitHub access is read-only. Local snapshots may write files; use --no-snapshot for a graph run without persisting a snapshot.",
       "",
@@ -53,7 +72,7 @@ export function GET() {
       `- [Documentation](${canonicalUrl("/docs")})`,
       `- [Getting started](${canonicalUrl("/docs/get-started")})`,
       `- [For agents](${canonicalUrl("/docs/agents")})`,
-      `- [Skill](${canonicalUrl("/skill.md")})`,
+      `- [Release-compatible agent setup](${canonicalUrl("/docs/agents.md")})`,
       `- [Documentation index](${canonicalUrl("/llms.txt")})`,
       "",
     ].join("\n"),

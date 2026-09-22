@@ -10,49 +10,54 @@ Find related GitHub issues, competing pull requests, and unresolved follow-ups b
 
 `issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, classification, and ranking need no model. Root-cause clustering is an optional agent step.
 
-![A public issue-graph snapshot connecting Portless PR 427 to four related pull requests in Portless and wterm.](apps/docs/public/issue-graph-demo.svg)
+![Bounded agent-browser graph: closed issue 1113, merged fix PR 1137, closed regression 1148, and open follow-ups 1371 and 1607.](apps/docs/public/issue-graph-demo.svg)
 
-Public reference data captured on September 18, 2026, not a live feed. Reproduce it with the bounded graph command below.
+Public reference data captured on 2026-09-22, not a live feed or complete history. All five fetched nodes are in `vercel-labs/agent-browser`; 19 references remain beyond the depth boundary and 22 edges to unfetched references are omitted from the displayed graph. Re-run the bounded command below to inspect current evidence, which may differ from the capture.
 
 ## Start here
 
-The supported installation today is from source and requires access to the **INTERNAL** `vercel-labs/issue-graph` repository. For source development, use [Node.js](https://nodejs.org) 20.19.x or 22.12+ (24 recommended), [pnpm](https://pnpm.io), and an authenticated [GitHub CLI](https://cli.github.com). The compiled CLI's runtime requirement remains Node.js 20 or later. Without repository access, this installation path is not available yet.
+[`issue-graph`](https://www.npmjs.com/package/issue-graph) is published on npm with a CLI and library. Use [Node.js](https://nodejs.org) 20 or later with npm/npx. GitHub queries also need an authenticated [GitHub CLI](https://cli.github.com). No source checkout is required; the source repository remains **INTERNAL**, and installing the public package does not grant repository access.
+
+Try the CLI without a global installation:
 
 ```bash
+npx issue-graph@latest --help
+```
+
+For the installed command used below:
+
+```bash
+npm install --global issue-graph@latest
+issue-graph --help
 gh auth login
 gh auth status
-gh repo clone vercel-labs/issue-graph
-cd issue-graph
-pnpm install --frozen-lockfile
-pnpm build
-pnpm link --global
-issue-graph --help
 ```
 
-Run a bounded graph around [portless PR #427](https://github.com/vercel-labs/portless/pull/427), a public example, without saving a snapshot:
+Run a bounded graph around public [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) without saving a snapshot:
 
 ```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
 ```
 
-Read the nodes, typed references, and cleanup candidates, then check for failed fetches, node caps, and unexpanded hubs before drawing conclusions. Results reflect live GitHub evidence, not a fixed demo output.
+To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. At the 2026-09-22 capture, issue #1113 was closed, [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) was merged, [regression #1148](https://github.com/vercel-labs/agent-browser/issues/1148) was closed, and follow-ups [#1371](https://github.com/vercel-labs/agent-browser/issues/1371) and [#1607](https://github.com/vercel-labs/agent-browser/issues/1607) were open. A merged fix and closed seed do not establish that related follow-ups are resolved.
 
-### Registry installation: pending publication
+Read the nodes, typed references, and cleanup candidates, then check for failed fetches, node caps, and unexpanded hubs before drawing conclusions. States were read during a capture window, not atomically. New runs query current GitHub evidence, not a fixed demo output.
 
-The public unscoped `issue-graph@0.1.0` is ctate's “Coming soon” placeholder and has no CLI `bin`. **`pnpm dlx issue-graph` does not run this tool today.** These are intended commands only after a functional unscoped release is confirmed:
+### Update an npm installation
+
+After reviewing the release you want to use:
 
 ```bash
-pnpm dlx issue-graph --help
-pnpm add --global issue-graph
+npm install --global issue-graph@latest
 ```
 
-The source checkout declares `issue-graph@0.2.0`, the selected release candidate. Publication is still pending; this metadata is not evidence that the registry CLI is available. Use pnpm for source development and Node.js to run the compiled CLI.
+`@latest` selects the latest published release. A newer source checkout may contain unreleased features; check the installed command's help rather than assuming source capabilities are published.
 
 ## Choose a workflow
 
 | Need | Installed command |
 | --- | --- |
-| Inspect an issue or PR before starting work | `issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot` |
+| Inspect an issue or PR before starting work | `issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot` |
 | Survey labeled open issues | `issue-graph --label bug --repo owner/repo --prioritize` |
 | Count open PRs by author | `issue-graph status --repo vercel-labs/portless --author ctate,Railly` |
 | See PR evidence, assignees, and requested reviewers | `issue-graph status --repo vercel-labs/portless --author ctate --view prs` |
@@ -67,7 +72,7 @@ Graph mode prints Markdown, even when piped; `--json PATH` writes a graph file. 
 Export a graph and a self-contained HTML explorer:
 
 ```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot --json graph.json --html graph.html
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
 ```
 
 Open `graph.html` in a browser. It includes typed relationships, node evidence, a cleanup checklist, and an Impact view projecting relationships visible in this graph. No server is needed. Impact is not proof of causality.
@@ -85,28 +90,19 @@ Status reports unknown counts as `?` or `null`, never a fabricated zero. Check c
 
 ## Agents and integrations
 
-The [repository skill](skills/issue-graph/SKILL.md) is an evergreen discovery stub. It tells agents to load the operational guidance bundled with their CLI before running commands, so copied skills do not retain stale workflow instructions. The core routes counts to status, linked work to graph mode, and backlog actions to reconcile or plan.
+For the published CLI, use [Agents](apps/docs/content/docs/agents.mdx) for release-compatible guidance and project-local skill setup. The npm 0.2.0 package bundles a workflow skill, but its installation/publication notes are outdated; follow the npm instructions above instead. Installing a skill does not install the CLI or authenticate GitHub. Check existing local changes before copying a skill into an agent's supported project directory.
 
-**The new `skills` command requires a build from this source checkout until the next release.** No package version bump or release is implied. After building, use `node dist/bin.js skills get core`, or the following commands if `issue-graph` already points to that build:
+The [repository skill](skills/issue-graph/SKILL.md) and the site's `/skill.md` route expose a newer source discovery stub that requires `issue-graph skills get core`. **The `skills` command is not available in npm 0.2.0.** Do not install that source stub alongside the published CLI. It requires a matching source build and does not imply a new release or authorize publication.
 
-```bash
-issue-graph skills list
-issue-graph skills get core
-issue-graph skills get core --full
-issue-graph skills --help
-```
-
-`skills` alone lists available guidance. `get core` returns the compact core; `--full` includes its workflow references. These commands read package-relative assets, independent of the working directory, without network or `gh` access. Output stays plain text/Markdown even in a pipe; add `--json` for a versioned envelope. See [Agents](apps/docs/content/docs/agents.mdx) for the JSON contract and setup details.
-
-Copy or symlink only `skills/issue-graph` into your agent's supported project skill directory, checking for existing local changes first, or ask the agent to read that file directly. Installing a skill does not install the CLI or authenticate GitHub. If the command or bundled guidance is unavailable, report the CLI/skill mismatch rather than inventing instructions or automatically installing/upgrading anything.
+Ask an agent to read the current `/docs/agents.md` page for setup guidance rather than invoking an unavailable skill command. If the installed CLI or guidance is unavailable, report the mismatch instead of inventing instructions or automatically installing/upgrading anything.
 
 Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
 
-The library separates the runtime-agnostic core from shell (`gh`) and HTTP (`fetch` plus token) transports. Current source consumers use a built local file dependency named `issue-graph`. Registry availability must be verified separately; local builds and skill discovery are not evidence of publication.
+Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
 
 ## Documentation
 
-The docs site at [issue-graph.dev/docs](https://issue-graph.dev/docs) is forthcoming. The content is available in this checkout:
+Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), or browse its source in this checkout:
 
 - [Get started](apps/docs/content/docs/get-started.mdx): installation, authentication, and a first result
 - [Graph](apps/docs/content/docs/graph.mdx): depth, caps, snapshots, and HTML
@@ -125,7 +121,9 @@ Snapshots, exports, logs, and cluster prompts can contain private repository met
 
 ## Source development
 
-From an authorized checkout, update a source installation with:
+Source development is optional and requires access to the **INTERNAL** `vercel-labs/issue-graph` repository. Use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and authenticated GitHub CLI access. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
+
+From an authorized checkout, after preserving local changes, update a source installation with:
 
 ```bash
 git pull --ff-only

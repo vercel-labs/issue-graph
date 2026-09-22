@@ -1,7 +1,7 @@
 ---
 title: Library
-description: Use the runtime-agnostic core with a local source dependency, a GitHub CLI transport, or an HTTP transport.
-lastModified: 2026-09-19
+description: Install the published npm library and use its runtime-agnostic core with a GitHub CLI or HTTP transport.
+lastModified: 2026-09-22
 ---
 
 ## Separate the core from GitHub access
@@ -10,21 +10,17 @@ The core exports graph types, crawling, classification, ranking, rendering, reco
 
 The CLI's filesystem snapshot store and headless clustering runner are not core exports. In a server integration, own your storage, authorization, retention, and agent policy explicitly.
 
-## Use the source package today
+## Install from npm
 
-The repository is INTERNAL, so the current path requires source access. Build the authorized checkout following [Get started](/docs/get-started), then reference it from a consumer using a local dependency. The local package identity is `issue-graph@0.2.0`, still pending publication:
+Install the published library in your consumer project:
 
-```json
-{
-  "dependencies": {
-    "issue-graph": "file:../issue-graph"
-  }
-}
+```bash
+npm install issue-graph@latest
 ```
 
-Run `pnpm install` in the consumer after the checkout has been built to resolve the local dependency. A local dependency is not a registry release. These docs do not claim that `issue-graph@0.2.0` is published.
+The package declares Node.js 20 or later and provides ESM imports with TypeScript declarations. No source checkout or build is required. The source repository remains INTERNAL; npm availability does not grant repository access.
 
-| Current source import | Runtime requirements |
+| Published import | Runtime requirements |
 | --- | --- |
 | `issue-graph` | Runtime-agnostic core; caller supplies transport and inputs |
 | `issue-graph/transport/shell` | Node-compatible child processes and authenticated `gh` on `PATH` |
@@ -32,7 +28,7 @@ Run `pnpm install` in the consumer after the checkout has been built to resolve 
 
 ## Crawl with HTTP
 
-This example is for the built local source dependency. Provide the token through your server's secret environment, not browser code:
+This example uses the published npm package. Provide the token through your server's secret environment, not browser code:
 
 ```ts
 import {
@@ -115,22 +111,6 @@ console.log({ coverageComplete: report.coverageComplete, totals: report.totals }
 
 Keep coverage and count provenance in your consumer. A `null` count is not zero. The collector does not make a PR merge-ready or save CLI snapshots for you. See [Status](/docs/status) for interpretation.
 
-## Public imports after a functional release
+## Keep credentials and results scoped
 
-The public `issue-graph@0.1.0` is a placeholder with no CLI `bin`, not the functional library described here. The functional unscoped `issue-graph@0.2.0` release is selected but publication is still pending.
-
-Only after that release, the intended consumer installation is:
-
-```bash
-pnpm add issue-graph
-```
-
-After publication, the registry package uses the same import spellings as the local source dependency:
-
-```ts
-import { classify, crawl, makeFetchNode } from "issue-graph";
-import { httpTransport } from "issue-graph/transport/http";
-import { shellTransport } from "issue-graph/transport/shell";
-```
-
-These are not instructions to install today's placeholder. Until the functional release is confirmed, use the local file dependency above. Keep GitHub tokens server-side and review [permissions and privacy](/docs/security) before exposing results to other users.
+Keep GitHub tokens server-side and review [permissions and privacy](/docs/security) before exposing results to other users. Public package availability does not make queried repository data public.

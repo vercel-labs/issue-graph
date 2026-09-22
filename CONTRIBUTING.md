@@ -7,6 +7,8 @@ this project are licensed under Apache-2.0.
 
 ## Setup
 
+To use the latest published CLI without contributing to source, run `npx issue-graph@latest --help` or install it with `npm install --global issue-graph@latest`. Library consumers can use `npm install issue-graph@latest`. The public npm package requires Node.js 20 or later and does not require or grant source access. Check the installed command's help before relying on source-only features; `@latest` does not promise unreleased capabilities.
+
 Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Cloning the INTERNAL `vercel-labs/issue-graph` repository requires access and an authenticated GitHub CLI.
 
 ```bash
@@ -49,7 +51,7 @@ Keep the two skill layers separate:
 - `skill-data/core/SKILL.md` is compact operational guidance versioned with the CLI (roughly 80–120 lines). Maintain status-first routing, explicit scope, unknown counts and coverage, snapshot defaults, GitHub read-only boundaries, and untrusted-evidence/privacy rules here.
 - `skill-data/core/references/workflows.md` holds detailed workflows, flags, limits, and safety details. Retrieve it through `issue-graph skills get core --full`; do not require agents to know source paths or copy reference files into their discovery directory.
 
-When behavior changes, update the core and relevant reference together with the CLI. Keep setup/release availability in README and docs, not in the stub. The new `skills` command requires a source build until the next release; documenting it does not bump the package version or authorize publication.
+When behavior changes, update the core and relevant reference together with the CLI. Keep setup/release availability in README and docs, not in the stub. The published npm 0.2.0 package does not include the new `skills` command. That command and the current source stub require a matching source build until a release includes them; documenting them does not bump the package version or authorize publication.
 
 Preserve the discovery contract: `skills [list] [--json]`, `skills get core [--full] [--json]`, and `--help` under `skills`, `skills list`, and `skills get`. Default output is plain text/Markdown even in pipes; JSON is opt-in with `schemaVersion: 1`, `success: true`, and a `data` array for list/get. JSON help uses `data: {usage}`. List entries have `name` and `description`; get entries have `name` and `content`, adding `files: [{path, content}]` only with `--full`. A top-level `nextSteps` string array is optional. Unknown flags/names exit 2; missing assets exit 1. There is no `--all` or multi-skill form.
 
@@ -63,16 +65,16 @@ Connect the project to `vercel-labs/issue-graph` with production branch `main`. 
 
 ## Release process
 
-The selected source identity is `issue-graph@0.2.0`. npm publication is pending. The repository remains INTERNAL, and adding the workflow does not authorize a release or change repository visibility.
+`issue-graph@0.2.0` is already published on npm. The repository remains INTERNAL; public package availability does not authorize another release or change repository visibility. The current source may contain unreleased changes despite retaining the same version. Do not attempt to republish 0.2.0: the workflow rejects any existing exact version, including in verify-only mode.
 
-`.github/workflows/release.yml` has only `workflow_dispatch`, with required `expected_sha` and `expected_version` inputs and a boolean `publish` input defaulting to `false`. Before any dispatch, review the commit on canonical `main` and set `EXPECTED_SHA` to its full 40-character SHA.
+`.github/workflows/release.yml` has only `workflow_dispatch`, with required `expected_sha` and `expected_version` inputs and a boolean `publish` input defaulting to `false`. For a future release, obtain approval for an unpublished version newer than registry latest and update the source identity through review. Before any dispatch, review the commit on canonical `main`, set `EXPECTED_SHA` to its full 40-character SHA, and set `EXPECTED_VERSION` to that reviewed, approved version. The commands below do not select a version or authorize a dispatch.
 
 ### Verify-only dispatch
 
 Leave `publish` false to run the real GitHub build, retain the artifact, and exercise the Node 20/22/24 consumers. The publish job is skipped, so this mode neither requests Release environment approval nor runs a job with OIDC write permission. After the workflow is committed, an authorized maintainer can request this verification without authorizing npm publication:
 
 ```bash
-gh workflow run release.yml --repo vercel-labs/issue-graph --ref main -f expected_sha="$EXPECTED_SHA" -f expected_version=0.2.0 -F publish=false
+gh workflow run release.yml --repo vercel-labs/issue-graph --ref main -f expected_sha="$EXPECTED_SHA" -f expected_version="$EXPECTED_VERSION" -F publish=false
 ```
 
 ### Publish dispatch
@@ -86,7 +88,7 @@ Publishing requires a separate explicit `publish=true` dispatch and Release envi
 Only after publication is authorized:
 
 ```bash
-gh workflow run release.yml --repo vercel-labs/issue-graph --ref main -f expected_sha="$EXPECTED_SHA" -f expected_version=0.2.0 -F publish=true
+gh workflow run release.yml --repo vercel-labs/issue-graph --ref main -f expected_sha="$EXPECTED_SHA" -f expected_version="$EXPECTED_VERSION" -F publish=true
 ```
 
 The publish dispatch builds and tests its own retained artifact; it does not promote or reuse an artifact from the earlier verify-only run. Both modes reject noncanonical repositories, non-main refs, mismatched source identities, an existing exact registry version, and registry/network errors. Preflight requires a canonical stable `dist-tags.latest` value (`major.minor.patch`) present in registry version history, and the target must be strictly newer. Missing, malformed, prerelease, or build-metadata latest tags fail closed. Releases are serialized without cancelling a running release. Preflight is repeated immediately before publishing, but there is no atomic registry compare-and-set: coordinate out-of-band publishers to avoid a race after that final check.

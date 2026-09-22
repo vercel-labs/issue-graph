@@ -10,7 +10,7 @@
   color: var(--ig-ink);
 }
 
-.dark .ig-home {
+.dark-theme .ig-home {
   --ig-accent: #52a8ff;
 }
 .ig-home a {
@@ -40,12 +40,6 @@
   padding: 94px 0 62px;
   text-align: center;
 }
-.ig-hero-eyebrow {
-  padding: 7px 12px;
-  border: 1px solid var(--ig-line);
-  border-radius: 100px;
-  background: var(--ig-soft);
-}
 .ig-hero h1 {
   margin: 26px 0 22px;
   font-size: clamp(44px, 6.1vw, 76px);
@@ -53,9 +47,6 @@
   line-height: 1.04;
   letter-spacing: -0.055em;
   text-wrap: balance;
-}
-.ig-hero h1 span {
-  color: var(--ig-muted);
 }
 .ig-hero-description {
   max-width: 555px;
@@ -72,23 +63,9 @@
   gap: 14px;
   margin-top: 28px;
 }
-.ig-primary-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 25px;
-  min-height: 46px;
-  padding: 0 20px;
-  border-radius: 8px;
-  background: var(--ig-ink);
-  color: var(--ig-panel);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: opacity 150ms;
-}
-.ig-primary-link:hover {
-  opacity: 0.82;
+.ig-home :is(a, button, summary, pre):focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 4px;
 }
 .ig-hero-note {
   font-size: 12px;
@@ -96,144 +73,6 @@
 }
 .ig-proof-section {
   padding-bottom: 92px;
-}
-.ig-proof {
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--ig-line);
-  border-radius: 12px;
-  background: var(--ig-panel);
-  box-shadow: 0 12px 48px #00000005;
-}
-.ig-proof-bar {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
-  min-height: 48px;
-  padding: 12px 23px;
-  border-bottom: 1px solid var(--ig-line);
-  font-size: 12px;
-}
-.ig-proof-bar > span:first-child {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-}
-.ig-proof-meta {
-  font-family: var(--font-mono);
-  color: var(--ig-muted);
-  font-size: 11px;
-}
-.ig-graph-board {
-  display: grid;
-  grid-template-columns: 39% 44%;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 400px;
-  padding: 24px 34px;
-  position: relative;
-  background-color: var(--ig-soft);
-  background-image: radial-gradient(var(--ig-line) 0.8px, transparent 0.8px);
-  background-size: 15px 15px;
-}
-.ig-graph-wires {
-  position: absolute;
-  width: calc(100% - 68px);
-  height: calc(100% - 48px);
-  inset: 24px 34px;
-  pointer-events: none;
-  stroke: var(--ig-accent);
-  stroke-width: 1.1;
-  opacity: 0.4;
-}
-.ig-graph-wires circle {
-  fill: var(--ig-accent);
-  stroke: var(--ig-panel);
-  stroke-width: 3;
-}
-.ig-graph-seed {
-  position: relative;
-  z-index: 1;
-}
-.ig-graph-seed > .ig-eyebrow {
-  margin-bottom: 14px;
-}
-.ig-node {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  gap: 8px;
-  padding: 13px 16px;
-  border: 1px solid var(--ig-line);
-  border-radius: 8px;
-  background: var(--ig-panel);
-  text-decoration: none;
-  box-shadow: 0 2px 5px #00000003;
-  transition:
-    border-color 150ms,
-    box-shadow 150ms;
-}
-.ig-node:hover {
-  border-color: var(--ig-accent);
-  box-shadow: 0 3px 12px #00000008;
-}
-.ig-node-seed {
-  padding: 20px;
-  border-color: var(--ig-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ig-accent) 7%, transparent);
-}
-.ig-node-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ig-muted);
-}
-.ig-node-state {
-  color: var(--ig-accent);
-  font-size: 9px;
-}
-.ig-node-merged {
-  color: var(--ig-muted);
-}
-.ig-node-title {
-  font-size: 12px;
-  line-height: 1.45;
-  font-weight: 500;
-  text-wrap: pretty;
-}
-.ig-node-seed .ig-node-title {
-  font-size: 17px;
-  line-height: 1.35;
-  margin-top: 4px;
-  letter-spacing: -0.02em;
-}
-.ig-node-detail {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 14px;
-  margin-top: 5px;
-  border-top: 1px solid var(--ig-line);
-  font-size: 11px;
-  color: var(--ig-muted);
-}
-.ig-seed-hint {
-  display: block;
-  margin-top: 16px;
-  font-size: 11px;
-  color: var(--ig-muted);
-}
-.ig-related-nodes {
-  display: grid;
-  gap: 12px;
-}
-.ig-proof-command {
-  border-top: 1px solid var(--ig-line);
-  padding: 12px 18px;
 }
 .ig-command {
   display: flex;
@@ -279,20 +118,6 @@
   font-size: 10px;
   color: var(--ig-muted);
 }
-.ig-proof-caption {
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 14px 22px;
-  border-top: 1px solid var(--ig-line);
-  font-size: 10px;
-  color: var(--ig-muted);
-  line-height: 1.5;
-}
-.ig-proof-caption a {
-  color: var(--ig-ink);
-  white-space: nowrap;
-}
 .ig-workflows {
   padding: 72px 0 88px;
   border-top: 1px solid var(--ig-line);
@@ -322,6 +147,7 @@
 }
 .ig-workflow {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   border-top: 1px solid var(--ig-line);
   padding-top: 20px;
@@ -344,17 +170,8 @@
   min-height: 85px;
 }
 .ig-workflow-command {
-  display: block;
+  min-width: 0;
   margin: 24px 0;
-  padding: 14px;
-  min-height: 70px;
-  border: 1px solid var(--ig-line);
-  border-radius: 7px;
-  background: var(--ig-soft);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
 }
 .ig-workflow > a {
   display: flex;
@@ -440,12 +257,8 @@
   align-self: center;
   min-width: 0;
 }
-.ig-install-details > .ig-command {
+.ig-install-details > [data-geist-code-block] {
   margin: 13px 0 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--ig-line);
-  background: var(--ig-soft);
-  border-radius: 8px;
 }
 .ig-install-details > p {
   font-size: 12px;
@@ -475,10 +288,6 @@
   .ig-hero {
     padding: 64px 0 42px;
   }
-  .ig-hero-eyebrow {
-    font-size: 9px;
-    letter-spacing: 0.03em;
-  }
   .ig-hero h1 {
     font-size: clamp(38px, 9.2vw, 56px);
     margin-top: 23px;
@@ -486,53 +295,11 @@
   .ig-hero-description {
     font-size: 15px;
   }
-  .ig-proof-bar {
-    padding-inline: 14px;
-  }
-  .ig-proof-meta {
-    font-size: 9px;
-  }
-  .ig-graph-board {
-    grid-template-columns: 1fr;
-    padding: 22px 18px;
-    gap: 26px;
-  }
-  .ig-graph-wires {
-    display: none;
-  }
-  .ig-node-seed {
-    padding: 17px;
-  }
-  .ig-seed-hint {
-    display: none;
-  }
-  .ig-related-nodes {
-    padding-left: 18px;
-    border-left: 1px solid var(--ig-accent);
-  }
-  .ig-node-meta {
-    font-size: 10px;
-  }
-  .ig-node-title {
-    font-size: 12px;
-  }
-  .ig-proof-command {
-    padding: 10px 12px;
-  }
   .ig-command {
     gap: 8px;
   }
   .ig-command code {
     font-size: 10px;
-  }
-  .ig-proof-caption {
-    flex-direction: column;
-    padding-inline: 14px;
-  }
-  .ig-proof-caption a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 32px;
   }
   .ig-proof-section {
     padding-bottom: 55px;
@@ -549,9 +316,7 @@
     min-height: auto;
   }
   .ig-workflow-command {
-    min-height: auto;
     margin: 18px 0 6px;
-    font-size: 11px;
   }
   .ig-agent-section,
   .ig-install-section {

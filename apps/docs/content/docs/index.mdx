@@ -1,7 +1,7 @@
 ---
-title: issue-graph documentation
+title: Overview
 description: Inspect GitHub relationships, PR status, and backlog actions with bounded, model-free evidence.
-lastModified: 2026-09-18
+lastModified: 2026-09-22
 ---
 
 ## Start with the work in front of you
@@ -12,9 +12,21 @@ Crawling, classification, status aggregation, and queue ordering require no mode
 
 ## Install before running examples
 
-The current supported path is a source build requiring access to the **INTERNAL** `vercel-labs/issue-graph` repository. The public npm `issue-graph@0.1.0` package is a “Coming soon” placeholder with no CLI executable. A functional unscoped release is pending; `pnpm dlx issue-graph` does not work for this tool yet.
+[`issue-graph`](https://www.npmjs.com/package/issue-graph) is published on npm with the CLI and library. Try the latest published CLI without a global installation:
 
-Follow [Get started](/docs/get-started) for prerequisites, authentication, and a first graph around the public [portless PR #427](https://github.com/vercel-labs/portless/pull/427).
+```bash
+npx issue-graph@latest --help
+```
+
+For the installed `issue-graph` command used throughout these docs, run `npm install --global issue-graph@latest`. Node.js 20 or later and authenticated GitHub CLI access are required for GitHub queries. The source repository remains **INTERNAL**; installing the public package does not require or grant source access.
+
+Follow [Get started](/docs/get-started) for prerequisites, authentication, and a first graph around public [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113):
+
+```bash
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+```
+
+The bounded capture from 2026-09-22 contains five nodes, all in `vercel-labs/agent-browser`: closed issue #1113, merged PR #1137, closed regression #1148, and open follow-ups #1371 and #1607. It is not a live feed or complete history. A merged fix and closed seed do not prove that related follow-ups are resolved.
 
 ## Choose a workflow
 

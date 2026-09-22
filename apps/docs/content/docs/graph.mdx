@@ -1,7 +1,7 @@
 ---
 title: Graph
 description: Trace issue and pull request relationships with explicit crawl bounds, local history, and an HTML explorer.
-lastModified: 2026-09-18
+lastModified: 2026-09-22
 ---
 
 ## Start from a seed
@@ -9,9 +9,13 @@ lastModified: 2026-09-18
 Graph mode is the default command, not a `graph` subcommand. Use an issue or PR URL, or a bare number with a repository:
 
 ```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot
-issue-graph https://github.com/vercel-labs/portless/pull/427 --no-snapshot
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+issue-graph https://github.com/vercel-labs/agent-browser/issues/1113 --depth 1 --max-nodes 12 --no-snapshot
 ```
+
+The bounded capture from 2026-09-22 shows five nodes, all in `vercel-labs/agent-browser`: closed issue #1113, merged PR #1137, closed regression #1148, and open follow-ups #1371 and #1607. PR #1137 has a closing link to #1113; that link does not close or prove resolution of the follow-ups. See [Get started](/docs/get-started) for the individual node links and captured states.
+
+This is not a live feed or complete history. All five fetched nodes are shown, with no node-cap or hub truncation in this capture, but 19 references remain beyond the depth boundary and 22 edges to unfetched references are omitted from the displayed graph. States were collected over a window rather than atomically; future runs can differ.
 
 For a repository you maintain, replace `owner/repo` and the seed numbers with your scope:
 
@@ -50,7 +54,7 @@ Review `cappedOut`, unfetched nodes, and hubs before concluding that no related 
 Without `--no-snapshot`, graph mode saves under `~/.issue-graph/` in a directory derived from the repository and seed list. Re-run the same seed list to see new nodes, state changes, and new links relative to the previous saved graph. Keep seed order consistent for history lookup.
 
 ```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12
 ```
 
 `--no-snapshot` skips writing a new snapshot, but the command may still read existing history to render a diff. Graph history is a comparison of observed, bounded graphs, not an audit log. Missing evidence, different crawl bounds, or changed access can change what is visible.
@@ -58,7 +62,7 @@ issue-graph 427 --repo vercel-labs/portless --depth 1
 ## Export JSON and HTML
 
 ```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot --json graph.json --html graph.html
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
 ```
 
 `--json PATH` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Unlike status, graph JSON is a file export and does not carry a report `schemaVersion` in the current source. Markdown still goes to stdout. `--format json` is not a graph output switch.

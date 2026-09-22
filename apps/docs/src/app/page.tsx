@@ -1,6 +1,7 @@
+import { CodeBlock } from "@vercel/geistdocs/components/code-block";
 import Link from "next/link";
-import { CopyCommand } from "@/components/copy-command";
 import { GraphProof } from "@/components/graph-proof";
+import { InstallSelector } from "@/components/install-selector";
 import { landingDescription, landingTitle, workflows } from "@/lib/landing-content";
 import { pageMetadata } from "@/lib/page-metadata";
 import {
@@ -29,9 +30,6 @@ export default function Home() {
         {JSON.stringify(structuredData).replace(/</g, "\\u003c")}
       </script>
       <section className="ig-hero" aria-labelledby="hero-title">
-        <div className="ig-eyebrow ig-hero-eyebrow">
-          <span className="ig-status-dot" /> A Vercel Labs CLI for humans and agents
-        </div>
         <h1 id="hero-title">
           Find related work.
           <br />
@@ -39,9 +37,7 @@ export default function Home() {
         </h1>
         <p className="ig-hero-description">{landingDescription}</p>
         <div className="ig-hero-action">
-          <Link className="ig-primary-link" href="/docs/get-started">
-            Trace your first issue <span aria-hidden="true">↗</span>
-          </Link>
+          <InstallSelector />
           <span className="ig-hero-note">Read-only on GitHub. No model required.</span>
         </div>
       </section>
@@ -69,7 +65,9 @@ export default function Home() {
               <span className="ig-workflow-number">{workflow.number}</span>
               <h3>{workflow.title}</h3>
               <p>{workflow.description}</p>
-              <code className="ig-workflow-command">{workflow.command}</code>
+              <CodeBlock title="Terminal" className="ig-workflow-command">
+                <code>{workflow.command}</code>
+              </CodeBlock>
               <Link href={workflow.href}>
                 {workflow.link} <span aria-hidden="true">↗</span>
               </Link>
@@ -116,7 +114,7 @@ export default function Home() {
             </p>
           </div>
           <div className="ig-agent-links">
-            <Link href="/skill.md">skill.md</Link>
+            <Link href="/docs/agents.md">Agent setup</Link>
             <Link href="/llms.txt">llms.txt</Link>
             <Link href="/docs/library">Library API</Link>
           </div>
@@ -136,14 +134,9 @@ export default function Home() {
           <span className="ig-release-label">
             {packageReleasePending ? "npm release in preparation" : "Run with Node.js 20+"}
           </span>
-          <CopyCommand
-            command={plannedInstallCommand}
-            label={
-              packageReleasePending
-                ? "Copy the planned npm command, available after release"
-                : "Copy npm command"
-            }
-          />
+          <CodeBlock title="Terminal">
+            <code>{plannedInstallCommand}</code>
+          </CodeBlock>
           <p>
             {packageReleasePending
               ? "This command is for the upcoming functional npm release. Today, source installation requires repository access. The quickstart explains both paths."

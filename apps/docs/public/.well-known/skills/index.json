@@ -1,0 +1,9 @@
+{
+  "skills": [
+    {
+      "name": "issue-graph",
+      "description": "Use the published issue-graph CLI for GitHub PR counts, related issues, competing fixes, and evidence-based backlog review.",
+      "files": ["SKILL.md"]
+    }
+  ]
+}

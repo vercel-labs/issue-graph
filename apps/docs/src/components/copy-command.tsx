@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from "react";
 export function CopyCommand({
   command,
   label = "Copy command",
+  prompt = "$",
 }: {
   command: string;
   label?: string;
+  prompt?: string;
 }) {
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,9 +34,11 @@ export function CopyCommand({
 
   return (
     <div className="ig-command">
-      <span className="ig-prompt" aria-hidden="true">
-        $
-      </span>
+      {prompt ? (
+        <span className="ig-prompt" aria-hidden="true">
+          {prompt}
+        </span>
+      ) : null}
       <code>{command}</code>
       <button type="button" onClick={copy} aria-label={label}>
         <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">

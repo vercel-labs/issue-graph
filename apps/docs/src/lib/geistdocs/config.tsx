@@ -8,6 +8,7 @@ export const config = defineConfig({
   logo: <span className="font-medium tracking-tight">{siteName}</span>,
   logoHref: "/",
   navbarVariant: "oss",
+  navbarBrand: "labs",
   navbarActiveProduct: siteName,
   navbarGithub: { enabled: true },
   github: {

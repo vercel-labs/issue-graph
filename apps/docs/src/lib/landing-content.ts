@@ -1,5 +1,5 @@
 export const landingTitle = "Find related work. Before you start.";
-export const landingLastModified = "2026-09-18";
+export const landingLastModified = "2026-09-22";
 export const landingDescription =
   "The fix might already be in another pull request. Trace the issues, competing changes, and follow-ups around your next task, without opening another dozen tabs.";
 
@@ -9,7 +9,7 @@ export const workflows = [
     title: "See what is connected",
     description:
       "Start with an issue or PR. Follow references across repositories and find the work you should read first.",
-    command: "issue-graph 427 --repo vercel-labs/portless --depth 1",
+    command: "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
     href: "/docs/graph",
     link: "Trace a graph",
   },

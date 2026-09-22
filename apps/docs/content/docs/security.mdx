@@ -1,7 +1,7 @@
 ---
 title: Permissions and privacy
 description: Understand GitHub read access, local writes, private-data boundaries, and optional external agent execution.
-lastModified: 2026-09-18
+lastModified: 2026-09-22
 ---
 
 ## Read-only on GitHub
@@ -18,7 +18,7 @@ The CLI and shell transport use authenticated `gh` access. Check authentication 
 gh auth status
 ```
 
-Your account or token needs read access to the issues, PRs, and repository metadata you request, including referenced private repositories. Organization SSO or token restrictions can still block access. Source installation also requires access to the INTERNAL `vercel-labs/issue-graph` repository; access to a public demo repository is not enough to clone it.
+Your account or token needs read access to the issues, PRs, and repository metadata you request, including referenced private repositories. Organization SSO or token restrictions can still block access. Installing the public npm package does not require source access. Optional source development requires access to the INTERNAL `vercel-labs/issue-graph` repository; neither npm installation nor access to a public demo repository grants permission to clone it.
 
 For the HTTP library transport, provide a token through server-side secret storage. Use the least repository scope and read permissions compatible with your queries; the CLI's read-only behavior does not remove write permissions from a broadly authorized credential. Never expose a token in client-side code, exported files, examples, or committed configuration.
 
