@@ -1,12 +1,9 @@
 .ig-demo {
-  --ig-demo-bg: var(--color-background-100, #fff);
-  --ig-demo-fg: var(--color-gray-1000, #171717);
-  --ig-demo-muted: var(--color-gray-900, #666);
-  --ig-demo-border: var(--color-gray-300, #eaeaea);
-  --ig-demo-pill-bg: #fff;
-  --ig-demo-green: #18794e;
-  --ig-demo-purple: #8e4ec6;
-  --ig-demo-cyan: #0070c9;
+  --ig-demo-bg: var(--ds-background-100);
+  --ig-demo-fg: var(--ds-gray-1000);
+  --ig-demo-muted: var(--ds-gray-900);
+  --ig-demo-border: var(--ds-gray-300);
+  --ig-demo-pill-bg: var(--ds-background-100);
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -16,10 +13,7 @@
 
 .dark-theme .ig-demo,
 .dark .ig-demo {
-  --ig-demo-pill-bg: var(--color-background-200, #1f1f1f);
-  --ig-demo-green: #62c78f;
-  --ig-demo-purple: #c89bf2;
-  --ig-demo-cyan: #70b8ff;
+  --ig-demo-pill-bg: var(--ds-background-200);
 }
 
 .ig-demo-tabs {
@@ -103,21 +97,29 @@
 
 .ig-demo .ig-demo-tab:focus-visible,
 .ig-demo-panel:focus-visible {
-  outline: 2px solid var(--ig-demo-cyan);
+  outline: 2px solid var(--ds-blue-900);
   outline-offset: -3px;
 }
 
 .ig-demo-summary {
   display: flex;
-  min-height: 20px;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  margin: 0 0 12px;
-  color: var(--ig-demo-fg);
+  margin: 0 0 16px;
+  color: var(--ig-demo-muted);
   font-size: 14px;
   font-weight: 400;
   line-height: 20px;
   text-align: center;
+}
+
+.ig-demo-purpose {
+  color: var(--ig-demo-fg);
+  font-size: 16px;
+  font-weight: 500;
 }
 
 .ig-demo-frame {
@@ -197,14 +199,12 @@
   word-break: normal;
 }
 
-.ig-demo-prompt,
-.ig-demo-state-open {
-  color: var(--ig-demo-green);
-}
-
-.ig-demo-state-closed,
-.ig-demo-state-merged {
-  color: var(--ig-demo-purple);
+.ig-demo-panel[data-example="graph"] pre,
+.ig-demo-panel[data-example="graph"] code,
+.ig-demo-panel[data-example="plan"] pre,
+.ig-demo-panel[data-example="plan"] code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 640px) {
@@ -223,19 +223,11 @@
   }
 
   .ig-demo-summary {
-    min-height: 40px;
+    min-height: 64px;
   }
 
   .ig-demo-panel {
     padding: 14px;
     font-size: 12px;
-  }
-
-  .ig-demo-panel[data-example="graph"] pre,
-  .ig-demo-panel[data-example="graph"] code,
-  .ig-demo-panel[data-example="plan"] pre,
-  .ig-demo-panel[data-example="plan"] code {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
   }
 }

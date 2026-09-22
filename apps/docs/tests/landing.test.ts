@@ -6,7 +6,7 @@ import Home from "../src/app/page";
 import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
-import { landingTitle } from "../src/lib/landing-content";
+import { landingTitle, workflows } from "../src/lib/landing-content";
 import { agentSetupPrompt, plannedInstallCommand } from "../src/lib/site";
 import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
 
@@ -44,7 +44,20 @@ describe("launch feedback", () => {
     expect(html.match(/data-geist-code-block=""/g)).toHaveLength(4);
     expect(html.match(/data-section="tabs"/g)).toHaveLength(4);
     expect(html.match(/data-section="content"/g)).toHaveLength(4);
-    expect(html).toContain(plannedInstallCommand);
+    const codes = html.match(/<code\b[^>]*>[\s\S]*?<\/code>/g) ?? [];
+    for (const command of [
+      ...workflows.map((workflow) => workflow.command),
+      plannedInstallCommand,
+    ]) {
+      expect(
+        codes.some(
+          (code) =>
+            code.includes("ig-demo-token-") &&
+            code.replace(/<code\b[^>]*>/, "<code>").replace(/<\/?span\b[^>]*>/g, "") ===
+              renderToStaticMarkup(createElement("code", null, command)),
+        ),
+      ).toBe(true);
+    }
     expect(html).not.toContain('class="ig-command"');
     expect(read("../src/app/page.tsx")).toContain("@vercel/geistdocs/components/code-block");
   });

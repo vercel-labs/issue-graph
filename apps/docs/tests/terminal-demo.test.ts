@@ -60,6 +60,19 @@ test("SSR includes three full outputs, the selected summary and linked accessibl
   expect(html).toContain("Validate repository-specific behavior before mutating GitHub.");
 });
 
+test("minimal Geist accents keep commands readable and emphasize only useful output signals", () => {
+  const html = renderToStaticMarkup(createElement(TerminalDemo, { examples }));
+  expect(html).toContain('class="ig-terminal-command"');
+  expect(html).toContain('ig-demo-token-merged">issue-graph</span>');
+  expect(html).toContain('ig-demo-token-reference">--repo</span>');
+  expect(html).toContain('ig-demo-token-positive">vercel-labs/agent-browser</span>');
+  expect(html).toContain('ig-demo-token-attention">2</span>');
+  expect(html).toContain('ig-demo-token-positive">1</span>');
+  expect(html).toContain('ig-demo-token-reference">Next:</span>');
+  expect(html).toContain('ig-demo-line ig-demo-line-plain">- Blocked: 6');
+  expect(html).not.toMatch(/ig-demo-line-focus|ig-demo-token-(?:parameter|keyword|danger)/);
+});
+
 test("plain formatting preserves labels and URLs while React escapes display text", () => {
   const output = plainTerminalText(
     "## Result\r\n**OPEN** PR_SET_PDEATHSIG _(depth 1)_\r\n[public PR](https://example.com/pr)\nhttps://example.com/a?x=1&y=2\n\t🟢",
@@ -160,6 +173,7 @@ test("Markdown shares examples and distinguishes the full capture from the displ
 test("terminal has no WASM, deferred output, replay timers or network execution", () => {
   const source = [
     "../src/components/terminal-demo.tsx",
+    "../src/components/terminal-output.tsx",
     "../src/components/graph-proof.tsx",
     "../src/lib/terminal-demo.ts",
     "../src/lib/terminal-examples.ts",

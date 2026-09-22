@@ -2,6 +2,7 @@ import { CodeBlock } from "@vercel/geistdocs/components/code-block";
 import Link from "next/link";
 import { GraphProof } from "@/components/graph-proof";
 import { InstallSelector } from "@/components/install-selector";
+import { renderTerminalCommand } from "@/components/terminal-output";
 import { landingDescription, landingTitle, workflows } from "@/lib/landing-content";
 import { pageMetadata } from "@/lib/page-metadata";
 import {
@@ -62,7 +63,7 @@ export default function Home() {
               <h3>{workflow.title}</h3>
               <p>{workflow.description}</p>
               <CodeBlock title="Terminal" className="ig-workflow-command">
-                <code>{workflow.command}</code>
+                <code>{renderTerminalCommand(workflow.command)}</code>
               </CodeBlock>
               <Link href={workflow.href}>
                 {workflow.link} <span aria-hidden="true">↗</span>
@@ -131,7 +132,7 @@ export default function Home() {
             {packageReleasePending ? "npm release in preparation" : "Run with Node.js 20+"}
           </span>
           <CodeBlock title="Terminal">
-            <code>{plannedInstallCommand}</code>
+            <code>{renderTerminalCommand(plannedInstallCommand)}</code>
           </CodeBlock>
           <p>
             {packageReleasePending

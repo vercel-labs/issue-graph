@@ -2,22 +2,14 @@
 
 import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalDemoProps } from "@/lib/terminal-demo";
+import { renderTerminalCommand, TerminalOutput } from "./terminal-output";
 import "./terminal-demo.css";
 
-function TerminalOutput({ output }: { output: string }) {
-  const tokens = Array.from(
-    output.matchAll(/\b(OPEN|CLOSED|MERGED)\b|[\s\S]+?(?=\b(?:OPEN|CLOSED|MERGED)\b|$)/g),
-  );
-  return tokens.map((token) =>
-    token[1] ? (
-      <span key={token.index} className={`ig-demo-state-${token[1].toLowerCase()}`}>
-        {token[0]}
-      </span>
-    ) : (
-      token[0]
-    ),
-  );
-}
+const purposes: Record<string, string> = {
+  graph: "Trace fixes and open follow-ups",
+  status: "Spot PRs waiting for review",
+  plan: "Choose what to tackle next",
+};
 
 export function TerminalDemo({ examples }: TerminalDemoProps) {
   const instanceId = useId();
@@ -121,7 +113,8 @@ export function TerminalDemo({ examples }: TerminalDemoProps) {
         ))}
       </div>
       <p className="ig-demo-summary" aria-live="polite" aria-atomic="true">
-        {examples[selectedIndex].summary}
+        <span className="ig-demo-purpose">{purposes[examples[selectedIndex].id]}</span>
+        <span>{examples[selectedIndex].summary}</span>
       </p>
       <div className="ig-demo-frame">
         <div className="ig-demo-bar">
@@ -146,9 +139,9 @@ export function TerminalDemo({ examples }: TerminalDemoProps) {
             <pre>
               <code>
                 <span className="ig-demo-prompt">$ </span>
-                {example.command}
+                {renderTerminalCommand(example.command)}
                 {"\n\n"}
-                <TerminalOutput output={example.output} />
+                <TerminalOutput output={example.output} exampleId={example.id} />
               </code>
             </pre>
           </div>
