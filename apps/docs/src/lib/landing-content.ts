@@ -1,4 +1,4 @@
-export const landingTitle = "Find related work. Before you start.";
+export const landingTitle = "Find related work before you start";
 export const landingLastModified = "2026-09-22";
 export const landingDescription =
   "The fix might already be in another pull request. Trace the issues, competing changes, and follow-ups around your next task, without opening another dozen tabs.";

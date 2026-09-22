@@ -30,11 +30,7 @@ export default function Home() {
         {JSON.stringify(structuredData).replace(/</g, "\\u003c")}
       </script>
       <section className="ig-hero" aria-labelledby="hero-title">
-        <h1 id="hero-title">
-          Find related work.
-          <br />
-          <span>Before you start.</span>
-        </h1>
+        <h1 id="hero-title">{landingTitle}</h1>
         <p className="ig-hero-description">{landingDescription}</p>
         <div className="ig-hero-action">
           <InstallSelector />

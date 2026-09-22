@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { docsSlugs, markdownPath } from "../src/lib/docs-paths";
+import { landingTitle } from "../src/lib/landing-content";
 import { canonicalUrl, repositoryUrl } from "../src/lib/site";
 import { testUrl } from "./test-url";
 
@@ -46,6 +47,17 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
   assert.equal(html.response.status, 200, path);
   assert.match(html.response.headers.get("content-type") ?? "", /text\/html/, path);
   assert.equal((html.body.match(/<h1(?:\s|>)/g) ?? []).length, 1, `One H1: ${path}`);
+  if (path === "/") {
+    const heading = html.body.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "";
+    assert.equal(
+      heading
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+      landingTitle,
+      "Canonical landing H1 sentence",
+    );
+  }
   assert.equal((html.body.match(/<main(?:\s|>)/g) ?? []).length, 1, `One main: ${path}`);
   assert.ok(html.body.includes('id="main-content"'), `Skip target: ${path}`);
   const title = html.body.match(/<title>([^<]+)<\/title>/)?.[1];
@@ -60,14 +72,24 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
   assert.equal(new URL(ogUrl).href, new URL(canonicalUrl(path)).href, `OG URL: ${path}`);
   const image = htmlAttribute(html.body, "meta", "property", "og:image", "content");
   assert.ok(image, `OG image metadata: ${path}`);
-  assert.ok(image.startsWith(canonicalUrl("/og")), `OG: ${path}`);
+  assert.equal(image, canonicalUrl(path === "/" ? "/og" : `/og${path}`), `OG: ${path}`);
   const imageResponse = await fetch(new URL(new URL(image).pathname, origin), {
     headers: { accept: "image/*" },
     redirect: "manual",
   });
   assert.equal(imageResponse.status, 200, `OG image: ${path}`);
-  assert.match(imageResponse.headers.get("content-type") ?? "", /^image\//);
-  assert.ok((await imageResponse.arrayBuffer()).byteLength > 0);
+  assert.match(imageResponse.headers.get("content-type") ?? "", /^image\/png(?:;|$)/);
+  const png = Buffer.from(await imageResponse.arrayBuffer());
+  assert.ok(png.byteLength > 33, `PNG body: ${path}`);
+  assert.deepEqual(
+    [...png.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10],
+    `PNG signature: ${path}`,
+  );
+  assert.equal(png.readUInt32BE(8), 13, `PNG IHDR length: ${path}`);
+  assert.equal(png.toString("ascii", 12, 16), "IHDR", `PNG header: ${path}`);
+  assert.equal(png.readUInt32BE(16), 1200, `OG width: ${path}`);
+  assert.equal(png.readUInt32BE(20), 630, `OG height: ${path}`);
   assert.ok(
     htmlAttribute(html.body, "meta", "name", "description", "content"),
     `Description: ${path}`,

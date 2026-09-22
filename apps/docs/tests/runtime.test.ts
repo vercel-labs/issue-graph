@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import robots from "../src/app/robots";
 import {
@@ -9,7 +10,7 @@ import {
 } from "../src/lib/docs-paths";
 import { applyDocsResponseHeaders } from "../src/lib/docs-response-headers";
 import { pageMetadata } from "../src/lib/page-metadata";
-import { canonicalUrl, isPreview, siteUrl } from "../src/lib/site";
+import { canonicalUrl, isPreview, siteName, siteUrl } from "../src/lib/site";
 import { textResponse } from "../src/lib/text-response";
 
 describe("route boundaries", () => {
@@ -69,32 +70,47 @@ describe("metadata and response isolation", () => {
     );
   });
 
-  test("gives every page a canonical, unique title and an OG image", () => {
+  test("gives every docs page unique, consistent canonical, OG and Twitter metadata", () => {
     const titles = new Set<string>();
+    const descriptions = new Set<string>();
+    const images = new Set<string>();
     for (const slug of docsSlugs) {
       const pathname = slug ? `/docs/${slug}` : "/docs";
-      const metadata = pageMetadata(
-        pathname,
-        slug || "Documentation",
-        `Description for ${pathname}`,
+      const source = readFileSync(
+        new URL(`../content/docs/${slug || "index"}.mdx`, import.meta.url),
+        "utf8",
       );
+      const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+      const title = frontmatter?.[1]?.match(/^title:\s*(.+)$/m)?.[1] ?? "";
+      const description = frontmatter?.[1]?.match(/^description:\s*(.+)$/m)?.[1] ?? "";
+      expect(title).not.toBe("");
+      expect(description).not.toBe("");
+      const fullTitle = `${title} | ${siteName}`;
+      const image = `${siteUrl}/og${pathname}`;
+      const metadata = pageMetadata(pathname, title, description);
+      expect(metadata.title).toEqual({ absolute: fullTitle });
+      expect(metadata.description).toBe(description);
       expect(metadata.alternates?.canonical).toBe(canonicalUrl(pathname));
       expect(metadata.alternates?.types?.["text/markdown"]).toBe(canonicalUrl(`${pathname}.md`));
       expect(metadata.openGraph).toMatchObject({
         url: canonicalUrl(pathname),
-        images: [
-          {
-            url: `${siteUrl}/og${pathname}`,
-            width: 1200,
-            height: 630,
-            alt: slug || "Documentation",
-          },
-        ],
+        title: fullTitle,
+        description,
+        images: [{ url: image, width: 1200, height: 630, alt: title }],
+      });
+      expect(metadata.twitter).toEqual({
+        card: "summary_large_image",
+        title: fullTitle,
+        description,
+        images: [image],
       });
       expect(metadata.robots).toEqual({ index: !isPreview, follow: !isPreview });
-      const title = JSON.stringify(metadata.title);
-      expect(titles.has(title)).toBe(false);
-      titles.add(title);
+      expect(titles.has(fullTitle)).toBe(false);
+      expect(descriptions.has(description)).toBe(false);
+      expect(images.has(image)).toBe(false);
+      titles.add(fullTitle);
+      descriptions.add(description);
+      images.add(image);
     }
   });
 

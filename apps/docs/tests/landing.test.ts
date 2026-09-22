@@ -7,6 +7,7 @@ import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
 import graph from "../src/lib/example-graph.json";
+import { landingTitle } from "../src/lib/landing-content";
 import { agentSetupPrompt, plannedInstallCommand } from "../src/lib/site";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -20,13 +21,20 @@ describe("launch feedback", () => {
     expect(layout).not.toContain("LogoVercelLabs");
   });
 
+  test("renders one canonical headline without periods or forced line breaks", () => {
+    const html = renderToStaticMarkup(createElement(Home));
+    const headings = html.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g);
+    expect(landingTitle).toBe("Find related work before you start");
+    expect(headings).toEqual([`<h1 id="hero-title">${landingTitle}</h1>`]);
+    expect(headings?.[0]).not.toContain(".");
+    expect(headings?.[0]).not.toMatch(/<br\b/);
+  });
+
   test("removes the hero eyebrow and exposes the audience selector", () => {
     const html = renderToStaticMarkup(createElement(Home));
     expect(html).not.toContain("A Vercel Labs CLI for humans and agents");
     expect(html).not.toContain("ig-hero-eyebrow");
     expect(html).not.toContain("ig-graph-board");
-    expect(html).toContain("Find related work.");
-    expect(html).toContain("Before you start.");
     expect(html).toContain("For humans");
     expect(html).toContain("For agents");
   });
