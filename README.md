@@ -10,9 +10,9 @@ Find related issues, competing changes, and unresolved follow-ups before you sta
 
 `issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, classification, and ranking need no model. Root-cause clustering is an optional agent step.
 
-![issue-graph demo](apps/docs/public/issue-graph-demo.png)
+![issue-graph demo](https://issue-graph.dev/issue-graph-demo.png)
 
-Example output, not a live feed or complete history. [Capture details](apps/docs/content/docs/graph.mdx).
+Example output, not a live feed or complete history. [Capture details](https://issue-graph.dev/docs/graph).
 
 ## Start here
 
@@ -123,6 +123,7 @@ Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), 
 - [Library](apps/docs/content/docs/library.mdx): core, shell, and HTTP integrations
 - [Security](apps/docs/content/docs/security.mdx): permissions and private data
 - [Reference](apps/docs/content/docs/reference.mdx): commands and output contracts
+- [Changelog](https://issue-graph.dev/docs/changelog): release notes
 
 ## Limits and privacy
 

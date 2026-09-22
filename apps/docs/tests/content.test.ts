@@ -133,7 +133,7 @@ describe("documentation content contract", () => {
       expect(page).toContain(`${example.coverage.beyondDepthReferences} references`);
       expect(page).toContain(`${example.coverage.omittedEdges} edges`);
     }
-    expect(pages[3]).toContain("[Capture details](apps/docs/content/docs/graph.mdx)");
+    expect(pages[3]).toContain("[Capture details](https://issue-graph.dev/docs/graph)");
   });
 
   test("root guidance separates published installation from future release authorization", async () => {

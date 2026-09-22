@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm sync:skill && next dev",
-    "build": "pnpm sync:skill && fumadocs-mdx && next build",
+    "dev": "pnpm sync:content && next dev",
+    "build": "pnpm sync:content && fumadocs-mdx && next build",
+    "sync:content": "pnpm sync:skill && pnpm sync:changelog",
     "sync:skill": "tsx scripts/sync-skill.ts",
+    "sync:changelog": "tsx scripts/sync-changelog.ts",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
     "typecheck": "fumadocs-mdx && next typegen && tsc --noEmit",

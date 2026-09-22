@@ -712,6 +712,8 @@ describe("manual release workflow contract", () => {
       "inputs.publish == true && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'",
     );
     expect(workflow.jobs.consumers.if).toBeUndefined();
+    expect(workflow.jobs["github-release"].needs).toBe("publish");
+    expect(workflow.jobs["github-release"].if).toBe(workflow.jobs.publish.if);
     for (const job of Object.values(workflow.jobs) as {
       steps: { uses?: string; with?: Record<string, unknown> }[];
     }[]) {
@@ -724,7 +726,8 @@ describe("manual release workflow contract", () => {
       { permissions?: Record<string, string> },
     ][]) {
       expect(job.permissions?.["id-token"]).toBe(name === "publish" ? "write" : undefined);
-      expect(job.permissions?.contents).not.toBe("write");
+      if (name === "github-release") expect(job.permissions?.contents).toBe("write");
+      else expect(job.permissions?.contents).not.toBe("write");
     }
   });
 

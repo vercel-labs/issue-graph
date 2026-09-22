@@ -67,6 +67,10 @@ Connect the project to `vercel-labs/issue-graph` with production branch `main`. 
 
 ## Release process
 
+Keep the current version's notes between the release markers in `CHANGELOG.md`, following the `## X.Y.Z` heading format. Run `pnpm --filter @issue-graph/docs sync:changelog` to update the generated docs page; docs development and build also sync it. Do not edit `apps/docs/content/docs/changelog.mdx` directly.
+
+After npm publication and registry-byte verification succeed, the workflow creates the matching `vX.Y.Z` GitHub Release from those notes at the approved commit. Verify-only runs do not create a tag or release.
+
 The repository remains INTERNAL; public package availability does not authorize another release or change repository visibility. The current source may contain unreleased changes despite retaining the same version as a published package. Check registry state rather than inferring publication from source, documentation, or a deployment. Never attempt to republish an existing version: the workflow rejects any existing exact version, including in verify-only mode.
 
 `.github/workflows/release.yml` has only `workflow_dispatch`, with required `expected_sha` and `expected_version` inputs and a boolean `publish` input defaulting to `false`. `expected_version` deliberately has no default; each dispatch must supply the exact approved version. Obtain approval for an unpublished version newer than registry latest and update the source identity through review. After the release changes merge, review the commit on canonical `main`, set `EXPECTED_SHA` to its full 40-character SHA, and set `EXPECTED_VERSION` to the matching, reviewed, approved `package.json` version. Merging the PR does not dispatch the workflow or authorize publication. The commands below do not select a version or authorize a dispatch.
