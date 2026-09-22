@@ -251,8 +251,8 @@ const publicSkill = await request("/.well-known/skills/issue-graph/SKILL.md", {
 });
 assert.equal(publicSkill.response.status, 200);
 assert.match(publicSkill.body, /^---\nname: issue-graph\n/);
-assert.match(publicSkill.body, /https:\/\/issue-graph\.dev\/docs\/agents\.md/);
-assert.doesNotMatch(publicSkill.body, /skills get core/);
+assert.equal(publicSkill.body, skill.body);
+assert.match(publicSkill.body, /issue-graph skills get core/);
 checks += 2;
 console.log(
   `PASS: ${checks} route checks against ${origin.origin}${preview ? " (preview noindex)" : ""}`,

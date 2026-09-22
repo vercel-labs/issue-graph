@@ -18,25 +18,27 @@ To inspect the available skill without installing it:
 npx skills@latest add https://issue-graph.dev --list
 ```
 
-The skill points agents to `https://issue-graph.dev/docs/agents.md` for release-aware workflows. You can also ask an agent to read that page for one task without installing a skill.
+The well-known download and [the `/skill.md` route](/skill.md) serve the same canonical skill. It tells agents to load operational guidance from the installed CLI rather than keeping a separate copy of workflows.
 
 ## Install the CLI separately
 
-Follow [Get started](/docs/get-started) to install `issue-graph@latest` from npm, or inspect it with `npx issue-graph@latest --help`. Ask before installing or upgrading the CLI, changing authentication, or writing local files. Skill installation does not grant GitHub access.
+```bash
+npm install --global issue-graph@latest
+issue-graph --help
+```
+
+For a quick inspection without a global installation, use `npx issue-graph@latest --help`. Follow [Get started](/docs/get-started) for GitHub authentication. Ask before installing or upgrading the CLI, changing authentication, or writing local files. Installing the CLI does not register the agent skill, and installing the skill does not grant GitHub access.
 
 ## Match guidance to the installed release
 
-`@latest` selects a published release, not unreleased source capabilities. Check the installed version and command help before choosing flags:
+Before operational commands, load and read the core guidance bundled with the CLI. Add `--full` when detailed workflows or references are needed:
 
 ```bash
-issue-graph --help
-issue-graph status --help
-issue-graph schema
+issue-graph skills get core
+issue-graph skills get core --full
 ```
 
-The npm 0.2.0 package includes `skills/issue-graph/SKILL.md`, but that bundled file contains outdated installation and publication notes. For existing global installations, `npm root --global` locates the package; use this site's npm setup instructions rather than those old notes.
-
-The newer source stub expects a skills subcommand that is not available in npm version 0.2.0. Do not pair the newer source stub with the published CLI. Do not install the source stub from `/skill.md`; the public well-known skill above is separate and release-compatible. If guidance and executable capabilities differ, report the mismatch and stop instead of inventing commands or automatically upgrading.
+Use `issue-graph skills list` to discover guidance and command-specific `--help` to check syntax. The canonical skill provides discovery; the installed CLI supplies the core and references. If the executable, guidance, or assets are unavailable, stop and report the mismatch and observed error. Do not invent guidance or automatically install or upgrade anything; ask for an authorized setup correction.
 
 ## Route the request before collecting evidence
 

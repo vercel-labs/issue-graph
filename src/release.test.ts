@@ -608,16 +608,21 @@ describe("supplied package archive", () => {
 });
 
 describe("retained artifact metadata", () => {
+  const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const sourceIdentity = { name: manifest.name, version: manifest.version };
+  const filename = `${sourceIdentity.name}-${sourceIdentity.version}.tgz`;
+
   function recorded() {
     const dir = temporary();
-    const tarball = join(dir, "issue-graph-0.2.0.tgz");
-    copyFileSync(archive(), tarball);
+    const tarball = join(dir, filename);
+    copyFileSync(archive(sourceIdentity), tarball);
     const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
     const env = {
       ...process.env,
       ...context,
       GITHUB_SHA: head,
       EXPECTED_SHA: head,
+      EXPECTED_VERSION: sourceIdentity.version,
       EXPECTED_TARBALL_SHA256: sha256(tarball),
       GITHUB_OUTPUT: join(temporary(), "outputs"),
     };
@@ -636,9 +641,9 @@ describe("retained artifact metadata", () => {
     const { dir, tarball, env, run } = recorded();
     const before = readFileSync(tarball);
     expect(JSON.parse(readFileSync(join(dir, "release.json"), "utf8"))).toEqual({
-      ...identity,
+      ...sourceIdentity,
       commit: env.EXPECTED_SHA,
-      filename: "issue-graph-0.2.0.tgz",
+      filename,
       sha256: env.EXPECTED_TARBALL_SHA256,
     });
     expect(readFileSync(env.GITHUB_OUTPUT, "utf8")).toContain(
@@ -685,6 +690,7 @@ describe("manual release workflow contract", () => {
     expect(Object.keys(workflow.on)).toEqual(["workflow_dispatch"]);
     expect(workflow.on.workflow_dispatch.inputs.expected_sha.required).toBe(true);
     expect(workflow.on.workflow_dispatch.inputs.expected_version.required).toBe(true);
+    expect(workflow.on.workflow_dispatch.inputs.expected_version).not.toHaveProperty("default");
     expect(workflow.on.workflow_dispatch.inputs.publish).toEqual({
       description: "Publish after verification and Release environment approval",
       required: true,

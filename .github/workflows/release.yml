@@ -11,7 +11,6 @@ on:
         description: Exact package.json version approved for release
         required: true
         type: string
-        default: "0.2.0"
       publish:
         description: Publish after verification and Release environment approval
         required: true

@@ -147,21 +147,38 @@ describe("documentation content contract", () => {
       expect(page).toContain("INTERNAL");
       expect(page).not.toMatch(/publication is (?:still )?pending|pending publication/i);
     }
-    expect(contributing).toContain("Do not attempt to republish 0.2.0");
+    expect(contributing).not.toMatch(/expected_version=\d+\.\d+\.\d+/);
     expect(contributing).toContain('expected_version="$EXPECTED_VERSION"');
     expect(contributing).toContain("Release environment approval");
   });
 
-  test("does not promise source-only skills commands in the published release", async () => {
-    const agents = await read("content/docs/agents.mdx");
-    expect(agents).toContain("not available in npm version 0.2.0");
-    expect(agents).toContain("outdated installation and publication notes");
-    expect(agents).toContain("Do not pair the newer source stub with the published CLI");
-    expect(agents).toContain("npm root --global");
-    expect(agents).toContain("https://issue-graph.dev/docs/agents.md");
-    expect(agents).toContain("Do not install the source stub from `/skill.md`");
-    for (const block of agents.matchAll(/^```[^\n]*\n([\s\S]*?)^```/gm)) {
-      expect(block[1]).not.toMatch(/issue-graph skills(?:\s|$)/);
+  test("uses canonical skill discovery and CLI-bundled guidance without release stories", async () => {
+    const [agents, readme] = await Promise.all([
+      read("content/docs/agents.mdx"),
+      read("../../README.md"),
+    ]);
+    const readmeAgents = readme.match(/^## Agents and integrations\n([\s\S]*?)(?=^## )/m)?.[1];
+    expect(readmeAgents).toBeDefined();
+    for (const page of [agents, readmeAgents ?? ""]) {
+      expect(page).not.toMatch(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/);
+      expect(page).not.toMatch(/outdated|source-only|newer source stub|not available in npm/i);
+      expect(page).not.toMatch(/do not (?:install|pair).*stub|npm root --global|cp -R/i);
+      expect(page).toContain("npm install --global issue-graph@latest");
+      expect(page).toContain("npx skills@latest add https://issue-graph.dev");
+      expect(page).toContain("same canonical");
+      expect(page).toContain("/skill.md");
+      expect(page).toContain("issue-graph skills get core\n");
+      expect(page).toContain("issue-graph skills get core --full\n");
+      expect(page).toContain("issue-graph skills list");
+      expect(page).toContain("authorized setup correction");
+    }
+    for (const heading of [
+      "## Match guidance to the installed release",
+      "## Route the request before collecting evidence",
+      "## Preserve evidence and uncertainty",
+      "## Optional root-cause clustering",
+    ]) {
+      expect(agents).toContain(heading);
     }
   });
 

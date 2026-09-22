@@ -24,10 +24,10 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
-For packaging changes, also run `pnpm test:package`. To test an existing archive without packing, building, or deleting the supplied file:
+For packaging changes, also run `pnpm test:package`. To test an existing archive without packing, building, or deleting the supplied file, set `EXPECTED_VERSION` to its reviewed source manifest version (the approved version for a release):
 
 ```bash
-pnpm test:package --tarball /absolute/path/issue-graph-0.2.0.tgz --sha256 <sha256>
+pnpm test:package --tarball "/absolute/path/issue-graph-${EXPECTED_VERSION}.tgz" --sha256 <sha256>
 ```
 
 Both options are required in supplied mode. Verification checks the archive's name and version against the source manifest, SHA-256 before and after consumption, installed CLI and exports, offline pnpm installation/dlx, and owned GitHub fixtures. Default mode packs once through `prepack`; supplied mode never packs or rebuilds.
@@ -51,7 +51,9 @@ Keep the two skill layers separate:
 - `skill-data/core/SKILL.md` is compact operational guidance versioned with the CLI (roughly 80–120 lines). Maintain status-first routing, explicit scope, unknown counts and coverage, snapshot defaults, GitHub read-only boundaries, and untrusted-evidence/privacy rules here.
 - `skill-data/core/references/workflows.md` holds detailed workflows, flags, limits, and safety details. Retrieve it through `issue-graph skills get core --full`; do not require agents to know source paths or copy reference files into their discovery directory.
 
-When behavior changes, update the core and relevant reference together with the CLI. Keep setup/release availability in README and docs, not in the stub. The published npm 0.2.0 package does not include the new `skills` command. That command and the current source stub require a matching source build until a release includes them; documenting them does not bump the package version or authorize publication.
+When behavior changes, update the core and relevant reference together with the CLI. Keep setup/release availability in README and docs, not in the stub.
+
+The package and `/skill.md` route use the canonical discovery stub. Run `pnpm --filter @issue-graph/docs sync:skill` after editing it to regenerate the checked-in well-known index and skill download. Docs development and build also run this generator; parity tests reject drift. Do not edit the generated public copies directly.
 
 Preserve the discovery contract: `skills [list] [--json]`, `skills get core [--full] [--json]`, and `--help` under `skills`, `skills list`, and `skills get`. Default output is plain text/Markdown even in pipes; JSON is opt-in with `schemaVersion: 1`, `success: true`, and a `data` array for list/get. JSON help uses `data: {usage}`. List entries have `name` and `description`; get entries have `name` and `content`, adding `files: [{path, content}]` only with `--full`. A top-level `nextSteps` string array is optional. Unknown flags/names exit 2; missing assets exit 1. There is no `--all` or multi-skill form.
 
@@ -65,9 +67,9 @@ Connect the project to `vercel-labs/issue-graph` with production branch `main`. 
 
 ## Release process
 
-`issue-graph@0.2.0` is already published on npm. The repository remains INTERNAL; public package availability does not authorize another release or change repository visibility. The current source may contain unreleased changes despite retaining the same version. Do not attempt to republish 0.2.0: the workflow rejects any existing exact version, including in verify-only mode.
+The repository remains INTERNAL; public package availability does not authorize another release or change repository visibility. The current source may contain unreleased changes despite retaining the same version as a published package. Check registry state rather than inferring publication from source, documentation, or a deployment. Never attempt to republish an existing version: the workflow rejects any existing exact version, including in verify-only mode.
 
-`.github/workflows/release.yml` has only `workflow_dispatch`, with required `expected_sha` and `expected_version` inputs and a boolean `publish` input defaulting to `false`. For a future release, obtain approval for an unpublished version newer than registry latest and update the source identity through review. Before any dispatch, review the commit on canonical `main`, set `EXPECTED_SHA` to its full 40-character SHA, and set `EXPECTED_VERSION` to that reviewed, approved version. The commands below do not select a version or authorize a dispatch.
+`.github/workflows/release.yml` has only `workflow_dispatch`, with required `expected_sha` and `expected_version` inputs and a boolean `publish` input defaulting to `false`. `expected_version` deliberately has no default; each dispatch must supply the exact approved version. Obtain approval for an unpublished version newer than registry latest and update the source identity through review. After the release changes merge, review the commit on canonical `main`, set `EXPECTED_SHA` to its full 40-character SHA, and set `EXPECTED_VERSION` to the matching, reviewed, approved `package.json` version. Merging the PR does not dispatch the workflow or authorize publication. The commands below do not select a version or authorize a dispatch.
 
 ### Verify-only dispatch
 

@@ -90,11 +90,22 @@ Status reports unknown counts as `?` or `null`, never a fabricated zero. Check c
 
 ## Agents and integrations
 
-For the published CLI, use [Agents](apps/docs/content/docs/agents.mdx) for release-compatible guidance and project-local skill setup. The npm 0.2.0 package bundles a workflow skill, but its installation/publication notes are outdated; follow the npm instructions above instead. Installing a skill does not install the CLI or authenticate GitHub. Check existing local changes before copying a skill into an agent's supported project directory.
+Install the CLI with `npm install --global issue-graph@latest`, then install the agent skill separately:
 
-The [repository skill](skills/issue-graph/SKILL.md) and the site's `/skill.md` route expose a newer source discovery stub that requires `issue-graph skills get core`. **The `skills` command is not available in npm 0.2.0.** Do not install that source stub alongside the published CLI. It requires a matching source build and does not imply a new release or authorize publication.
+```bash
+npx skills@latest add https://issue-graph.dev
+```
 
-Ask an agent to read the current `/docs/agents.md` page for setup guidance rather than invoking an unavailable skill command. If the installed CLI or guidance is unavailable, report the mismatch instead of inventing instructions or automatically installing/upgrading anything.
+The well-known download, `/skill.md`, and [repository skill](skills/issue-graph/SKILL.md) contain the same canonical discovery guidance. Choose the intended agent and project scope, and compare existing local changes before replacing a skill. Skill installation does not install the CLI or authenticate GitHub; public package and skill installation do not require source repository access.
+
+Before operational commands, load and read the guidance bundled with the installed CLI:
+
+```bash
+issue-graph skills get core
+issue-graph skills get core --full
+```
+
+The core provides operational guidance; `--full` adds detailed workflow references. Use `issue-graph skills list` for discovery and command-specific `--help` for syntax. If the executable or guidance is unavailable, stop and report the mismatch rather than inventing instructions or automatically installing/upgrading anything. Ask for an authorized setup correction. See [Agents](apps/docs/content/docs/agents.mdx) for setup and evidence-handling details.
 
 Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
 
