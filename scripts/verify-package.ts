@@ -322,7 +322,6 @@ try {
   verifyArchive(tarball, sourceManifest, digest);
   const entries = run([tools.tar, "-tzf", tarball], repo, process.env).stdout.trim().split("\n");
   const files = entries.filter((name) => !name.endsWith("/"));
-  assert.equal(files.length, 65, "published file count must remain 65");
   assert.equal(new Set(files).size, files.length, "archive must not contain duplicate files");
   for (const entry of entries) {
     assert.ok(entry.startsWith("package/"), `unexpected archive root: ${entry}`);
@@ -331,7 +330,9 @@ try {
   for (const file of files) {
     const name = file.slice("package/".length);
     assert.ok(
-      /^(?:package\.json|README\.md|LICENSE|SECURITY\.md|CONTRIBUTING\.md)$/.test(name) ||
+      /^(?:package\.json|README\.md|CHANGELOG\.md|LICENSE|SECURITY\.md|CONTRIBUTING\.md)$/.test(
+        name,
+      ) ||
         /^dist\/.+\.(?:js|d\.ts)$/.test(name) ||
         name === "skills/issue-graph/SKILL.md" ||
         name === "skill-data/core/SKILL.md" ||

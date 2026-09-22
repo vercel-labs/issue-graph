@@ -183,12 +183,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v$EXPECTED_VERSION"
+          TAG_REF=$(gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG" \
+            --jq ".[] | select(.ref == \"refs/tags/$TAG\") | .ref")
+          if [ -z "$TAG_REF" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$TAG" -f sha="$EXPECTED_SHA" >/dev/null
+          fi
+          RELEASE_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq '.sha')
+          test "$RELEASE_SHA" = "$EXPECTED_SHA"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            RELEASE_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq '.sha')
-            test "$RELEASE_SHA" = "$EXPECTED_SHA"
             echo "Release $TAG already exists at the approved commit"
           else
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --title "$TAG" --target "$EXPECTED_SHA" \
+              --title "$TAG" --verify-tag \
               --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
