@@ -6,13 +6,13 @@
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
 </p>
 
-Find related GitHub issues, competing pull requests, and unresolved follow-ups before you start work.
+Find related issues, competing changes, and unresolved follow-ups before you start work.
 
 `issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, classification, and ranking need no model. Root-cause clustering is an optional agent step.
 
-![Bounded agent-browser graph: closed issue 1113, merged fix PR 1137, closed regression 1148, and open follow-ups 1371 and 1607.](apps/docs/public/issue-graph-demo.svg)
+![Static issue-graph demo with Graph, PR status and Backlog tabs. Graph shows merged fix PR 1137 closing issue 1113 and open follow-ups 1371 and 1607.](apps/docs/public/issue-graph-demo.png)
 
-Public reference data captured on 2026-09-22, not a live feed or complete history. All five fetched nodes are in `vercel-labs/agent-browser`; 19 references remain beyond the depth boundary and 22 edges to unfetched references are omitted from the displayed graph. Re-run the bounded command below to inspect current evidence, which may differ from the capture.
+The current docs demo shows captured output, not a live feed. This Graph excerpt highlights one merged fix and two open follow-ups from public data captured on 2026-09-22. The full capture contains five nodes in `vercel-labs/agent-browser`; the displayed excerpt omits other captured nodes. Another 19 references remain beyond the depth boundary and 22 edges to unfetched references are omitted. Re-run the bounded command below for current evidence, not complete history.
 
 ## Start here
 

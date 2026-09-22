@@ -122,6 +122,9 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
   assert.ok(html.body.includes('id="main-content"'), `Skip target: ${path}`);
   const title = html.body.match(/<title>([^<]+)<\/title>/)?.[1];
   assert.ok(title, `Title: ${path}`);
+  assert.ok(title.startsWith("issue-graph | "), `Product-first title: ${path}`);
+  assert.equal(htmlAttribute(html.body, "meta", "property", "og:title", "content"), title);
+  assert.equal(htmlAttribute(html.body, "meta", "name", "twitter:title", "content"), title);
   assert.ok(!titles.has(title), `Unique title: ${path}`);
   titles.add(title);
   const canonical = htmlAttribute(html.body, "link", "rel", "canonical", "href");

@@ -85,7 +85,7 @@ describe("metadata and response isolation", () => {
       const description = frontmatter?.[1]?.match(/^description:\s*(.+)$/m)?.[1] ?? "";
       expect(title).not.toBe("");
       expect(description).not.toBe("");
-      const fullTitle = `${title} | ${siteName}`;
+      const fullTitle = `${siteName} | ${title}`;
       const image = `${siteUrl}/og${pathname}`;
       const metadata = pageMetadata(pathname, title, description);
       expect(metadata.title).toEqual({ absolute: fullTitle });

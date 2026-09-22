@@ -7,13 +7,13 @@ import type { ReactNode } from "react";
 import { DocsProvider } from "@/components/geistdocs-provider";
 import { config } from "@/lib/geistdocs/config";
 import { pageMetadata } from "@/lib/page-metadata";
-import { siteDescription, siteUrl } from "@/lib/site";
+import { siteDescription, siteTagline, siteUrl } from "@/lib/site";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
 export const viewport: Viewport = { viewportFit: "cover" };
 export const metadata: Metadata = {
-  ...pageMetadata("/", "Know the work before you start", siteDescription),
+  ...pageMetadata("/", siteTagline, siteDescription),
   metadataBase: new URL(siteUrl),
 };
 
