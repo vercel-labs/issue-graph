@@ -1,0 +1,42 @@
+{
+  "model": "typesafe-ai/jev",
+  "answers": {
+    "requestType": {
+      "type": "choice",
+      "choice": "bug",
+      "probabilities": {
+        "bug": 0.78,
+        "documentation": 0,
+        "question": 0,
+        "feature": 0.04,
+        "multiple": 0.18,
+        "maintenance": 0,
+        "insufficient": 0
+      },
+      "confidence": 0.75
+    },
+    "reproStepsPresent": { "type": "boolean", "probability": 0.92 },
+    "expectedActualPresent": { "type": "boolean", "probability": 0.97 },
+    "regressionReported": { "type": "boolean", "probability": 0.08 },
+    "impactReported": {
+      "type": "score",
+      "score": 2.23,
+      "probabilities": { "0": 0, "1": 0.05, "2": 0.66, "3": 0.28 },
+      "confidence": 0.66
+    }
+  },
+  "usage": { "inputTokens": 2173, "outputTokens": 152 },
+  "providerMetadata": {
+    "gateway": {
+      "routing": {
+        "originalModelId": "typesafe-ai/jev",
+        "resolvedProvider": "typesafe-ai",
+        "canonicalSlug": "typesafe-ai/jev",
+        "finalProvider": "typesafe-ai"
+      },
+      "cost": "0",
+      "gatewayCost": "0",
+      "marketCost": "0.000091266"
+    }
+  }
+}

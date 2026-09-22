@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "repo": "vercel-labs/wterm",
+  "version": "provisional-2026-09-22.1-3e436faae1ab",
+  "components": [
+    {
+      "id": "builtin-core",
+      "description": "Contrato headless TerminalCore y backend integrado Zig/WASM de @wterm/core: WasmBridge, carga de wterm.wasm, interpretación VT/ANSI, estado de celdas y cursor, modos, ancho Unicode y almacenamiento de scrollback del core integrado. Incluye cambios al contrato compartido, no el comportamiento específico de otra implementación. Excluye GhosttyCore, WebSocketTransport, presentación/input DOM y wrappers. Un síntoma visual o la palabra WASM sin identificar backend o contrato no bastan para asignar este componente.",
+      "examples": [
+        "En el backend integrado, getCell devuelve un ancho incorrecto tras writeString de un carácter CJK.",
+        "WasmBridge.load no carga el binario integrado wterm.wasm sin URL explícita.",
+        "Solicitud de ampliar la interfaz compartida TerminalCore para exponer estado headless adicional."
+      ]
+    },
+    {
+      "id": "ghostty-backend",
+      "description": "Implementación alternativa @wterm/ghostty: GhosttyCore, bindings de libghostty, emulación y scrollback propios, carga y distribución de ghostty-vt.wasm y su cadena de compilación/parches. Requiere evidencia específica de este backend. Excluye el backend integrado, cambios a la interfaz compartida TerminalCore, la presentación DOM y la entrega de props/eventos de React o Vue. Usar Ghostty dentro de una app no convierte todo problema de esa app en un problema de este componente.",
+      "examples": [
+        "GhosttyCore.load necesita resolver ghostty-vt.wasm mediante wasmPath en un bundler concreto.",
+        "Consulta sobre scrollbackLimit de GhosttyCore: presupuesto en bytes frente a cantidad de filas retenidas.",
+        "Mantenimiento de los parches WASM de libghostty o de su proceso rebuild-wasm."
+      ]
+    },
+    {
+      "id": "dom-terminal",
+      "description": "Capa de navegador compartida @wterm/dom: WTerm y su orquestación, renderer DOM, input del navegador, foco, selección, CSS/temas, medición del contenedor, auto-resize y limpieza de listeners/DOM. Trata la presentación e interacción sobre el estado del core, no la emulación headless. Excluye celdas o modos incorrectos producidos por un backend, transporte de red, integración propia de React/Vue, edición de comandos de BashShell y conversión Markdown a ANSI. Distinguir medición/presentación del resize del estado headless.",
+      "examples": [
+        "Con getCell correcto, la presentación DOM dibuja desalineada una celda ancha.",
+        "WTerm autoResize no adapta la terminal a las dimensiones del contenedor.",
+        "Cambiar --term-bg o una clase de tema no actualiza la presentación de la terminal vanilla."
+      ]
+    },
+    {
+      "id": "websocket-transport",
+      "description": "WebSocketTransport de @wterm/core, también reexportado por @wterm/dom: conexión cliente con el backend PTY, envío/recepción, buffering antes de conectar, reconexión/backoff, cierre y callbacks de conexión. Su pertenencia al paquete core no lo convierte en emulación. Excluye captura de teclas en DOM, interpretación de los bytes recibidos, shell local BashShell y fallos propios de servidores PTY/SSH, autenticación o infraestructura externa sin evidencia del contrato cliente.",
+      "examples": [
+        "WebSocketTransport.send no vacía al conectar los datos acumulados antes de abrir el socket.",
+        "WebSocketTransport.close debe detener los intentos automáticos de reconexión.",
+        "Consulta sobre reconnect y maxReconnectDelay del cliente WebSocketTransport."
+      ]
+    },
+    {
+      "id": "framework-bindings",
+      "description": "Adaptadores @wterm/react y @wterm/vue sobre WTerm: componentes Terminal, integración con montaje/desmontaje, props, callbacks/eventos, refs, TerminalHandle y useTerminal. Requiere evidencia del contrato de integración del framework, no simplemente que la aplicación use React o Vue. Excluye rendering/CSS/input compartidos de @wterm/dom, emulación/carga del backend y transporte, salvo que lo señalado sea la entrega específica de sus opciones o eventos por el wrapper.",
+      "examples": [
+        "El helper write de useTerminal no delega en la instancia WTerm disponible mediante la ref.",
+        "El componente Vue no expone la instancia o los métodos documentados mediante su template ref tras ready.",
+        "La prop theme no se transmite a la clase del contenedor del wrapper aunque la clase CSS funciona en vanilla."
+      ]
+    },
+    {
+      "id": "bash-shell",
+      "description": "Adaptador de shell en navegador @wterm/just-bash: BashShell, attach/handleInput, edición de línea, historial, autocompletado, prompt y configuración de archivos virtuales, env, cwd o red expuesta por ShellOptions. Excluye captura física de eventos en DOM, emulación VT, WebSocketTransport y shells remotos. No atribuye fallos al proyecto externo just-bash sin evidencia independiente; el componente identifica la superficie del adaptador wterm.",
+      "examples": [
+        "BashShell.handleInput recibe las secuencias correctas pero el historial no recupera el comando anterior.",
+        "El autocompletado de BashShell no ofrece archivos configurados en su filesystem virtual.",
+        "El prompt configurado en BashShell no refleja el cwd después de cambiar de directorio."
+      ]
+    },
+    {
+      "id": "markdown-output",
+      "description": "Conversión incremental de Markdown a secuencias ANSI en @wterm/markdown: MarkdownRenderer, push, flush, buffering, ancho configurado y formato de encabezados, enlaces, listas o bloques de código. Excluye la generación o el transporte del contenido de entrada, interpretación VT por los cores y presentación final DOM cuando la salida ANSI es correcta. Markdown es aquí un formato de contenido, no una categoría general para documentación del repositorio.",
+      "examples": [
+        "MarkdownRenderer.push recibe un bloque de código en varios chunks y produce ANSI incorrecto.",
+        "MarkdownRenderer.flush omite texto pendiente al terminar el stream.",
+        "Solicitud de soportar una construcción Markdown adicional en el conversor a ANSI."
+      ]
+    }
+  ]
+}
