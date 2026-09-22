@@ -157,7 +157,7 @@ Snapshots, exports, logs, and cluster prompts can contain private repository met
 
 ## Source development
 
-For source development, use a local checkout. Use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and authenticated GitHub CLI access. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
+The source repository is INTERNAL and requires repository access; installing the public npm package does not grant that access. For source development, use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and an authenticated GitHub CLI. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
 
 From an authorized checkout, after preserving local changes, update a source installation with:
 
