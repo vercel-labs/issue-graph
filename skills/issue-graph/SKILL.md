@@ -1,6 +1,6 @@
 ---
 name: issue-graph
-description: Read-only GitHub PR status and reference graphs for maintainers and agents. Use whenever the user asks for PR counts or status by author, project, repository, or review state; approved, changes-requested, conflicting, draft, ready-for-review, or unassigned PRs; a compact portfolio table; or counts for named contributors, even without naming issue-graph. Spanish triggers include cuantas PRs, conteo por autor, tabla por proyecto, pendientes de revision, conflictos, and sin asignar. Also use before working an issue or PR, tracing references, finding duplicate or superseded work, reconciling an unlabeled backlog, prioritizing issues, and checking changes since a snapshot. Route counts to issue-graph status, references to graph, and backlog actions to reconcile or plan. Never infer code correctness or merge readiness from counts.
+description: Read-only context for issues, pull requests, and backlogs. Use to trace related work, check review queues and PR counts, prioritize follow-ups, or compare snapshots.
 ---
 
 # issue-graph
