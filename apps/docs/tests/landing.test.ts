@@ -2,12 +2,12 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import Home from "../src/app/page";
+import Home, { metadata } from "../src/app/page";
 import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
 import { landingTitle, workflows } from "../src/lib/landing-content";
-import { agentSetupPrompt, plannedInstallCommand } from "../src/lib/site";
+import { agentSetupPrompt, plannedInstallCommand, siteName } from "../src/lib/site";
 import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -25,6 +25,7 @@ describe("launch feedback", () => {
     const html = renderToStaticMarkup(createElement(Home));
     const headings = html.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g);
     expect(landingTitle).toBe("Find related work before you start");
+    expect(metadata.title).toEqual({ absolute: `${siteName} | ${landingTitle}` });
     expect(headings).toEqual([`<h1 id="hero-title">${landingTitle}</h1>`]);
     expect(headings?.[0]).not.toContain(".");
     expect(headings?.[0]).not.toMatch(/<br\b/);

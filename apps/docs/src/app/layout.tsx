@@ -6,14 +6,15 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { DocsProvider } from "@/components/geistdocs-provider";
 import { config } from "@/lib/geistdocs/config";
+import { landingTitle } from "@/lib/landing-content";
 import { pageMetadata } from "@/lib/page-metadata";
-import { siteDescription, siteTagline, siteUrl } from "@/lib/site";
+import { siteDescription, siteUrl } from "@/lib/site";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
 export const viewport: Viewport = { viewportFit: "cover" };
 export const metadata: Metadata = {
-  ...pageMetadata("/", siteTagline, siteDescription),
+  ...pageMetadata("/", landingTitle, siteDescription),
   metadataBase: new URL(siteUrl),
 };
 

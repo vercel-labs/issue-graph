@@ -1,5 +1,4 @@
 export const siteName = "issue-graph";
-export const siteTagline = "Work context for humans and agents";
 export const siteUrl = "https://issue-graph.dev";
 export const repositoryUrl = "https://github.com/vercel-labs/issue-graph";
 export const siteDescription =

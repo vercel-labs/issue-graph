@@ -10,12 +10,11 @@ import {
   plannedInstallCommand,
   siteDescription,
   siteName,
-  siteTagline,
   siteUrl,
 } from "@/lib/site";
 import "@/components/landing.css";
 
-export const metadata = pageMetadata("/", siteTagline, siteDescription);
+export const metadata = pageMetadata("/", landingTitle, siteDescription);
 
 export default function Home() {
   const structuredData = {

@@ -3,7 +3,7 @@
 These detailed workflows accompany `issue-graph skills get core`. Load this reference
 with `issue-graph skills get core --full`; a source checkout is not required.
 
-Inspect the bounded reference neighborhood of a GitHub issue or PR before starting work. The CLI collects and classifies evidence without a model; use that evidence to identify related work and review candidates, not to guarantee that no duplicate or unresolved item exists. Semantic root-cause clustering is optional.
+Use bounded reference graphs to find related work and review candidates. Classifications are evidence, not conclusions; root-cause clustering is optional.
 
 ## Contents
 
@@ -133,7 +133,7 @@ If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limit
 
 Use `issue-graph plan --repo owner/repo --format json` when a human or agent needs the next safe backlog action. It returns a ready execution queue, an investigation queue, blocked work, a single `next` item when coverage permits, and a structured `decision` for its observed neighborhood. Competing pull requests include comparable draft, review, mergeability, diff, file-count, and update signals. A `reviewFirst` value orders inspection only; it never proves correctness or chooses the winning implementation. Failed neighbor references are quarantined to their affected items. The ordering is deterministic and uses reconcile action, PR readiness, discussion heat, and visible inbound references.
 
-The MVP does not infer semantic dependencies from issue prose. Treat `blockedBy` as visible graph evidence only, and re-run after each merge or closure.
+The plan does not infer semantic dependencies from issue prose. Treat `blockedBy` as visible graph evidence only, and re-run after each merge or closure.
 
 ## Flags
 

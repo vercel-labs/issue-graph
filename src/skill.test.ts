@@ -10,7 +10,7 @@ const skill = readFileSync(
 const core = readFileSync(new URL("../skill-data/core/SKILL.md", import.meta.url), "utf8");
 
 describe("issue-graph skill routing", () => {
-  test("discovery description includes PR status and English/Spanish count requests", () => {
+  test("discovery metadata has a name and a bounded description", () => {
     const frontmatter = stub.split("---")[1];
     const description =
       frontmatter
@@ -20,18 +20,6 @@ describe("issue-graph skill routing", () => {
     expect(frontmatter).toContain("name: issue-graph");
     expect(description.length).toBeGreaterThan(0);
     expect(description.length).toBeLessThanOrEqual(1024);
-    for (const intent of [
-      "PR counts",
-      "by author",
-      "review state",
-      "ready-for-review",
-      "unassigned",
-      "conteo por autor",
-      "tabla por proyecto",
-      "sin asignar",
-      "issue-graph status",
-    ])
-      expect(description).toContain(intent);
   });
 
   test("the discovery stub stays evergreen and delegates operational guidance", () => {

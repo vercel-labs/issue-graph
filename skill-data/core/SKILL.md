@@ -1,6 +1,6 @@
 ---
 name: core
-description: Status-first routing, bounded GitHub evidence collection, and safety guidance for issue-graph workflows.
+description: Status-first routing, bounded evidence collection, and safety guidance for issue-graph.
 ---
 
 # issue-graph core
