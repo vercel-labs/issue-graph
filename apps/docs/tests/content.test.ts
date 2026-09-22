@@ -129,10 +129,11 @@ describe("documentation content contract", () => {
       const row = start.split("\n").find((line) => line.includes(`](${node.url}) |`));
       expect(row).toContain(`| ${node.state} |`);
     }
-    for (const page of pages.slice(1)) {
+    for (const page of pages.slice(1, 3)) {
       expect(page).toContain(`${example.coverage.beyondDepthReferences} references`);
       expect(page).toContain(`${example.coverage.omittedEdges} edges`);
     }
+    expect(pages[3]).toContain("[Capture details](apps/docs/content/docs/graph.mdx)");
   });
 
   test("root guidance separates published installation from future release authorization", async () => {

@@ -10,9 +10,9 @@ Find related issues, competing changes, and unresolved follow-ups before you sta
 
 `issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, classification, and ranking need no model. Root-cause clustering is an optional agent step.
 
-![Static issue-graph demo with Graph, PR status and Backlog tabs. Graph shows merged fix PR 1137 closing issue 1113 and open follow-ups 1371 and 1607.](apps/docs/public/issue-graph-demo.png)
+![issue-graph demo](apps/docs/public/issue-graph-demo.png)
 
-The current docs demo shows captured output, not a live feed. This Graph excerpt highlights one merged fix and two open follow-ups from public data captured on 2026-09-22. The full capture contains five nodes in `vercel-labs/agent-browser`; the displayed excerpt omits other captured nodes. Another 19 references remain beyond the depth boundary and 22 edges to unfetched references are omitted. Re-run the bounded command below for current evidence, not complete history.
+Example output, not a live feed or complete history. [Capture details](apps/docs/content/docs/graph.mdx).
 
 ## Start here
 
