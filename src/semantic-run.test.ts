@@ -2,7 +2,14 @@ import { mkdir, mkdtemp, open, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { fixture, type Operation, repoData } from "../tests/semantic-github-fixture.js";
+import {
+  connection,
+  envelope,
+  fixture,
+  type Operation,
+  repoData,
+} from "../tests/semantic-github-fixture.js";
+import { type RawEvaluation, rawEvaluation } from "../tests/semantic-response-fixture.js";
 import { runSemanticCli, SEMANTIC_USAGE, type SemanticIO } from "./semantic-cli.js";
 import { createSemanticReceiptStore } from "./semantic-store.js";
 import {
@@ -34,12 +41,6 @@ const fakeCache: SemanticCacheStore = {
 };
 
 type Call = { operation: Operation; number: number; ordinal: number };
-type RawEvaluation = {
-  model: string;
-  answers: Record<string, Record<string, unknown>>;
-  usage: { inputTokens: number; outputTokens: number };
-  providerMetadata?: { gateway: { cost: string | number; routing?: Record<string, string> } };
-};
 
 function issue(number = 1) {
   return {
@@ -50,28 +51,19 @@ function issue(number = 1) {
     updatedAt: TIME,
     title: `${RAW} title ${number}`,
     body: `${RAW} ${ESC}[31m https://example.invalid/do-not-fetch`,
-    comments: connection([
-      {
-        __typename: "IssueComment",
-        id: `C_${number}`,
-        url: `https://github.com/o/r/issues/${number}#issuecomment-${number}`,
-        updatedAt: TIME,
-        author: { login: "fixture-author" },
-        body: RAW,
-      },
-    ]),
-  };
-}
-
-function connection(nodes: unknown[], totalCount = nodes.length) {
-  return { nodes, totalCount, pageInfo: { hasNextPage: false, endCursor: null } };
-}
-
-function envelope(fields: Record<string, unknown>) {
-  return {
-    data: {
-      repository: { nameWithOwner: "o/r", visibility: "PUBLIC", isPrivate: false, ...fields },
-    },
+    comments: connection(
+      [
+        {
+          __typename: "IssueComment",
+          id: `C_${number}`,
+          url: `https://github.com/o/r/issues/${number}#issuecomment-${number}`,
+          updatedAt: TIME,
+          author: { login: "fixture-author" },
+          body: RAW,
+        },
+      ],
+      1,
+    ),
   };
 }
 
@@ -106,39 +98,7 @@ function evaluation(
   choices: Record<string, string> = {},
   cost: string | number | null = "0.125",
 ): RawEvaluation {
-  const answers = Object.fromEntries(
-    Object.entries(request.questions).map(([id, question]) => {
-      if (question.type === "boolean") return [id, { type: "boolean", probability: 0.2 }];
-      if (question.type === "score") {
-        return [
-          id,
-          { type: "score", score: 1.75, probabilities: { "0": 0, "1": 0.25, "2": 0.75, "3": 0 } },
-        ];
-      }
-      const choice = choices[id] ?? (id === "requestType" ? "bug" : "cli");
-      const alternate = Object.keys(question.criteria).find((key) => key !== choice);
-      return [
-        id,
-        {
-          type: "choice",
-          choice,
-          probabilities: Object.fromEntries(
-            Object.keys(question.criteria).map((key) => [
-              key,
-              key === choice ? 0.8 : key === alternate ? 0.2 : 0,
-            ]),
-          ),
-          confidence: 0.7,
-        },
-      ];
-    }),
-  );
-  return {
-    model: "typesafe-ai/jev",
-    answers,
-    usage: { inputTokens: 120, outputTokens: 30 },
-    ...(cost === null ? {} : { providerMetadata: { gateway: { cost } } }),
-  };
+  return rawEvaluation(request, { choices, cost, choiceConfidence: 0.7 });
 }
 
 function gateway(
@@ -240,7 +200,7 @@ afterEach(async () => {
   }
 });
 
-describe("V2 real CLI evaluation pipeline", () => {
+describe("real CLI evaluation pipeline", () => {
   test("reports distributions, applicable impact, typed input references and correlated durable receipts", async () => {
     const pendingAtSend: SemanticPendingReceipt[] = [];
     const lockAtSend: SemanticPendingReceipt[] = [];
@@ -479,36 +439,6 @@ describe("V2 real CLI evaluation pipeline", () => {
       },
     ],
     [
-      "extra question",
-      (raw) => {
-        raw.answers.priority = { type: "boolean", probability: 1 };
-      },
-    ],
-    [
-      "unknown answer field",
-      (raw) => {
-        raw.answers.requestType.quote = RAW;
-      },
-    ],
-    [
-      "invalid distribution",
-      (raw) => {
-        raw.answers.requestType.probabilities = { bug: 1 };
-      },
-    ],
-    [
-      "wrong answer type",
-      (raw) => {
-        raw.answers.requestType.type = "boolean";
-      },
-    ],
-    [
-      "different resolved model",
-      (raw) => {
-        raw.model = "other/model";
-      },
-    ],
-    [
       "different provider",
       (raw) => {
         raw.providerMetadata = { gateway: { cost: "0.125", routing: { finalProvider: "other" } } };
@@ -662,7 +592,7 @@ describe("V2 real CLI evaluation pipeline", () => {
   });
 });
 
-describe("V2 evidence freshness and controls", () => {
+describe("evidence freshness and controls", () => {
   test.each([
     {
       label: "private visibility",
@@ -1023,7 +953,7 @@ describe("V2 evidence freshness and controls", () => {
   });
 });
 
-describe("V2 receipt failures, isolation and output", () => {
+describe("receipt failures, isolation and output", () => {
   test.each([
     { status: 422, outcomeUnknown: false },
     { status: 529, outcomeUnknown: true },

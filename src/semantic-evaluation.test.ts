@@ -337,7 +337,7 @@ describe("evaluation validation", () => {
     expectInvalid(() => validateEvaluation(request(), raw));
   });
 
-  test("replays the wterm55 response without changing its rounded score distribution", () => {
+  test("preserves a rounded score distribution during response replay", () => {
     const raw = JSON.parse(
       readFileSync(
         new URL("../tests/fixtures/classify/jev-rounded-score.json", import.meta.url),

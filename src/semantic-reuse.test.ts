@@ -2,8 +2,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { assertWarmReuse } from "../tests/classify-pareto-checks.js";
 import { connection, envelope } from "../tests/semantic-github-fixture.js";
+import { assertWarmReuse } from "../tests/semantic-report-checks.js";
 import {
   buildClassificationPreview,
   buildEvaluationInput,
@@ -539,7 +539,7 @@ describe.each<ReuseLane>(["warm", "owned"])("STOP after %s expiry", (lane) => {
   });
 });
 
-describe("V3 semantic reuse orchestration", () => {
+describe("semantic reuse orchestration", () => {
   test("pure preview is cache-unchecked and fingerprints the explicit epoch", async () => {
     const input = capture();
     const initial = structuredClone(input);

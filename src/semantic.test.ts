@@ -1,15 +1,19 @@
-import { describe, expect, test } from "vitest";
+import { createHash } from "node:crypto";
+import { describe, expect, test, vi } from "vitest";
 import captureFixture from "../tests/fixtures/classify/capture.json";
 import taxonomyFixture from "../tests/fixtures/classify/taxonomy.json";
 import {
   buildClassificationPreview,
   buildEvaluationInput,
   fingerprintInput,
+  prepareClassification,
   SEMANTIC_MAX_INPUT_BYTES,
   validateTaxonomy,
 } from "./semantic.js";
+import { buildEvaluationRequest } from "./semantic-evaluation.js";
 import { escapeSemanticMarkdown, renderClassificationPreview } from "./semantic-render.js";
-import type { SemanticCapture, SemanticTaxonomy } from "./semantic-types.js";
+import { runSemanticEvaluation, runSemanticPreview } from "./semantic-run.js";
+import type { SemanticCacheStore, SemanticCapture, SemanticTaxonomy } from "./semantic-types.js";
 
 const capture = () => structuredClone(captureFixture) as SemanticCapture;
 const taxonomy = () => validateTaxonomy(structuredClone(taxonomyFixture), "sample/public-repo");
@@ -153,6 +157,119 @@ describe("semantic evaluation projection", () => {
     if (change === "model") input.model = "different-model";
     if (change === "question") input.questions.requestType.instruction += " Changed.";
     expect(await fingerprintInput(input, tax)).not.toBe(baseline);
+  });
+});
+
+describe("classification preparation", () => {
+  test.each([
+    [
+      false,
+      undefined,
+      3376,
+      "cdffbe9c6bbc67bdc6cc332513930b600f6987b3db05cc9da99624610e56bf7e",
+      "6bce82aa8324372dc06473786a01b1da279e020649512067ca3aef7b0ee43995",
+      "57f3814bdab668693843addc0129437ea3e170e9a78e61fa554b1dd93295059c",
+    ],
+    [
+      true,
+      "next",
+      4221,
+      "bbbe50e9482bc69240bdf09143441a8dd52df5fe2bd65c1fa2517fa73c199e84",
+      "ecbfc4e426bac36c97c5d2af5df3eeee9e4dcd5ca8eeed78cb9b8727a42ad0b1",
+      "84f95b32bfac5b49721bd2c90ed2f41e32ca3e3be57ef84838d21159bcd30f11",
+    ],
+  ] as const)("preserves exact wire and preview JSON with taxonomy=%s epoch=%s", async (supplied, cacheEpoch, bytes, wireHash, inputHash, previewHash) => {
+    const data = capture();
+    const options = { limit: 50, maxCalls: 0, taxonomy: supplied ? taxonomy() : null, cacheEpoch };
+    const { preview: report, contexts } = await prepareClassification(data, options);
+    const context = contexts[0];
+    if (!context) throw new Error("Missing prepared context");
+    const wire = JSON.stringify(context.request);
+    const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+    expect(hash(wire)).toBe(wireHash);
+    expect(Buffer.byteLength(wire)).toBe(bytes);
+    expect(context.inputHash).toBe(inputHash);
+    expect(report.items[0]).toMatchObject({ inputHash, inputBytes: bytes });
+    expect(hash(JSON.stringify(report))).toBe(previewHash);
+    expect(JSON.stringify(await buildClassificationPreview(data, options))).toBe(
+      JSON.stringify(report),
+    );
+  });
+
+  test("keeps contexts aligned without retaining excluded, failed or oversized requests", async () => {
+    const data = capture();
+    data.items = ["excluded", "ready", "failed", "ready"].map((status, index) => ({
+      ...structuredClone(data.items[0]),
+      key: `${data.repo}#${index + 1}`,
+      id: `SYNTHETIC_I_${index + 1}`,
+      number: index + 1,
+      url: `https://github.com/${data.repo}/issues/${index + 1}`,
+      status: status as SemanticCapture["items"][number]["status"],
+      body: index === 3 ? "界".repeat(10_000) : data.items[0].body,
+    }));
+    const { preview: report, contexts } = await prepareClassification(data, {
+      limit: 50,
+      maxCalls: 0,
+      taxonomy: null,
+    });
+    expect(contexts.map((context) => context?.inputHash ?? null)).toEqual([
+      null,
+      report.items[1].inputHash,
+      null,
+      null,
+    ]);
+    expect(contexts[1]).not.toBeNull();
+    expect(report.items[3].inputHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(report.items[3].inputBytes).toBeGreaterThan(SEMANTIC_MAX_INPUT_BYTES);
+  });
+
+  test.each([
+    "preview",
+    "evaluation",
+  ] as const)("%s reuses one preparation without exposing requests", async (mode) => {
+    const data = capture();
+    const expectedWire = JSON.stringify(
+      buildEvaluationRequest(buildEvaluationInput(data.items[0], taxonomy())),
+    );
+    const read = vi.fn<SemanticCacheStore["read"]>(async () => ({ status: "miss" }));
+    const forbidden = vi.fn((): never => {
+      throw new Error("Unexpected external I/O");
+    });
+    const dependencies = {
+      transport: { graphql: forbidden, search: forbidden },
+      createCache: () => ({ read, write: forbidden }),
+      createStore: forbidden,
+      getApiKey: forbidden,
+      isDisabled: forbidden,
+      fetch: forbidden,
+    };
+    const digest = vi.spyOn(globalThis.crypto.subtle, "digest");
+    try {
+      const options = { limit: 50, maxCalls: 0, taxonomy: taxonomy(), noSnapshot: false };
+      const report = await (mode === "preview" ? runSemanticPreview : runSemanticEvaluation)(
+        data,
+        options,
+        dependencies,
+      );
+      expect(digest).toHaveBeenCalledOnce();
+      expect(read).toHaveBeenCalledOnce();
+      expect(JSON.stringify(read.mock.calls[0][0].request)).toBe(expectedWire);
+      expect(read.mock.calls[0][0].inputHash).toBe(report.items[0].inputHash);
+      expect(report.totals.failed).toBe(0);
+      expect(forbidden).not.toHaveBeenCalled();
+      const json = JSON.stringify(report);
+      for (const value of [
+        data.items[0].body,
+        data.items[0].comments[0].body,
+        '"request":',
+        '"contexts":',
+        '"questions":',
+        '"providerOptions":',
+      ])
+        expect(json).not.toContain(value);
+    } finally {
+      digest.mockRestore();
+    }
   });
 });
 

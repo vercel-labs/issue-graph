@@ -181,56 +181,29 @@ afterEach(() => {
   }
 });
 
-describe("parseSemanticArgs V2", () => {
-  test("preserves explicit dry-run defaults", () => {
-    expect(parseSemanticArgs(ARGS)).toEqual({
-      repo: "o/r",
-      taxonomy: null,
-      limit: 50,
-      maxCalls: 50,
-      format: "auto",
-      dryRun: true,
-      noSnapshot: false,
-      refresh: false,
-      cached: false,
-      concurrency: 1,
-      maxRetries: 0,
-      minIntervalMs: 0,
-      help: false,
-    });
-    expect(parseSemanticArgs(["--help"])).toEqual({
-      repo: "",
-      taxonomy: null,
-      limit: 50,
-      maxCalls: 50,
-      format: "auto",
-      dryRun: false,
-      noSnapshot: false,
-      refresh: false,
-      cached: false,
-      concurrency: 1,
-      maxRetries: 0,
-      minIntervalMs: 0,
-      help: true,
-    });
-  });
+describe("parseSemanticArgs", () => {
+  const expectedDefaults = {
+    repo: "o/r",
+    taxonomy: null,
+    limit: 50,
+    maxCalls: 50,
+    format: "auto",
+    dryRun: false,
+    noSnapshot: false,
+    refresh: false,
+    cached: false,
+    concurrency: 1,
+    maxRetries: 0,
+    minIntervalMs: 0,
+    help: false,
+  };
 
-  test("accepts default inference without an explicit dry-run flag", () => {
-    expect(parseSemanticArgs(["--repo", "o/r"])).toEqual({
-      repo: "o/r",
-      taxonomy: null,
-      limit: 50,
-      maxCalls: 50,
-      format: "auto",
-      dryRun: false,
-      noSnapshot: false,
-      refresh: false,
-      cached: false,
-      concurrency: 1,
-      maxRetries: 0,
-      minIntervalMs: 0,
-      help: false,
-    });
+  test.each([
+    ["explicit dry-run", ARGS, { dryRun: true }],
+    ["help without a repository", ["--help"], { repo: "", help: true }],
+    ["default inference", ["--repo", "o/r"], {}],
+  ])("preserves %s defaults", (_name, argv, overrides) => {
+    expect(parseSemanticArgs(argv)).toEqual({ ...expectedDefaults, ...overrides });
   });
 
   test("refresh is a boolean and composes with dry-run and no-snapshot", () => {
@@ -257,19 +230,13 @@ describe("parseSemanticArgs V2", () => {
         "--no-snapshot",
       ]),
     ).toEqual({
-      repo: "o/r",
+      ...expectedDefaults,
       taxonomy: "a taxonomy.json",
       limit: 500,
       maxCalls: 0,
       format: "json",
       dryRun: true,
       noSnapshot: true,
-      refresh: false,
-      cached: false,
-      concurrency: 1,
-      maxRetries: 0,
-      minIntervalMs: 0,
-      help: false,
     });
     expect(parseSemanticArgs([...ARGS, "--format", "json", "--json"]).format).toBe("json");
     expect(parseSemanticArgs([...ARGS, "--format", "markdown"]).format).toBe("markdown");
@@ -354,8 +321,14 @@ describe("parseSemanticArgs V2", () => {
   ];
 
   test.each(invalid)("rejects %s before taxonomy or GitHub access", async (_label, argv, code) => {
-    expect(() => parseSemanticArgs(argv)).toThrow(SemanticError);
-    expect(() => parseSemanticArgs(argv)).toThrow(expect.objectContaining({ code, exitCode: 2 }));
+    let error: unknown;
+    try {
+      parseSemanticArgs(argv);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(SemanticError);
+    expect(error).toMatchObject({ code, exitCode: 2 });
     const { transport } = fixture();
     const readTaxonomy = vi.fn(async () => {
       throw new Error(SECRET);
@@ -367,7 +340,7 @@ describe("parseSemanticArgs V2", () => {
   });
 });
 
-describe("runSemanticCli V1 output and boundaries", () => {
+describe("runSemanticCli output and boundaries", () => {
   test.each([
     "--help",
     "-h",

@@ -322,7 +322,31 @@ try {
   verifyArchive(tarball, sourceManifest, digest);
   const entries = run([tools.tar, "-tzf", tarball], repo, process.env).stdout.trim().split("\n");
   const files = entries.filter((name) => !name.endsWith("/"));
-  assert.equal(files.length, 65, "published file count must remain 65");
+  const runtimeFiles = readdirSync(join(repo, "src"), { recursive: true, encoding: "utf8" })
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+    .flatMap((name) =>
+      ["js", "d.ts"].map(
+        (extension) => `package/dist/${name.slice(0, -3).split(sep).join("/")}.${extension}`,
+      ),
+    );
+  const expectedFiles = [
+    ...runtimeFiles,
+    ...[
+      "package.json",
+      "LICENSE",
+      "README.md",
+      "SECURITY.md",
+      "skills/issue-graph/SKILL.md",
+      "skill-data/core/SKILL.md",
+      "skill-data/core/references/workflows.md",
+      "skill-data/core/examples/taxonomy.json",
+    ].map((name) => `package/${name}`),
+  ];
+  assert.deepEqual(
+    [...files].sort(),
+    expectedFiles.sort(),
+    "published contents must match source modules and approved assets",
+  );
   assert.equal(new Set(files).size, files.length, "archive must not contain duplicate files");
   for (const entry of entries) {
     assert.ok(entry.startsWith("package/"), `unexpected archive root: ${entry}`);
@@ -335,7 +359,8 @@ try {
         /^dist\/.+\.(?:js|d\.ts)$/.test(name) ||
         name === "skills/issue-graph/SKILL.md" ||
         name === "skill-data/core/SKILL.md" ||
-        name === "skill-data/core/references/workflows.md",
+        name === "skill-data/core/references/workflows.md" ||
+        name === "skill-data/core/examples/taxonomy.json",
       `unexpected published file (source, internal docs, or maps): ${name}`,
     );
     assert.ok(
@@ -557,10 +582,23 @@ try {
     invoke([...statusArgs, "--save"], 1, { ISSUE_GRAPH_HOME: join(blocker, "status") }).stderr,
     /ENOTDIR|EEXIST|not a directory/i,
   );
+  const classify = run(
+    [
+      node,
+      "--import",
+      import.meta.resolve("tsx"),
+      join(repo, "tests/verify-classify.ts"),
+      installed,
+    ],
+    consumer,
+    { ...env, NODE_OPTIONS: "" },
+  );
+  assert.match(classify.stdout, /PASS: \d+ classify\/legacy\/package checks/);
+  console.log(classify.stdout.trim().split("\n").at(-1));
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 44 : 45;
+  const expectedChecks = suppliedTarball ? 45 : 46;
   assert.equal(
     checks,
     expectedChecks,

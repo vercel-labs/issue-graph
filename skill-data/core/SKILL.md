@@ -20,7 +20,7 @@ issue-graph skills get core --full
 ```
 
 Read the returned workflow reference before detailed graph triage, status-history
-comparison, reconciliation, planning, exports, or clustering. Retrieve references
+comparison, reconciliation, planning, semantic suggestions, exports, or clustering. Retrieve references
 through the CLI rather than assuming the agent has a source checkout.
 Use `issue-graph skills list` for discovery and command-specific `--help` for syntax.
 If a command is unavailable, report the CLI/skill mismatch; do not invent guidance,
@@ -37,6 +37,7 @@ fabricate results, or install/upgrade anything automatically.
 | Linked work, competing fixes, overlap | `issue-graph <url\|number> --repo owner/repo` |
 | Open-backlog verification queue | `issue-graph reconcile --repo owner/repo` |
 | Next backlog action | `issue-graph plan --repo owner/repo` |
+| Semantic request/component suggestions | Preview `issue-graph classify --repo owner/repo --dry-run` after reading the full workflow |
 
 For counts, skip graph discovery and do not reconstruct counts through ad hoc queries
 when status is available. Resolve repository and author scope from the request and
@@ -76,39 +77,29 @@ Priority scores and plan `reviewFirst` order inspection, not correctness.
 Treat `blockedBy` as visible graph evidence, not inferred semantic dependencies.
 Report coverage with findings; use printed hub re-seed commands to explore omissions.
 
-## Semantic suggestions (V3)
+## Semantic suggestions
 
-Source build only; these capabilities are not yet part of the published package. Read the full workflow first. Preview: `issue-graph classify --repo owner/repo --dry-run --limit 1 --max-calls 1`.
-Preview may read cache/locks/receipts but writes zero, reads no Gateway key and makes zero Gateway calls.
-After review, explicitly run: `issue-graph classify --repo owner/repo --limit 1 --max-calls 1`.
-On active misses, inference can incur charges and needs environment `AI_GATEWAY_API_KEY`; use an account spending limit, not just a call cap.
-Live reuse: `issue-graph classify --repo owner/repo --limit 1 --max-calls 0`; still queries GitHub and can save the first eligible public-evidence capture before inference. Hits reuse; misses/expiry defer. Unchanged ordinary warm evidence/response reuse writes zero files.
-Saved local view: `issue-graph classify --repo owner/repo --limit 1 --cached`; no GitHub, key, paid inference or writes. Exact saved repo+limit, supplied taxonomy, response TTL/input hash/source receipts/current policy and pending/unknown locks still apply. Missing/expired answers defer; missing evidence fails without network fallback.
-`--cached` is saved, NOT live verification: `evidenceSource` shows capture time/age and `liveRevalidated: false`; all items require review. It forces zero calls, conflicts with `--dry-run`, `--refresh`, `--no-snapshot` and positive `--max-calls`; `coverageComplete: false` keeps exit 1 even with all saved hits.
-Explicit refresh: `issue-graph classify --repo owner/repo --limit 1 --max-calls 1 --refresh`; bypasses evidence-body reuse and saved responses without deleting history. Zero budget never calls Gateway, but still captures live evidence.
-Cache defaults on: TTL 24h from evaluation, expired at the exact boundary; alias/epoch are not immutable model pins.
-Ordinary warm hits need no key/call/new receipt; preserve source provenance and rerun policy. Fresh `evaluated` and `cacheHits` stay separate.
-Current cost excludes `cachedHistoricalCostUsd`; `hasUnknownCost` and `hasUnknownHistoricalCost` stay separate, never unknown-as-free.
-Preview/ordinary/own-lease hits reread cache after metadata awaits: later locks/corruption block use; expiry follows miss budget. Last-checked window, not atomic.
-Capture batches 20 OPEN issues with 10 initial comments each, then 100/100/90 continuations: max 300 comments, four pages. Metadata batches up to 20; preserve coverage/drift and never truncate text.
-Live body reuse checks PUBLIC visibility, issue identity/title/state/version and ALL comment IDs/URLs/authors/order/versions/membership/coverage. Edits, additions and deletion invalidate reuse independently of parent updatedAt; fetch affected evidence or mark needs-refresh, never silently fall back to stale evidence. Pre-send/post-evaluation checks remain non-atomic.
-Mixed-case scope is preserved in wire input; storage scope/path is case-normalized. Canonical serialized comments retain `id,url,body,updatedAt,author` order and historic hashes.
-Markdown groups by component and separates exceptions; p(true) signals are not verified facts. JSON keeps exact distributions and original outcomes.
-Policy 2 preserves bounded two-decimal rounding drift without normalization and marks `<questionId>-distribution-rounded` / `needs-review`; see schema/full workflow for limits.
-A provisional wterm catalog lives in `skill-data/core/examples/wterm-taxonomy.json` in the package/source tree; validate and obtain human review before treating it as an approved taxonomy.
-Explicit `--taxonomy PATH`; fixed Jev/Gateway, no provider/model fallback; unchanged 24,000 UTF-8 request bytes (not tokens), 30s/256 KiB response limits.
-Scheduling: `--concurrency 1..4` default 1, `--max-retries 0..3` default 0, `--min-interval-ms 0..60000` default 0. Only known HTTP 429 failures retry opt-in; all attempts/retries across workers count against max-calls and retain separate receipts/cost unknowns.
-Shared pause starts at error-header time, before diagnostic reads. Honor numeric/HTTP-date Retry-After with bounded backoff; waits over 30s defer. Pacing/backoff stays outside the 30s request timer, with STOP/abort checks while waiting and before dispatch. Never retry unknown outcomes, network errors, timeouts, aborts, invalid replies or unsafe storage.
-Diagnostics expose bounded/redacted code/type, opaque IDs and providerReported identifiers as untrusted, never arbitrary provider prose/message (privacy-review fix). Real tier/quota are UNKNOWN, not checked live; status/cost cannot establish them.
-Per-item attempts, diagnostics/timing and root performance are optional additive fields. githubCalls counts logical transport invocations; githubRequestMs aggregates I/O time, not wall time under concurrency. Phase wall times and client headers/total timings are not pure model latency.
-All suggestions require review; errors are not categories, diagnostics are uncalibrated and accuracy is unmeasured.
-Evidence/cache/receipts/locks use `ISSUE_GRAPH_HOME` (default `~/.issue-graph`): owned `0700` directories including home, regular single-link `0600` files, no symlinks. Unsafe permissions/corruption fail closed; reads create nothing, never chmod/recover. Use a dedicated private home for incompatible legacy permissions.
-Existing response cache/receipts have no raw issue/comment bodies; NEW evidence snapshots explicitly store public bodies under `classify/evidence/<scopeHash>/<uuid>.json` plus atomic `current.json`, version 1, bounded 16 MiB, savedAt/checksum, history retained. No credentials/provider keys; permissions are not encryption or proof that public text is non-sensitive.
-Only complete captures or an explicit issue-limit cohort with every captured item/comment complete and ready publish before inference; bounded cohorts retain incomplete repo coverage. Other incomplete/drifting/failed captures preserve prior evidence. Unchanged evidence writes nothing and does not slide capture timestamps.
-Cache publishes before finalization unlocks. Unknown outcomes block; pending/crashed writes block reuse. Never blindly retry/delete locks; refresh cannot bypass locks/unsafe storage.
-`--no-snapshot` disables evidence/cache/receipt filesystem access/locks, uses memory receipts, still checks `classify/STOP`; no crash/cross-process recovery or safe unknown-request bypass. STOP blocks new calls, not valid hits or in-flight completion.
-Oversized active inputs remain `needs-review` but count in `deferred`/`oversized`, exit 1, not model abstention; complete dry-run may exit 0 with oversized explicit.
-JSON in pipes, Markdown in TTY; `--json` boolean. Exit 0 includes complete live zero-call reuse/abstention, 1 partial/failure/deferred or saved-not-live `--cached`, 2 usage.
+Read [Semantic suggestions](references/workflows.md#semantic-suggestions) via
+`issue-graph skills get core --full` before using `classify`. Preview first:
+
+```bash
+issue-graph classify --repo owner/repo --dry-run --limit 1 --max-calls 1
+```
+
+Preview queries GitHub but makes no Gateway calls, reads no key and writes nothing.
+Only explicitly authorized inference may send public issue/comment text to Gateway
+and incur charges. Routing is fixed to Jev (`typesafe-ai/jev`) through Vercel AI
+Gateway with no provider/model fallback. Use environment `AI_GATEWAY_API_KEY` and an
+account spending limit; `--max-calls` is an attempt cap, not a monetary cap.
+
+`--max-calls 0` still queries GitHub and may save public evidence. `--cached` is a
+read-only saved view, not live verification, and exits 1. Inspect coverage, cache
+status, costs and exclusions; never bypass unknown-outcome locks or unsafe storage.
+Evidence snapshots contain public bodies/comments, which can still be sensitive.
+Use an explicit reviewed `--taxonomy PATH` for components; do not invent a catalog.
+All suggestions require review. Probabilities are uncalibrated, reported impact is
+not verified severity, and errors are not categories. No result authorizes a fix,
+acceptance or GitHub mutation.
 
 ## Output and local history
 

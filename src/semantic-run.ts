@@ -1,16 +1,5 @@
-import {
-  buildClassificationPreview,
-  buildEvaluationInput,
-  SEMANTIC_MODEL,
-  SEMANTIC_POLICY_VERSION,
-  validateTaxonomy,
-} from "./semantic.js";
-import {
-  buildEvaluationRequest,
-  decideSuggestion,
-  fingerprintEvaluation,
-  validateEvaluation,
-} from "./semantic-evaluation.js";
+import { prepareClassification, SEMANTIC_MODEL, SEMANTIC_POLICY_VERSION } from "./semantic.js";
+import { decideSuggestion, validateEvaluation } from "./semantic-evaluation.js";
 import { revalidateSemanticEvidenceBatch } from "./semantic-github.js";
 import { evaluateWithJev, JEV_ADAPTER_VERSION, JevError } from "./semantic-jev.js";
 import { abortableSleep, retryDelayMs, type SemanticWaitOptions } from "./semantic-rate.js";
@@ -123,21 +112,6 @@ function clearPlan(item: { reasonCodes: string[] }): void {
   );
 }
 
-async function cacheContext(
-  evidence: SemanticEvidence,
-  taxonomy: SemanticTaxonomy | null,
-  cacheEpoch: string,
-): Promise<SemanticCacheContext> {
-  const request = buildEvaluationRequest(buildEvaluationInput(evidence, taxonomy));
-  return {
-    request,
-    taxonomy,
-    cacheEpoch,
-    adapterVersion: JEV_ADAPTER_VERSION,
-    inputHash: await fingerprintEvaluation(request, taxonomy, JEV_ADAPTER_VERSION, cacheEpoch),
-  };
-}
-
 async function lookupCache(
   item: SemanticPreviewItem | SemanticReportItem,
   getCache: () => SemanticCacheStore,
@@ -180,8 +154,7 @@ async function inspectCaches(
   capture: SemanticCapture,
   items: Array<SemanticPreviewItem | SemanticReportItem>,
   options: SemanticRunOptions,
-  taxonomy: SemanticTaxonomy | null,
-  epoch: string,
+  contexts: Array<SemanticCacheContext | null>,
   getCache: () => SemanticCacheStore,
   transport: GhTransport,
   signal?: AbortSignal,
@@ -191,13 +164,16 @@ async function inspectCaches(
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
     if (signal?.aborted) break;
-    if (capture.items[index].status !== "ready" || item.reasonCodes.includes("input-too-large"))
+    const context = contexts[index];
+    if (
+      !context ||
+      capture.items[index].status !== "ready" ||
+      item.reasonCodes.includes("input-too-large")
+    )
       continue;
     const inspection = inspections[index];
+    inspection.context = context;
     try {
-      const context = await cacheContext(capture.items[index], taxonomy, epoch);
-      inspection.context = context;
-      item.inputHash = context.inputHash;
       if (!options.noSnapshot) {
         inspection.lookup = await lookupCache(item, getCache, context, options.refresh);
         if (inspection.lookup.status === "hit") hits.push(index);
@@ -231,7 +207,7 @@ export async function runSemanticPreview(
   },
 ): Promise<SemanticPreview> {
   validateOptions(options, capture);
-  const preview = await buildClassificationPreview(capture, options);
+  const { preview, contexts } = await prepareClassification(capture, options);
   preview.execution.cache = options.noSnapshot ? "disabled" : "read-only";
   if (options.noSnapshot) {
     for (const item of preview.items) item.cacheStatus = "disabled";
@@ -239,7 +215,6 @@ export async function runSemanticPreview(
       "Review evidence coverage and taxonomy. No inference was performed. Cache is disabled.";
     return preview;
   }
-  const taxonomy = options.taxonomy ? validateTaxonomy(options.taxonomy, capture.repo) : null;
   let cache: SemanticCacheStore | undefined;
   const getCache = () => (cache ??= dependencies.createCache());
   let stopReason: string | null = null;
@@ -247,8 +222,7 @@ export async function runSemanticPreview(
     capture,
     preview.items,
     options,
-    taxonomy,
-    preview.cacheEpoch,
+    contexts,
     getCache,
     dependencies.transport,
   );
@@ -370,8 +344,7 @@ export async function runSemanticEvaluation(
 ): Promise<SemanticReport> {
   validateOptions(options, capture);
   const now = () => new Date(dependencies.now?.() ?? Date.now()).toISOString();
-  const preview = await buildClassificationPreview(capture, options);
-  const taxonomy = options.taxonomy ? validateTaxonomy(options.taxonomy, capture.repo) : null;
+  const { preview, contexts } = await prepareClassification(capture, options);
   const policy = dependencies.policy ?? {
     version: SEMANTIC_POLICY_VERSION,
     decide: decideSuggestion,
@@ -517,8 +490,7 @@ export async function runSemanticEvaluation(
     capture,
     items,
     options,
-    taxonomy,
-    report.cacheEpoch,
+    contexts,
     getCache,
     dependencies.transport,
     dependencies.signal,

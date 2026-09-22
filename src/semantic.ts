@@ -4,6 +4,7 @@ import {
   SEMANTIC_CACHE_EPOCH,
 } from "./semantic-evaluation.js";
 import {
+  type SemanticCacheContext,
   type SemanticCapture,
   SemanticError,
   type SemanticEvaluationInput,
@@ -225,6 +226,13 @@ export async function buildClassificationPreview(
     cacheEpoch?: string;
   },
 ): Promise<SemanticPreview> {
+  return (await prepareClassification(capture, options)).preview;
+}
+
+export async function prepareClassification(
+  capture: SemanticCapture,
+  options: Parameters<typeof buildClassificationPreview>[1],
+): Promise<{ preview: SemanticPreview; contexts: Array<SemanticCacheContext | null> }> {
   validateSemanticRepo(capture.repo);
   if (
     !Number.isInteger(options.limit) ||
@@ -244,6 +252,7 @@ export async function buildClassificationPreview(
   const taxonomy = options.taxonomy ? validateTaxonomy(options.taxonomy, capture.repo) : null;
   const cacheEpoch = options.cacheEpoch ?? SEMANTIC_CACHE_EPOCH;
   const items: SemanticPreviewItem[] = [];
+  const contexts: Array<SemanticCacheContext | null> = [];
   let eligible = 0;
   let plannedCalls = 0;
   let deferred = 0;
@@ -274,12 +283,25 @@ export async function buildClassificationPreview(
         reasons.push("max-calls-reached");
       }
     }
+    const context = request
+      ? {
+          request,
+          taxonomy,
+          cacheEpoch,
+          adapterVersion: JEV_ADAPTER_VERSION,
+          inputHash: await fingerprintEvaluation(
+            request,
+            taxonomy,
+            JEV_ADAPTER_VERSION,
+            cacheEpoch,
+          ),
+        }
+      : null;
+    contexts.push(tooLarge ? null : context);
     items.push({
       key: evidence.key,
       url: evidence.url,
-      inputHash: request
-        ? await fingerprintEvaluation(request, taxonomy, JEV_ADAPTER_VERSION, cacheEpoch)
-        : null,
+      inputHash: context?.inputHash ?? null,
       cacheStatus: "not-checked",
       cacheEvaluatedAt: null,
       cacheSourceRequestId: null,
@@ -306,7 +328,7 @@ export async function buildClassificationPreview(
       },
     });
   }
-  return {
+  const preview: SemanticPreview = {
     schemaVersion: 1,
     kind: "classification-preview",
     scope: { repo: capture.repo, state: "OPEN", limit: options.limit, maxCalls: options.maxCalls },
@@ -358,4 +380,5 @@ export async function buildClassificationPreview(
           },
     ],
   };
+  return { preview, contexts };
 }

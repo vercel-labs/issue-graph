@@ -424,59 +424,53 @@ describe("performance CLI with native private storage and synthetic services", (
     );
   });
 
-  test("cached fresh-instance reads 76 saved answers, then TTL-deferred evidence, without any external I/O or writes", async () => {
-    const api = gateway();
-    expect(
-      (await run(["--limit", "100", "--max-calls", "76"], github(76), { gatewayFetch: api.fetch }))
-        .exit,
-    ).toBe(0);
-    const before = await tree();
-    clock = LATER;
-    const fresh = readOnlyIO();
-    const result = await run(["--cached", "--limit", "100"], offline(), fresh);
-    const value = report(result);
-    expect(result.exit).toBe(1);
-    expect(value.scope.maxCalls).toBe(0);
-    expect(value.evidenceSource).toEqual({
-      mode: "cached",
-      capturedAt: TIME,
-      ageMs: 3600000,
-      liveRevalidated: false,
-      reusedIssues: 76,
-    });
-    expect(value.coverageComplete).toBe(false);
-    expect.soft(value.totals).toMatchObject({ cacheHits: 76, evaluated: 0, deferred: 0 });
-    expect(value.performance?.githubCalls).toBe(0);
-    expect(fresh.evidenceStore?.read).toHaveBeenCalledExactlyOnceWith("o/r", 100);
-    for (const item of value.items)
-      expect(item.reasonCodes).toContain("cached-evidence-not-revalidated");
-    clock = "2026-09-21T00:00:01Z";
-    const expired = report(await run(["--cached", "--limit", "100"], offline(), readOnlyIO()));
-    expect(expired.totals).toMatchObject({ cacheHits: 0, evaluated: 0, deferred: 76 });
-    expect
-      .soft(expired.items.every((item) => item.cacheStatus === "expired" && item.answers === null))
-      .toBe(true);
-    expect(await tree()).toEqual(before);
-  }, 30_000);
-
-  test("comment-free cached control reuses a response only until its exact TTL boundary", async () => {
-    const cold = await run([], github(1, { comments: {} }), { gatewayFetch: gateway().fetch });
+  test("fresh cached reads preserve a mixed-comment cohort through exact TTL expiry without I/O or writes", async () => {
+    const cold = await run(
+      ["--limit", "100", "--max-calls", "3"],
+      github(3, {
+        comments: { 1: 0, 2: 1, 3: 2 },
+      }),
+      { gatewayFetch: gateway().fetch },
+    );
     expect(cold.exit).toBe(0);
     const before = await tree();
-    for (const expired of [false, true]) {
-      clock = expired ? "2026-09-21T00:00:00Z" : LATER;
-      const result = await run(["--cached"], offline(), readOnlyIO());
+    for (const [time, expired] of [
+      [LATER, false],
+      ["2026-09-20T23:59:59.999Z", false],
+      ["2026-09-21T00:00:00Z", true],
+      ["2026-09-21T00:00:00.001Z", true],
+    ] as const) {
+      clock = time;
+      const fresh = readOnlyIO();
+      const result = await run(["--cached", "--limit", "100"], offline(), fresh);
       const value = report(result);
       expect(result.exit).toBe(1);
-      expect(value.items[0].cacheStatus).toBe(expired ? "expired" : "hit");
-      expect(value.totals).toMatchObject({ cacheHits: expired ? 0 : 1, deferred: expired ? 1 : 0 });
+      expect(value.scope.maxCalls).toBe(0);
+      expect(value.evidenceSource).toEqual({
+        mode: "cached",
+        capturedAt: TIME,
+        ageMs: Date.parse(time) - Date.parse(TIME),
+        liveRevalidated: false,
+        reusedIssues: 3,
+      });
+      expect(value.coverageComplete).toBe(false);
+      expect(value.totals).toMatchObject({
+        cacheHits: expired ? 0 : 3,
+        evaluated: 0,
+        deferred: expired ? 3 : 0,
+      });
       expect(value.execution).toMatchObject({
         gatewayCalls: 0,
         cacheEntriesWritten: 0,
         receiptRecordsWritten: 0,
       });
       expect(value.performance?.githubCalls).toBe(0);
-      expect(value.evidenceSource?.liveRevalidated).toBe(false);
+      expect(fresh.evidenceStore?.read).toHaveBeenCalledExactlyOnceWith("o/r", 100);
+      for (const item of value.items) {
+        expect(item.cacheStatus).toBe(expired ? "expired" : "hit");
+        expect(item.answers === null).toBe(expired);
+        expect(item.reasonCodes).toContain("cached-evidence-not-revalidated");
+      }
       expect(await tree()).toEqual(before);
     }
   });

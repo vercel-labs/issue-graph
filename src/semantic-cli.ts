@@ -69,7 +69,7 @@ Reported cost can be unknown. Use an account spending limit; abort does not prov
 Rounded distributions may require review; see schema for the bounded compatibility policy.
 Responses are checked at runtime; resolved weights and semantic quality are not independently verified.
 
-Example: issue-graph classify --repo vercel-labs/agent-browser --dry-run --json`;
+Example: issue-graph classify --repo owner/repo --dry-run --json`;
 
 export interface SemanticArgs {
   repo: string;

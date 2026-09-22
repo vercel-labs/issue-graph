@@ -8,6 +8,7 @@ import {
   record,
   repoData,
 } from "../tests/semantic-github-fixture.js";
+import { rawEvaluation } from "../tests/semantic-response-fixture.js";
 import { SEMANTIC_MAX_INPUT_BYTES } from "./semantic.js";
 import { runSemanticCli, type SemanticIO } from "./semantic-cli.js";
 import { decideSuggestion } from "./semantic-evaluation.js";
@@ -78,37 +79,7 @@ function github(
 }
 
 function evaluation(request: GatewayEvaluationRequest, cost: string | null = "0.125") {
-  return {
-    model: "typesafe-ai/jev",
-    answers: Object.fromEntries(
-      Object.entries(request.questions).map(([id, question]) => {
-        if (question.type === "boolean") return [id, { type: "boolean", probability: 0.2 }];
-        if (question.type === "score") {
-          return [
-            id,
-            { type: "score", score: 1.75, probabilities: { "0": 0, "1": 0.25, "2": 0.75, "3": 0 } },
-          ];
-        }
-        const choice = id === "requestType" ? "bug" : "cli";
-        const alternate = Object.keys(question.criteria).find((key) => key !== choice);
-        return [
-          id,
-          {
-            type: "choice",
-            choice,
-            probabilities: Object.fromEntries(
-              Object.keys(question.criteria).map((key) => [
-                key,
-                key === choice ? 0.8 : key === alternate ? 0.2 : 0,
-              ]),
-            ),
-          },
-        ];
-      }),
-    ),
-    usage: { inputTokens: 120, outputTokens: 30 },
-    ...(cost === null ? {} : { providerMetadata: { gateway: { cost } } }),
-  };
+  return rawEvaluation(request, { cost });
 }
 
 function gateway(
@@ -257,7 +228,7 @@ afterEach(async () => {
   }
 });
 
-describe("V3 real CLI cache integration with synthetic responses", () => {
+describe("real CLI cache integration with synthetic responses", () => {
   test.each([
     { label: "default inference", flags: [], dryRun: false },
     { label: "no-snapshot inference", flags: ["--no-snapshot"], dryRun: false },

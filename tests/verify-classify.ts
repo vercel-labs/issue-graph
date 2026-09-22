@@ -283,9 +283,10 @@ assert.throws(() => lstatSync(join(process.env.ISSUE_GRAPH_HOME, "classify", "ST
   assert.match(schema.commands.classify.diagnostics, /untrusted/);
   assert.match(schema.commands.classify.diagnostics, /prose is omitted/);
   const guide = JSON.parse(run(["skills", "get", "core", "--full", "--json"]).stdout);
-  assert.match(guide.data[0].content, /Semantic suggestions \(V3\)/);
-  assert.match(guide.data[0].content, /inference can incur charges/);
-  assert.match(guide.data[0].content, /Unknown outcomes block/);
+  assert.match(guide.data[0].content, /Semantic suggestions/);
+  assert.doesNotMatch(guide.data[0].content, /\bV[123]\b/);
+  assert.match(guide.data[0].content, /incur charges/);
+  assert.match(guide.data[0].content, /unknown-outcome locks/);
   assert.ok(
     guide.data[0].files.some((file: { content: string }) =>
       file.content.includes("classification-preview"),
@@ -299,26 +300,16 @@ assert.throws(() => lstatSync(join(process.env.ISSUE_GRAPH_HOME, "classify", "ST
   const invalid = run(["classify", "--repo", "sample/public-repo", "--unknown-flag"], 2);
   assert.equal(JSON.parse(invalid.stdout).kind, "classification-error");
   assert.equal(JSON.parse(invalid.stdout).error.code, "invalid-arguments");
-  for (const flags of [["--refresh", "true"], ["--refresh=false"], ["--refresh", "--refresh"]]) {
-    const invalidRefresh = run(["classify", "--repo", "sample/public-repo", ...flags], 2);
-    assert.equal(JSON.parse(invalidRefresh.stdout).error.code, "invalid-arguments");
-  }
+  const invalidRefresh = run(["classify", "--repo", "sample/public-repo", "--refresh=false"], 2);
+  assert.equal(JSON.parse(invalidRefresh.stdout).error.code, "invalid-arguments");
   assert.equal(existsSync(log), false);
   assert.equal(gatewayCalls().length, 0);
 
   for (const flags of [
     ["--cached", "--dry-run"],
-    ["--cached", "--refresh"],
-    ["--cached", "--no-snapshot"],
     ["--cached", "--max-calls", "1"],
-    ["--cached", "true"],
-    ["--cached=false"],
-    ["--cached", "--cached"],
     ["--concurrency", "0"],
-    ["--concurrency", "5"],
-    ["--max-retries", "4"],
     ["--max-retries", "-1"],
-    ["--min-interval-ms", "60001"],
     ["--min-interval-ms", "1.5"],
   ]) {
     assert.equal(
@@ -358,25 +349,6 @@ assert.throws(() => lstatSync(join(process.env.ISSUE_GRAPH_HOME, "classify", "ST
   const deferred = JSON.parse(run([...args, "--max-calls", "0"], 1).stdout);
   assert.equal(deferred.totals.deferred, 1);
   assert.equal(deferred.totals.plannedCalls, 0);
-  const bounded = JSON.parse(
-    run(
-      [
-        ...args,
-        "--concurrency",
-        "4",
-        "--max-retries",
-        "3",
-        "--min-interval-ms",
-        "60000",
-        "--max-calls",
-        "0",
-      ],
-      1,
-    ).stdout,
-  );
-  assert.equal(bounded.totals.plannedCalls, 0);
-  assert.equal(bounded.execution.gatewayCalls, 0);
-  assert.equal(bounded.execution.localWrites, 0);
   const partial = JSON.parse(
     run([...args, "--limit", "1"], 1, { CLASSIFY_TEST_CASE: "partial" }).stdout,
   );

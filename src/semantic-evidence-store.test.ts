@@ -461,162 +461,49 @@ describe("private versioned semantic evidence", () => {
     expect(await state()).toEqual(before);
   });
 
-  const malformed: Array<[string, (value: ReturnType<typeof JSON.parse>) => void]> = [
-    [
-      "private",
-      (v) => {
-        v.visibility = "PRIVATE";
-      },
-    ],
-    [
-      "wrong repo",
-      (v) => {
-        v.repo = "other/repo";
-      },
-    ],
-    [
-      "unknown properties",
-      (v) => {
-        v.apiKey = "not-evidence";
-      },
-    ],
-    [
-      "unknown nested properties",
-      (v) => {
-        v.items[0].comments[0].token = "not-evidence";
-      },
-    ],
-    [
-      "bad state",
-      (v) => {
-        v.items[0].state = "open";
-      },
-    ],
-    [
-      "bad status",
-      (v) => {
-        v.items[0].status = "unknown";
-      },
-    ],
-    [
-      "zero issue",
-      (v) => {
-        v.items[0].number = 0;
-      },
-    ],
-    [
-      "unsafe issue",
-      (v) => {
-        v.items[0].number = Number.MAX_SAFE_INTEGER + 1;
-      },
-    ],
-    [
-      "bad key",
-      (v) => {
-        v.items[0].key = "owner/repo#2";
-      },
-    ],
-    [
-      "foreign URL",
-      (v) => {
-        v.items[0].url = "https://example.com/owner/repo/issues/1";
-      },
-    ],
-    [
-      "PR URL",
-      (v) => {
-        v.items[0].url = "https://github.com/owner/repo/pull/1";
-      },
-    ],
-    [
-      "URL credentials",
-      (v) => {
-        v.items[0].url = "https://token@github.com/owner/repo/issues/1";
-      },
-    ],
-    [
-      "empty ID",
-      (v) => {
-        v.items[0].id = "";
-      },
-    ],
-    [
-      "numeric ID",
-      (v) => {
-        v.items[0].id = 1;
-      },
-    ],
-    [
-      "bad title",
-      (v) => {
-        v.items[0].title = null;
-      },
-    ],
-    [
-      "bad body",
-      (v) => {
-        v.items[0].body = {};
-      },
-    ],
-    [
-      "invalid unicode",
-      (v) => {
-        v.items[0].body = "\ud800";
-      },
-    ],
-    [
-      "bad date",
-      (v) => {
-        v.items[0].updatedAt = "2026-02-30T00:00:00Z";
-      },
-    ],
-    [
-      "non ISO",
-      (v) => {
-        v.items[0].updatedAt = "September 20, 2026";
-      },
-    ],
-    [
-      "future issue",
-      (v) => {
-        v.items[0].updatedAt = LATER;
-      },
-    ],
-    [
-      "future comment",
-      (v) => {
-        v.items[0].comments[0].updatedAt = LATER;
-      },
-    ],
-    [
-      "reversed window",
-      (v) => {
-        v.captureWindow.startedAt = LATER;
-      },
-    ],
-    [
-      "outside window",
-      (v) => {
-        v.items[0].captureWindow.completedAt = LATER;
-      },
-    ],
-    [
-      "bad author type",
-      (v) => {
-        v.items[0].comments[0].author = { login: "me" };
-      },
-    ],
-    [
-      "empty author",
-      (v) => {
-        v.items[0].comments[0].author = "";
-      },
-    ],
+  type MalformedCase =
+    | [name: string, path: string, value: unknown]
+    | [name: string, change: (value: SemanticCapture) => void];
+
+  function setMalformedValue(value: SemanticCapture, path: string, replacement: unknown) {
+    const keys = path.split(".");
+    let target = value as unknown as Record<string, unknown>;
+    for (const key of keys.slice(0, -1)) {
+      target = target[key] as Record<string, unknown>;
+    }
+    target[keys[keys.length - 1]] = replacement;
+  }
+
+  const malformed: MalformedCase[] = [
+    ["private", "visibility", "PRIVATE"],
+    ["wrong repo", "repo", "other/repo"],
+    ["unknown properties", "apiKey", "not-evidence"],
+    ["unknown nested properties", "items.0.comments.0.token", "not-evidence"],
+    ["bad state", "items.0.state", "open"],
+    ["bad status", "items.0.status", "unknown"],
+    ["zero issue", "items.0.number", 0],
+    ["unsafe issue", "items.0.number", Number.MAX_SAFE_INTEGER + 1],
+    ["bad key", "items.0.key", "owner/repo#2"],
+    ["foreign URL", "items.0.url", "https://example.com/owner/repo/issues/1"],
+    ["PR URL", "items.0.url", "https://github.com/owner/repo/pull/1"],
+    ["URL credentials", "items.0.url", "https://token@github.com/owner/repo/issues/1"],
+    ["empty ID", "items.0.id", ""],
+    ["numeric ID", "items.0.id", 1],
+    ["bad title", "items.0.title", null],
+    ["bad body", "items.0.body", {}],
+    ["invalid unicode", "items.0.body", "\ud800"],
+    ["bad date", "items.0.updatedAt", "2026-02-30T00:00:00Z"],
+    ["non ISO", "items.0.updatedAt", "September 20, 2026"],
+    ["future issue", "items.0.updatedAt", LATER],
+    ["future comment", "items.0.comments.0.updatedAt", LATER],
+    ["reversed window", "captureWindow.startedAt", LATER],
+    ["outside window", "items.0.captureWindow.completedAt", LATER],
+    ["bad author type", "items.0.comments.0.author", { login: "me" }],
+    ["empty author", "items.0.comments.0.author", ""],
     [
       "foreign comment",
-      (v) => {
-        v.items[0].comments[0].url = "https://github.com/owner/repo/issues/2#issuecomment-10";
-      },
+      "items.0.comments.0.url",
+      "https://github.com/owner/repo/issues/2#issuecomment-10",
     ],
     [
       "comment query",
@@ -626,9 +513,8 @@ describe("private versioned semantic evidence", () => {
     ],
     [
       "bad comment anchor",
-      (v) => {
-        v.items[0].comments[0].url = "https://github.com/owner/repo/issues/1#issuecomment-0";
-      },
+      "items.0.comments.0.url",
+      "https://github.com/owner/repo/issues/1#issuecomment-0",
     ],
     [
       "duplicate issue",
@@ -660,70 +546,23 @@ describe("private versioned semantic evidence", () => {
         v.items[0].comments = Array.from({ length: 301 }, () => v.items[0].comments[0]);
       },
     ],
-    [
-      "counter mismatch",
-      (v) => {
-        v.coverage.captured = 2;
-      },
-    ],
-    [
-      "negative counter",
-      (v) => {
-        v.coverage.pages = -1;
-      },
-    ],
-    [
-      "fractional counter",
-      (v) => {
-        v.coverage.pages = 1.5;
-      },
-    ],
-    [
-      "unsafe counter",
-      (v) => {
-        v.coverage.total = Number.MAX_SAFE_INTEGER + 1;
-      },
-    ],
-    [
-      "no page",
-      (v) => {
-        v.coverage.pages = 0;
-      },
-    ],
-    [
-      "contradictory full coverage",
-      (v) => {
-        v.coverage.hasNextPage = true;
-      },
-    ],
-    [
-      "full with unknown total",
-      (v) => {
-        v.coverage.total = null;
-      },
-    ],
-    [
-      "invalid reasons",
-      (v) => {
-        v.coverage.reasonCodes = ["oops", "oops"];
-      },
-    ],
-    [
-      "known token shape",
-      (v) => {
-        v.items[0].body = `Example: ghp_${"a".repeat(36)}`;
-      },
-    ],
-    [
-      "private key shape",
-      (v) => {
-        v.items[0].body = "-----BEGIN PRIVATE KEY-----";
-      },
-    ],
+    ["counter mismatch", "coverage.captured", 2],
+    ["negative counter", "coverage.pages", -1],
+    ["fractional counter", "coverage.pages", 1.5],
+    ["unsafe counter", "coverage.total", Number.MAX_SAFE_INTEGER + 1],
+    ["no page", "coverage.pages", 0],
+    ["contradictory full coverage", "coverage.hasNextPage", true],
+    ["full with unknown total", "coverage.total", null],
+    ["invalid reasons", "coverage.reasonCodes", ["oops", "oops"]],
+    ["known token shape", "items.0.body", `Example: ghp_${"a".repeat(36)}`],
+    ["private key shape", "items.0.body", "-----BEGIN PRIVATE KEY-----"],
   ];
-  test.each(malformed)("rejects %s before creating directories", async (_name, change) => {
+  test.each(
+    malformed,
+  )("rejects %s before creating directories", async (_name, pathOrChange, replacement?: unknown) => {
     const value = capture();
-    change(value);
+    if (typeof pathOrChange === "string") setMalformedValue(value, pathOrChange, replacement);
+    else pathOrChange(value);
     await blocked(store().write(REPO, 10, value));
     await missing();
     expect(mkdir).not.toHaveBeenCalled();
