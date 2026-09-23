@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { docsSlugs, markdownPath } from "../src/lib/docs-paths";
+import { landingTitle } from "../src/lib/landing-content";
 import { canonicalUrl, repositoryUrl } from "../src/lib/site";
+import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
 import { testUrl } from "./test-url";
 
 const origin = testUrl();
@@ -40,16 +44,87 @@ function htmlAttribute(html: string, tag: string, key: string, value: string, at
   return element?.match(new RegExp(`${attribute}="([^"]*)"`))?.[1];
 }
 
+function staticTerminal(html: string) {
+  const terminal = html.match(/<section\b[^>]*class="ig-demo"[^>]*>[\s\S]*?<\/section>/)?.[0];
+  assert.ok(terminal, "Terminal examples are present in the server HTML");
+  assert.match(terminal, /aria-label="issue-graph terminal examples"/);
+  assert.equal((terminal.match(/role="tablist"/g) ?? []).length, 1, "One terminal tablist");
+  const tabs = terminal.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+  const panels = terminal.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+  assert.equal(tabs.length, 3, "Three terminal tabs");
+  assert.equal(panels.length, 3, "Three server-rendered panels");
+  const ids = new Set<string>();
+  for (const [index, example] of terminalExampleCatalog.map(toTerminalExample).entries()) {
+    const tab: string = tabs[index] ?? "";
+    const panel: string = panels[index] ?? "";
+    const tabId = htmlAttribute(tab, "button", "role", "tab", "id");
+    const panelId = htmlAttribute(panel, "div", "role", "tabpanel", "id");
+    assert.ok(tabId && panelId, `ARIA identifiers: ${example.id}`);
+    ids.add(tabId);
+    ids.add(panelId);
+    assert.equal(htmlAttribute(tab, "button", "role", "tab", "aria-controls"), panelId);
+    assert.equal(htmlAttribute(panel, "div", "role", "tabpanel", "aria-labelledby"), tabId);
+    assert.equal(htmlAttribute(tab, "button", "role", "tab", "aria-selected"), String(index === 0));
+    assert.equal(htmlAttribute(tab, "button", "role", "tab", "tabindex"), index === 0 ? "0" : "-1");
+    assert.equal(
+      /\bhidden(?:="")?(?:\s|>)/.test(panel),
+      index !== 0,
+      `Inactive panel hidden: ${example.id}`,
+    );
+    assert.ok(tab.includes(`>${example.label}</button>`), `Tab label: ${example.id}`);
+    const code = panel.match(/<pre><code>[\s\S]*?<\/code><\/pre>/)?.[0];
+    assert.ok(code, `SSR pre/code: ${example.id}`);
+    assert.equal(
+      code.replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?span\b[^>]*>/g, ""),
+      renderToStaticMarkup(
+        createElement(
+          "pre",
+          null,
+          createElement("code", null, `$ ${example.command}\n\n${example.output}`),
+        ),
+      ),
+      `Complete captured excerpt, not an animated prefix: ${example.id}`,
+    );
+  }
+  assert.equal(ids.size, 6, "Unique tab and panel identifiers");
+  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate Graph takeaway");
+  assert.match(terminal, /aria-live="polite"/);
+  assert.match(terminal, /Unknown=review unknown; \?=unknown, not zero\./);
+  assert.match(terminal, /Approval does not imply merge readiness\./);
+  assert.match(terminal, /Validate repository-specific behavior before mutating GitHub\./);
+  assert.doesNotMatch(terminal, /Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
+  assert.doesNotMatch(
+    terminal,
+    /<(?:textarea|canvas|iframe)\b|stdoutSha256|excerptSha256|receiptFile/,
+  );
+  checks++;
+}
+
 const titles = new Set<string>();
 for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/docs"))]) {
   const html = await request(path);
   assert.equal(html.response.status, 200, path);
   assert.match(html.response.headers.get("content-type") ?? "", /text\/html/, path);
   assert.equal((html.body.match(/<h1(?:\s|>)/g) ?? []).length, 1, `One H1: ${path}`);
+  if (path === "/") {
+    staticTerminal(html.body);
+    const heading = html.body.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "";
+    assert.equal(
+      heading
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+      landingTitle,
+      "Canonical landing H1 sentence",
+    );
+  }
   assert.equal((html.body.match(/<main(?:\s|>)/g) ?? []).length, 1, `One main: ${path}`);
   assert.ok(html.body.includes('id="main-content"'), `Skip target: ${path}`);
   const title = html.body.match(/<title>([^<]+)<\/title>/)?.[1];
   assert.ok(title, `Title: ${path}`);
+  assert.ok(title.startsWith("issue-graph | "), `Product-first title: ${path}`);
+  assert.equal(htmlAttribute(html.body, "meta", "property", "og:title", "content"), title);
+  assert.equal(htmlAttribute(html.body, "meta", "name", "twitter:title", "content"), title);
   assert.ok(!titles.has(title), `Unique title: ${path}`);
   titles.add(title);
   const canonical = htmlAttribute(html.body, "link", "rel", "canonical", "href");
@@ -60,14 +135,24 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
   assert.equal(new URL(ogUrl).href, new URL(canonicalUrl(path)).href, `OG URL: ${path}`);
   const image = htmlAttribute(html.body, "meta", "property", "og:image", "content");
   assert.ok(image, `OG image metadata: ${path}`);
-  assert.ok(image.startsWith(canonicalUrl("/og")), `OG: ${path}`);
+  assert.equal(image, canonicalUrl(path === "/" ? "/og" : `/og${path}`), `OG: ${path}`);
   const imageResponse = await fetch(new URL(new URL(image).pathname, origin), {
     headers: { accept: "image/*" },
     redirect: "manual",
   });
   assert.equal(imageResponse.status, 200, `OG image: ${path}`);
-  assert.match(imageResponse.headers.get("content-type") ?? "", /^image\//);
-  assert.ok((await imageResponse.arrayBuffer()).byteLength > 0);
+  assert.match(imageResponse.headers.get("content-type") ?? "", /^image\/png(?:;|$)/);
+  const png = Buffer.from(await imageResponse.arrayBuffer());
+  assert.ok(png.byteLength > 33, `PNG body: ${path}`);
+  assert.deepEqual(
+    [...png.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10],
+    `PNG signature: ${path}`,
+  );
+  assert.equal(png.readUInt32BE(8), 13, `PNG IHDR length: ${path}`);
+  assert.equal(png.toString("ascii", 12, 16), "IHDR", `PNG header: ${path}`);
+  assert.equal(png.readUInt32BE(16), 1200, `OG width: ${path}`);
+  assert.equal(png.readUInt32BE(20), 630, `OG height: ${path}`);
   assert.ok(
     htmlAttribute(html.body, "meta", "name", "description", "content"),
     `Description: ${path}`,
@@ -121,6 +206,15 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
     isolated(result.response);
   }
   assert.equal(markdown.body, sibling.body, `Matching representations: ${path}`);
+  if (path === "/") {
+    for (const example of terminalExampleCatalog.map(toTerminalExample)) {
+      assert.ok(markdown.body.includes(example.command));
+      assert.ok(markdown.body.includes(example.summary));
+      assert.ok(markdown.body.includes(example.output));
+    }
+    assert.match(markdown.body, /This displayed excerpt omits other captured nodes/);
+    assert.doesNotMatch(markdown.body, /All fetched nodes are shown/);
+  }
   const after = await request(path);
   assert.match(after.response.headers.get("content-type") ?? "", /text\/html/);
   checks += 5;

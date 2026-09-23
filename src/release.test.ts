@@ -712,6 +712,8 @@ describe("manual release workflow contract", () => {
       "inputs.publish == true && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'",
     );
     expect(workflow.jobs.consumers.if).toBeUndefined();
+    expect(workflow.jobs["github-release"].needs).toBe("publish");
+    expect(workflow.jobs["github-release"].if).toBe(workflow.jobs.publish.if);
     for (const job of Object.values(workflow.jobs) as {
       steps: { uses?: string; with?: Record<string, unknown> }[];
     }[]) {
@@ -724,8 +726,45 @@ describe("manual release workflow contract", () => {
       { permissions?: Record<string, string> },
     ][]) {
       expect(job.permissions?.["id-token"]).toBe(name === "publish" ? "write" : undefined);
-      expect(job.permissions?.contents).not.toBe("write");
+      if (name === "github-release") expect(job.permissions?.contents).toBe("write");
+      else expect(job.permissions?.contents).not.toBe("write");
     }
+  });
+
+  test.each([
+    "missing",
+    "matching",
+    "mismatched",
+    "lookup-error",
+  ])("checks the tag commit before creating a release: %s", (scenario) => {
+    const script = workflow.jobs["github-release"].steps.find((step: { run?: string }) =>
+      step.run?.includes("gh release create"),
+    ).run;
+    const mock = `
+        gh() {
+          case "$1 $2" in
+            "api --paginate")
+              [ "$SCENARIO" != lookup-error ] || return 1
+              [ "$SCENARIO" = missing ] || echo "refs/tags/v$EXPECTED_VERSION"
+              return 0 ;;
+            "api --method")
+              [ "$*" = "api --method POST repos/$GITHUB_REPOSITORY/git/refs -f ref=refs/tags/v$EXPECTED_VERSION -f sha=$EXPECTED_SHA" ] ;;
+            "api repos/$GITHUB_REPOSITORY/commits/refs/tags/v$EXPECTED_VERSION")
+              if [ "$SCENARIO" = mismatched ]; then echo wrong-commit; else echo "$EXPECTED_SHA"; fi ;;
+            "release view") return 1 ;;
+            "release create")
+              case "$*" in *--verify-tag*) echo RELEASE_CREATED ;; *) return 1 ;; esac ;;
+            *) return 1 ;;
+          esac
+        }
+      `;
+    const result = spawnSync("bash", ["-e", "-c", `${mock}\n${script}`], {
+      env: { ...process.env, ...context, SCENARIO: scenario, RUNNER_TEMP: temporary() },
+      encoding: "utf8",
+    });
+    const allowed = scenario === "missing" || scenario === "matching";
+    expect(result.status).toBe(allowed ? 0 : 1);
+    expect(result.stdout.includes("RELEASE_CREATED")).toBe(allowed);
   });
 
   test("downloads the same immutable artifact ID for testing and publishing", () => {

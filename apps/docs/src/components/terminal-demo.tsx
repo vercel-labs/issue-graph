@@ -1,191 +1,151 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  plainTerminalText,
-  type TerminalDemoProps,
-  type TerminalDemoRuntimeProps,
-} from "@/lib/terminal-demo";
+import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
+import type { TerminalDemoProps } from "@/lib/terminal-demo";
+import { renderTerminalCommand, TerminalOutput } from "./terminal-output";
 import "./terminal-demo.css";
 
-function TerminalFallback({ command, output }: TerminalDemoProps) {
-  return (
-    <div className="ig-demo-fallback" aria-hidden="true">
-      <code>$ {command}</code>
-      <pre>{plainTerminalText(output).split("\n").slice(0, 9).join("\n")}</pre>
-    </div>
-  );
-}
+const purposes: Record<string, string> = {
+  graph: "Trace fixes and open follow-ups",
+  status: "Spot PRs waiting for review",
+  plan: "Choose what to tackle next",
+};
 
-const Runtime = dynamic<TerminalDemoRuntimeProps>(
-  () => import("./terminal-demo-runtime").catch(() => ({ default: TerminalFallback })),
-  { ssr: false },
-);
+export function TerminalDemo({ examples }: TerminalDemoProps) {
+  const instanceId = useId();
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [indicator, setIndicator] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }>();
 
-export function TerminalDemo({ command, output }: TerminalDemoProps) {
-  const windowRef = useRef<HTMLElement>(null);
-  const hostRef = useRef<HTMLDivElement>(null);
-  const expandRef = useRef<HTMLButtonElement>(null);
-  const [canMount, setCanMount] = useState(false);
-  const [active, setActive] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
-  const [replay, setReplay] = useState(0);
-  const [failed, setFailed] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const handleError = useCallback(() => setFailed(true), []);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    let cancelled = false;
-    let visible = false;
-    let fontsReady = false;
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updateMotion = () => setReducedMotion(motion.matches);
-    const update = () => {
-      if (cancelled) return;
-      const rect = host.getBoundingClientRect();
-      const running = visible && !document.hidden && rect.width > 0 && rect.height > 0;
-      setActive(running);
-      if (running && fontsReady) setCanMount(true);
+  useLayoutEffect(() => {
+    const tabs = tabsRef.current;
+    const selected = tabRefs.current[selectedIndex];
+    if (!tabs || !selected) return;
+    const measure = () => {
+      setIndicator({
+        left: selected.offsetLeft,
+        top: selected.offsetTop,
+        width: selected.offsetWidth,
+        height: selected.offsetHeight,
+      });
     };
-    const intersection = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
-      update();
-    });
-    const resize = new ResizeObserver(update);
-    intersection.observe(host);
-    resize.observe(host);
-    document.addEventListener("visibilitychange", update);
-    motion.addEventListener("change", updateMotion);
-    updateMotion();
-    void document.fonts.ready.then(() => {
-      fontsReady = true;
-      update();
-    });
-    return () => {
-      cancelled = true;
-      intersection.disconnect();
-      resize.disconnect();
-      document.removeEventListener("visibilitychange", update);
-      motion.removeEventListener("change", updateMotion);
-    };
-  }, []);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(tabs);
+    for (const tab of tabRefs.current) if (tab) observer.observe(tab);
+    return () => observer.disconnect();
+  }, [selectedIndex]);
 
-  useEffect(() => {
-    let wasFullscreen = false;
-    const changed = () => {
-      const next = document.fullscreenElement === windowRef.current;
-      setFullscreen(next);
-      if (wasFullscreen && !next) expandRef.current?.focus({ preventScroll: true });
-      wasFullscreen = next;
-    };
-    document.addEventListener("fullscreenchange", changed);
-    return () => document.removeEventListener("fullscreenchange", changed);
-  }, []);
-
-  useEffect(() => {
-    if (!expanded) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setExpanded(false);
-      expandRef.current?.focus({ preventScroll: true });
-    };
-    document.addEventListener("keydown", close);
-    return () => document.removeEventListener("keydown", close);
-  }, [expanded]);
-
-  const toggleExpanded = async () => {
-    const element = windowRef.current;
-    if (!element) return;
-    if (document.fullscreenElement === element) {
-      try {
-        await document.exitFullscreen();
-      } catch {
-        expandRef.current?.focus({ preventScroll: true });
-      }
-    } else if (expanded) {
-      setExpanded(false);
-    } else {
-      try {
-        if (!element.requestFullscreen) throw new Error("Fullscreen unavailable");
-        await element.requestFullscreen();
-      } catch {
-        setExpanded(true);
-      }
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowLeft":
+        nextIndex = (index - 1 + examples.length) % examples.length;
+        break;
+      case "ArrowRight":
+        nextIndex = (index + 1) % examples.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = examples.length - 1;
+        break;
+      default:
+        return;
     }
+    event.preventDefault();
+    setSelectedIndex(nextIndex);
+    tabRefs.current[nextIndex]?.focus({ preventScroll: true });
+    tabRefs.current[nextIndex]?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "instant",
+    });
   };
 
   return (
-    <section
-      ref={windowRef}
-      className={`ig-demo${expanded ? " ig-demo-expanded" : ""}`}
-      aria-label="issue-graph terminal demo"
-    >
-      <div className="ig-demo-bar">
-        <div className="ig-demo-dots" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-        <span className="ig-demo-title">issue-graph</span>
-        <div className="ig-demo-controls">
-          <button
-            type="button"
-            aria-label="Replay terminal demo"
-            title="Replay"
-            onClick={() => {
-              setFailed(false);
-              setReplay((value) => value + 1);
+    <section className="ig-demo" aria-label="issue-graph terminal examples">
+      <div
+        ref={tabsRef}
+        className="ig-demo-tabs"
+        role="tablist"
+        aria-label="Terminal examples"
+        data-indicator-ready={indicator ? "true" : undefined}
+      >
+        {indicator ? (
+          <span
+            className="ig-demo-tab-indicator"
+            aria-hidden="true"
+            style={{
+              transform: `translateX(${indicator.left}px)`,
+              top: indicator.top,
+              width: indicator.width,
+              height: indicator.height,
             }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" />
-            </svg>
-          </button>
-          <button
-            ref={expandRef}
-            type="button"
-            aria-label={fullscreen || expanded ? "Collapse terminal" : "Expand terminal"}
-            aria-expanded={fullscreen || expanded}
-            title={fullscreen || expanded ? "Collapse" : "Expand"}
-            onClick={() => void toggleExpanded()}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d={
-                  fullscreen || expanded
-                    ? "m3 3 7 7M4 10h6V4m11 17-7-7m6 0h-6v6"
-                    : "M15 3h6v6m0-6-7 7M9 21H3v-6m0 6 7-7"
-                }
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div ref={hostRef} className="ig-demo-body">
-        {failed ? (
-          <TerminalFallback command={command} output={output} />
-        ) : canMount ? (
-          <Runtime
-            command={command}
-            output={output}
-            active={active}
-            reducedMotion={reducedMotion}
-            replay={replay}
-            onError={handleError}
           />
-        ) : (
-          <div className="ig-demo-placeholder" aria-hidden="true">
-            <span>$</span> {command}
-          </div>
-        )}
+        ) : null}
+        {examples.map((example, index) => (
+          <button
+            key={example.id}
+            ref={(element) => {
+              tabRefs.current[index] = element;
+            }}
+            type="button"
+            role="tab"
+            id={`${instanceId}-tab-${example.id}`}
+            aria-controls={`${instanceId}-panel-${example.id}`}
+            aria-selected={selectedIndex === index}
+            tabIndex={selectedIndex === index ? 0 : -1}
+            className="ig-demo-tab"
+            onClick={() => setSelectedIndex(index)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
+          >
+            {example.label}
+          </button>
+        ))}
       </div>
-      <div className="ig-demo-transcript">
-        <p>issue-graph command and output</p>
-        <pre>{`$ ${command}\n\n${output}`}</pre>
+      <p className="ig-demo-summary" aria-live="polite" aria-atomic="true">
+        <span className="ig-demo-purpose">{purposes[examples[selectedIndex].id]}</span>
+        <span>{examples[selectedIndex].summary}</span>
+      </p>
+      <div className="ig-demo-frame">
+        <div className="ig-demo-bar">
+          <div className="ig-demo-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <span className="ig-demo-title">issue-graph</span>
+        </div>
+        {examples.map((example, index) => (
+          <div
+            key={example.id}
+            role="tabpanel"
+            data-example={example.id}
+            id={`${instanceId}-panel-${example.id}`}
+            aria-labelledby={`${instanceId}-tab-${example.id}`}
+            hidden={selectedIndex !== index}
+            tabIndex={selectedIndex === index ? 0 : -1}
+            className="ig-demo-panel"
+          >
+            <pre>
+              <code>
+                <span className="ig-demo-prompt">$ </span>
+                {renderTerminalCommand(example.command)}
+                {"\n\n"}
+                <TerminalOutput output={example.output} exampleId={example.id} />
+              </code>
+            </pre>
+          </div>
+        ))}
       </div>
     </section>
   );

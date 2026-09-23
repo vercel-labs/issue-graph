@@ -1,177 +1,195 @@
-import { readFileSync } from "node:fs";
-import { WasmBridge } from "@wterm/dom";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { expect, test, vi } from "vitest";
+import { GET as landingMarkdown } from "../src/app/api/landing-md/route";
 import { TerminalDemo } from "../src/components/terminal-demo";
 import graph from "../src/lib/example-graph.json";
+import plan from "../src/lib/example-plan.json";
+import status from "../src/lib/example-status.json";
+import { plainTerminalText, type TerminalDemoProps } from "../src/lib/terminal-demo";
 import {
-  CLEAR_TERMINAL,
-  colorTerminalLine,
-  createTerminalPlayback,
-  plainTerminalText,
-  terminalReplayFrames,
-} from "../src/lib/terminal-demo";
+  selectTerminalLines,
+  summarizePlanOutput,
+  summarizeStatusOutput,
+  terminalExampleCatalog,
+  toTerminalExample,
+} from "../src/lib/terminal-examples";
+
+vi.mock("@/lib/discovery", () => ({ releaseNotice: () => "" }));
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
-const frames = terminalReplayFrames(graph.command, graph.terminalOutput);
-const complete = frames.map((frame) => frame.text).join("");
+const [first, ...rest] = terminalExampleCatalog;
+const examples: TerminalDemoProps["examples"] = [
+  toTerminalExample(first),
+  ...rest.map(toTerminalExample),
+];
+const attribute = (html: string, name: string) =>
+  html.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1];
 
-function screen(core: WasmBridge) {
-  return Array.from({ length: core.getRows() }, (_, row) =>
-    Array.from({ length: core.getCols() }, (_, column) =>
-      String.fromCodePoint(core.getCell(row, column).char || 32),
-    )
-      .join("")
-      .trimEnd(),
-  ).join("\n");
-}
-
-afterEach(() => vi.useRealTimers());
-
-describe("terminal demo presentation", () => {
-  test("keeps the original facts and identifiers while removing Markdown emphasis", () => {
-    const text = plainTerminalText(graph.terminalOutput);
-    expect(text).not.toContain("**");
-    expect(text).not.toContain("_(depth");
-    expect(text).toContain("PR_SET_PDEATHSIG");
-    for (const node of graph.nodes) expect(text).toContain(node.key);
-    expect(colorTerminalLine("## Nodes")).toBe("\x1b[1;36mNodes\x1b[0m\r\n");
-    expect(colorTerminalLine("OPEN CLOSED MERGED")).toContain("\x1b[32mOPEN\x1b[0m");
-    expect(colorTerminalLine("OPEN CLOSED MERGED")).toContain("\x1b[35mMERGED\x1b[0m");
-  });
-
-  test("types whole graphemes and emits complete ANSI sequences with CRLF", () => {
-    const unicode = terminalReplayFrames("echo 👩‍💻", "## Result\nOPEN");
-    expect(unicode.some((frame) => frame.text === "👩‍💻")).toBe(true);
-    expect(complete).not.toMatch(/(?<!\r)\n/);
-    expect(complete).toContain(graph.command);
-    expect(complete.endsWith("\x1b[?25l")).toBe(true);
-    expect(plainTerminalText(String.fromCharCode(0, 7, 27, 127))).toBe("");
-  });
-
-  test("renders only chrome and a bounded placeholder before client initialization", () => {
-    const html = renderToStaticMarkup(
-      createElement(TerminalDemo, { command: graph.command, output: graph.terminalOutput }),
+test("SSR includes three full outputs, the selected summary and linked accessible tabs", () => {
+  const html = renderToStaticMarkup(createElement(TerminalDemo, { examples }));
+  const tabs = html.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+  const panels = html.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+  expect(tabs).toHaveLength(3);
+  expect(panels).toHaveLength(3);
+  expect(html.match(/<pre><code>/g)).toHaveLength(3);
+  expect(html).toContain('role="tablist"');
+  expect(html).toContain('aria-live="polite"');
+  expect(html).toContain(examples[0].summary);
+  for (const [index, example] of examples.entries()) {
+    const tab = tabs[index] ?? "";
+    const panel = panels[index] ?? "";
+    expect(attribute(tab, "id")).toBeTruthy();
+    expect(attribute(panel, "id")).toBeTruthy();
+    expect(attribute(tab, "aria-controls")).toBe(attribute(panel, "id"));
+    expect(attribute(panel, "aria-labelledby")).toBe(attribute(tab, "id"));
+    expect(attribute(tab, "aria-selected")).toBe(String(index === 0));
+    expect(attribute(tab, "tabindex")).toBe(index === 0 ? "0" : "-1");
+    expect(/\bhidden(?:="")?(?:\s|>)/.test(panel)).toBe(index !== 0);
+    const code = panel.match(/<code>[\s\S]*?<\/code>/)?.[0];
+    expect(code?.replace(/<\/?span\b[^>]*>/g, "")).toBe(
+      renderToStaticMarkup(
+        createElement("code", null, `$ ${example.command}\n\n${example.output}`),
+      ),
     );
-    expect(html).toContain('aria-label="Replay terminal demo"');
-    expect(html).toContain('aria-label="Expand terminal"');
-    expect(html).toContain('class="ig-demo-dots" aria-hidden="true"');
-    expect(html).toContain('class="ig-demo-transcript"');
-    expect(html).toContain(graph.terminalOutput);
-    expect(html).not.toMatch(/Sources and capture limits|figcaption|not a live feed/);
-    expect(html).not.toContain("textarea");
-    expect(html.match(/<pre>/g)).toHaveLength(1);
-  });
-
-  test("isolates the heavy runtime and bounds layout, motion, input and fullscreen", () => {
-    const loader = read("../src/components/terminal-demo.tsx");
-    const runtime = read("../src/components/terminal-demo-runtime.tsx");
-    const css = read("../src/components/terminal-demo.css");
-    expect(loader).toContain('import("./terminal-demo-runtime")');
-    expect(loader).toContain("ssr: false");
-    expect(loader).toContain("document.fonts.ready");
-    expect(loader).toContain("IntersectionObserver");
-    expect(loader).toContain("!document.hidden");
-    expect(loader).toContain("requestFullscreen");
-    expect(loader).toContain('event.key !== "Escape"');
-    expect(runtime).toContain('from "@wterm/react"');
-    expect(runtime).toContain('import "@wterm/react/css"');
-    expect(runtime).toContain("inert={!terminal}");
-    expect(runtime).toContain("input.disabled = true");
-    expect(runtime).toContain("input.tabIndex = -1");
-    expect(runtime).toContain("onData={ignoreInput}");
-    expect(loader + runtime).not.toMatch(/fetch\(|WebSocket|just-bash|libfx|wasmUrl=/);
-    expect(css).toContain("height: 400px");
-    expect(css).toContain("height: 300px");
-    expect(css).toContain(".ig-demo:fullscreen");
-    expect(css).toContain("prefers-reduced-motion: reduce");
-    expect(css).toContain(".dark-theme .ig-demo");
-  });
+  }
+  expect(html).toContain("?=unknown, not zero.");
+  expect(html).toContain("Approval does not imply merge readiness.");
+  expect(html).toContain("Validate repository-specific behavior before mutating GitHub.");
 });
 
-describe("terminal replay lifecycle", () => {
-  test("pauses without accumulating hidden work and resumes exactly once", () => {
-    vi.useFakeTimers();
-    const write = vi.fn();
-    const playback = createTerminalPlayback(frames, write);
-    playback.setActive(true);
-    vi.advanceTimersByTime(100);
-    const prefix = playback.transcript;
-    expect(prefix.length).toBeGreaterThan(0);
-    expect(prefix.length).toBeLessThan(complete.length);
-    playback.setActive(false);
-    vi.advanceTimersByTime(10_000);
-    expect(playback.transcript).toBe(prefix);
-    expect(vi.getTimerCount()).toBe(0);
-    playback.setActive(true);
-    vi.runAllTimers();
-    expect(playback.transcript).toBe(complete);
-    expect(write.mock.calls.map(([text]) => text).join("")).toBe(complete);
-    playback.setActive(true);
-    expect(vi.getTimerCount()).toBe(0);
-    playback.dispose();
-  });
-
-  test("reduced motion completes in one write and does not animate offscreen", () => {
-    vi.useFakeTimers();
-    const write = vi.fn();
-    const playback = createTerminalPlayback(frames, write);
-    playback.setActive(false, true);
-    expect(write).not.toHaveBeenCalled();
-    playback.setActive(true, true);
-    expect(write).toHaveBeenCalledExactlyOnceWith(complete);
-    expect(vi.getTimerCount()).toBe(0);
-    playback.dispose();
-  });
-
-  test("motion changes finish only the remaining prefix, and cleanup prevents late writes", () => {
-    vi.useFakeTimers();
-    const write = vi.fn();
-    const playback = createTerminalPlayback(frames, write);
-    playback.setActive(true);
-    vi.advanceTimersByTime(50);
-    playback.setActive(true, true);
-    expect(write.mock.calls.map(([text]) => text).join("")).toBe(complete);
-    playback.dispose();
-    playback.setActive(true);
-    vi.runAllTimers();
-    expect(write.mock.calls.map(([text]) => text).join("")).toBe(complete);
-    const cancelledWrite = vi.fn();
-    const cancelled = createTerminalPlayback(frames, cancelledWrite);
-    cancelled.setActive(true);
-    cancelled.dispose();
-    vi.runAllTimers();
-    expect(cancelledWrite).not.toHaveBeenCalled();
-  });
+test("minimal Geist accents keep commands readable and emphasize only useful output signals", () => {
+  const html = renderToStaticMarkup(createElement(TerminalDemo, { examples }));
+  expect(html).toContain('class="ig-terminal-command"');
+  expect(html).toContain('ig-demo-token-merged">issue-graph</span>');
+  expect(html).toContain('ig-demo-token-reference">--repo</span>');
+  expect(html).toContain('ig-demo-token-positive">vercel-labs/agent-browser</span>');
+  expect(html).toContain('ig-demo-token-attention">2</span>');
+  expect(html).toContain('ig-demo-token-positive">1</span>');
+  expect(html).toContain('ig-demo-token-reference">Next:</span>');
+  expect(html).toContain('ig-demo-line ig-demo-line-plain">- Blocked: 6');
+  expect(html).not.toMatch(/ig-demo-line-focus|ig-demo-token-(?:parameter|keyword|danger)/);
 });
 
-describe("published wterm WASM", () => {
-  test("renders the captured text and heading color with the actual embedded core", async () => {
-    const core = await WasmBridge.load();
-    core.init(200, 48);
-    core.writeString(CLEAR_TERMINAL + complete);
-    expect(screen(core)).toContain("Reference graph: vercel-labs/agent-browser#1113");
-    expect(screen(core)).toContain("PR_SET_PDEATHSIG");
-    expect(screen(core)).toContain("OPEN issue");
-    expect(screen(core)).not.toContain("**");
-    expect(core.getCell(2, 0).fg).toBe(6);
-    expect(core.getCursor().visible).toBe(false);
-  });
+test("plain formatting preserves labels and URLs while React escapes display text", () => {
+  const output = plainTerminalText(
+    "## Result\r\n**OPEN** PR_SET_PDEATHSIG _(depth 1)_\r\n[public PR](https://example.com/pr)\nhttps://example.com/a?x=1&y=2\n\t🟢",
+  );
+  expect(output).toBe(
+    "Result\nOPEN PR_SET_PDEATHSIG (depth 1)\npublic PR\nhttps://example.com/a?x=1&y=2\n\t🟢",
+  );
+  expect(plainTerminalText(String.fromCharCode(0, 7, 27, 127, 159))).toBe("");
+  const text = '<script>example</script> & "quoted"';
+  const example = { ...examples[0], label: text, summary: text, command: text, output: text };
+  const html = renderToStaticMarkup(createElement(TerminalDemo, { examples: [example] }));
+  expect(html).not.toMatch(/<(?:script|a)\b/);
+  expect(
+    html.match(/&lt;script&gt;example&lt;\/script&gt; &amp; &quot;quoted&quot;/g),
+  ).toHaveLength(4);
+});
 
-  test("clear and prefix redraw after shrinking matches a fresh terminal at that size", async () => {
-    const resized = await WasmBridge.load();
-    const fresh = await WasmBridge.load();
-    resized.init(100, 16);
-    resized.writeString(complete);
-    resized.resize(40, 12);
-    resized.writeString(CLEAR_TERMINAL);
-    expect(resized.getScrollbackCount()).toBe(0);
-    resized.writeString(complete);
-    fresh.init(40, 12);
-    fresh.writeString(complete);
-    expect(screen(resized)).toBe(screen(fresh));
-    expect(resized.getCursor()).toEqual(fresh.getCursor());
-    expect(resized.getScrollbackCount()).toBe(fresh.getScrollbackCount());
-  });
+test("catalog selects captured lines and exposes only five display fields", () => {
+  expect(examples.map(({ id }) => id)).toEqual(["graph", "status", "plan"]);
+  const fixtures = { graph, status, plan };
+  for (const entry of terminalExampleCatalog) {
+    const fixture = fixtures[entry.id];
+    const display = toTerminalExample(entry);
+    expect(entry.output).toBe(fixture.terminalOutput);
+    expect(display.command).toBe(fixture.command);
+    expect(Object.keys(display).sort().join(",")).toBe("command,id,label,output,summary");
+    expect(display.output).toBe(
+      plainTerminalText(selectTerminalLines(fixture.terminalOutput, entry.selection.lineRanges)),
+    );
+  }
+  expect(first.selection.lineRanges).toEqual([
+    { startLine: 1, endLine: 3 },
+    { startLine: 9, endLine: 10 },
+    { startLine: 14, endLine: 20 },
+  ]);
+  expect(examples[0].output.split("\n")).toHaveLength(12);
+  expect(examples[0].output).not.toContain("Nodes: 5");
+  expect(graph.nodes).toHaveLength(5);
+  expect(graph.terminalOutput).toContain("Nodes: 5");
+  expect(examples[2].output).toContain("@wterm/search");
+});
+
+test("captures remain public with sane timestamps and matching in-repo excerpt hashes", () => {
+  for (const fixture of [graph, status, plan]) {
+    expect(fixture.repositoryVisibility).toBe("PUBLIC");
+    const times = [fixture.visibilityCheckedAt, fixture.captureStartedAt, fixture.capturedAt];
+    const parsed = times.map(Date.parse);
+    expect(parsed.every(Number.isFinite)).toBe(true);
+    expect(parsed).toEqual([...parsed].sort((a, b) => a - b));
+  }
+  for (const fixture of [status, plan]) {
+    expect(fixture.capturedAt).toBe(fixture.captureEndedAt);
+    expect(fixture.terminalExcerpt).toMatchObject({
+      source: "CLI stdout",
+      excerpt: true,
+      exitCode: 0,
+    });
+    expect(createHash("sha256").update(fixture.terminalOutput).digest("hex")).toBe(
+      fixture.terminalExcerpt.excerptSha256,
+    );
+  }
+  expect(plan.coverage).toMatchObject({ completeBacklog: false, depth: 0 });
+});
+
+test("summaries preserve unknown counts and never invent a missing next action", () => {
+  expect(examples.map(({ summary }) => summary)).toEqual([
+    "1 merged PR, 2 open follow-ups",
+    "3 open PRs with their review states",
+    "26 open items, a suggested next action",
+  ]);
+  for (const output of ["", "Totals: Open ?"])
+    expect(summarizeStatusOutput(output)).toBe("? open PRs with their review states");
+  for (const output of ["", "- Open items: ?"])
+    expect(summarizePlanOutput(output)).toBe("? open items in the captured backlog");
+  expect(summarizePlanOutput("- Open items: 0\n\n## Next\n")).toBe(
+    "0 open items in the captured backlog",
+  );
+});
+
+test("Markdown shares examples and distinguishes the full capture from the displayed subset", async () => {
+  const response = landingMarkdown();
+  expect(response.status).toBe(200);
+  const markdown = await response.text();
+  for (const example of examples) {
+    for (const text of [example.label, example.summary, example.command, example.output])
+      expect(markdown).toContain(text);
+  }
+  for (const fixture of [graph, status, plan]) expect(markdown).toContain(fixture.capturedAt);
+  for (const fixture of [status, plan]) expect(markdown).toContain(fixture.coverage.note);
+  expect(markdown).toContain("not live results");
+  expect(markdown).toContain("they do not run commands or call GitHub");
+  expect(markdown).toContain("The full captured graph contains 5 fetched nodes");
+  expect(markdown).toContain("This displayed excerpt omits other captured nodes");
+  expect(markdown).toContain("19 beyond-depth references and 22 edges");
+  expect(markdown).not.toContain("All fetched nodes are shown");
+});
+
+test("terminal has no WASM, deferred output, replay timers or network execution", () => {
+  const source = [
+    "../src/components/terminal-demo.tsx",
+    "../src/components/terminal-output.tsx",
+    "../src/components/graph-proof.tsx",
+    "../src/lib/terminal-demo.ts",
+    "../src/lib/terminal-examples.ts",
+  ]
+    .map(read)
+    .join("\n");
+  expect(source).not.toMatch(/@wterm\/(?:dom|react)\b|WebAssembly|WasmBridge|\.wasm\b/);
+  expect(source).not.toMatch(
+    /next\/dynamic|\bimport\s*\(|terminalReplayFrames|createTerminalPlayback/,
+  );
+  expect(source).not.toMatch(
+    /\b(?:setTimeout|setInterval|fetch|WebSocket)\b|dangerouslySetInnerHTML/,
+  );
+  expect(existsSync(new URL("../src/components/terminal-demo-runtime.tsx", import.meta.url))).toBe(
+    false,
+  );
+  for (const path of ["../package.json", "../../../pnpm-lock.yaml"])
+    expect(read(path)).not.toMatch(/@wterm\/(?:dom|react)(?=[@:'"\s])/);
 });

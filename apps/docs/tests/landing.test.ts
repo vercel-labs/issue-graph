@@ -2,12 +2,13 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import Home from "../src/app/page";
+import Home, { metadata } from "../src/app/page";
 import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
-import graph from "../src/lib/example-graph.json";
-import { agentSetupPrompt, plannedInstallCommand } from "../src/lib/site";
+import { landingTitle, workflows } from "../src/lib/landing-content";
+import { agentSetupPrompt, plannedInstallCommand, siteName } from "../src/lib/site";
+import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -20,13 +21,21 @@ describe("launch feedback", () => {
     expect(layout).not.toContain("LogoVercelLabs");
   });
 
+  test("renders one canonical headline without periods or forced line breaks", () => {
+    const html = renderToStaticMarkup(createElement(Home));
+    const headings = html.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g);
+    expect(landingTitle).toBe("Find related work before you start");
+    expect(metadata.title).toEqual({ absolute: `${siteName} | ${landingTitle}` });
+    expect(headings).toEqual([`<h1 id="hero-title">${landingTitle}</h1>`]);
+    expect(headings?.[0]).not.toContain(".");
+    expect(headings?.[0]).not.toMatch(/<br\b/);
+  });
+
   test("removes the hero eyebrow and exposes the audience selector", () => {
     const html = renderToStaticMarkup(createElement(Home));
     expect(html).not.toContain("A Vercel Labs CLI for humans and agents");
     expect(html).not.toContain("ig-hero-eyebrow");
     expect(html).not.toContain("ig-graph-board");
-    expect(html).toContain("Find related work.");
-    expect(html).toContain("Before you start.");
     expect(html).toContain("For humans");
     expect(html).toContain("For agents");
   });
@@ -36,7 +45,20 @@ describe("launch feedback", () => {
     expect(html.match(/data-geist-code-block=""/g)).toHaveLength(4);
     expect(html.match(/data-section="tabs"/g)).toHaveLength(4);
     expect(html.match(/data-section="content"/g)).toHaveLength(4);
-    expect(html).toContain(plannedInstallCommand);
+    const codes = html.match(/<code\b[^>]*>[\s\S]*?<\/code>/g) ?? [];
+    for (const command of [
+      ...workflows.map((workflow) => workflow.command),
+      plannedInstallCommand,
+    ]) {
+      expect(
+        codes.some(
+          (code) =>
+            code.includes("ig-demo-token-") &&
+            code.replace(/<code\b[^>]*>/, "<code>").replace(/<\/?span\b[^>]*>/g, "") ===
+              renderToStaticMarkup(createElement("code", null, command)),
+        ),
+      ).toBe(true);
+    }
     expect(html).not.toContain('class="ig-command"');
     expect(read("../src/app/page.tsx")).toContain("@vercel/geistdocs/components/code-block");
   });
@@ -74,14 +96,31 @@ describe("launch feedback", () => {
     expect(html).toContain('aria-label="Copy prompt"');
   });
 
-  test("renders a terminal window and accessible transcript without the explanatory footer", () => {
+  test("server-renders the catalog's three static terminal examples without replay chrome or metadata", () => {
     const html = renderToStaticMarkup(createElement(GraphProof));
-    expect(html).toContain('aria-label="issue-graph terminal demo"');
-    expect(html).toContain('aria-label="Replay terminal demo"');
-    expect(html).toContain('aria-label="Expand terminal"');
-    expect(html).toContain('class="ig-demo-transcript"');
-    expect(html).toContain(graph.terminalOutput);
-    expect(html).toContain(graph.command);
+    expect(html).toContain('aria-label="issue-graph terminal examples"');
+    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tabpanel"/g)).toHaveLength(3);
+    expect(html.match(/hidden=""/g)).toHaveLength(2);
+    const panels = html.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+    for (const [index, example] of terminalExampleCatalog.map(toTerminalExample).entries()) {
+      expect(html).toContain(`>${example.label}</button>`);
+      const code = panels[index]?.match(/<pre><code>[\s\S]*?<\/code><\/pre>/)?.[0];
+      expect(code).toBeDefined();
+      expect(renderToStaticMarkup(createElement(Home))).toContain(code);
+      expect(code?.replace(/<\/?span\b[^>]*>/g, "")).toBe(
+        renderToStaticMarkup(
+          createElement(
+            "pre",
+            null,
+            createElement("code", null, `$ ${example.command}\n\n${example.output}`),
+          ),
+        ),
+      );
+    }
+    expect(html).toContain("Approval does not imply merge readiness.");
+    expect(html).not.toMatch(/Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
+    expect(html).not.toMatch(/stdoutSha256|excerptSha256|receiptFile|lineRanges|captureStartedAt/);
     expect(html).not.toContain("not a live feed");
     expect(html).not.toContain("Sources and capture limits");
     expect(html).not.toContain("Reproduce this result");

@@ -1,4 +1,7 @@
 import { releaseNotice } from "@/lib/discovery";
+import graph from "@/lib/example-graph.json";
+import plan from "@/lib/example-plan.json";
+import status from "@/lib/example-status.json";
 import {
   landingDescription,
   landingLastModified,
@@ -8,14 +11,16 @@ import {
 import {
   agentSetupPrompt,
   canonicalUrl,
-  exampleCommand,
   plannedInstallCommand,
   siteDescription,
   siteName,
 } from "@/lib/site";
+import { terminalExampleCatalog, toTerminalExample } from "@/lib/terminal-examples";
 import { textResponse } from "@/lib/text-response";
 
 export const dynamic = "force-dynamic";
+
+const captures = { graph, status, plan };
 
 export function GET() {
   return textResponse(
@@ -49,12 +54,34 @@ export function GET() {
       "",
       "Inspect references, competing fixes, status, and follow-ups before starting work. GitHub access is read-only. Local snapshots may write files; use --no-snapshot for a graph run without persisting a snapshot.",
       "",
-      "Example command for an installed CLI, not a claim of live results:",
+      "## Command examples",
       "",
-      "```sh",
-      exampleCommand,
-      "```",
+      "Static excerpts from public CLI captures, not live results. The website tabs only switch the displayed example; they do not run commands or call GitHub.",
       "",
+      ...terminalExampleCatalog.flatMap((source) => {
+        const example = toTerminalExample(source);
+        const capture = captures[source.id];
+        const coverageNote =
+          source.id === "graph"
+            ? `The full captured graph contains ${graph.coverage.capturedNodes} fetched nodes. This displayed excerpt omits other captured nodes. The depth-${graph.limits.depth} capture is not complete history: ${graph.coverage.beyondDepthReferences} beyond-depth references and ${graph.coverage.omittedEdges} edges to unfetched references are omitted from the captured graph. States were read during a capture window, not atomically.`
+            : capture.coverage.note;
+        return [
+          `### ${example.label}`,
+          "",
+          example.summary,
+          "",
+          "```sh",
+          example.command,
+          "```",
+          "",
+          "```text",
+          example.output,
+          "```",
+          "",
+          `Captured: ${capture.capturedAt}. ${coverageNote}`,
+          "",
+        ];
+      }),
       ...workflows.flatMap((workflow) => [
         `## ${workflow.title}`,
         "",

@@ -1,0 +1,26 @@
+.ig-demo-line-heading,
+.ig-demo-token-strong {
+  font-weight: 500;
+}
+
+.ig-demo-token-reference {
+  color: var(--ds-blue-900);
+}
+
+.ig-demo-token-positive {
+  color: var(--ds-green-900);
+}
+
+.ig-demo-token-merged {
+  color: var(--ds-purple-900);
+}
+
+.ig-demo-token-attention {
+  color: var(--ds-amber-900);
+}
+
+.ig-demo-prompt,
+.ig-demo-token-muted,
+.ig-demo-line-muted {
+  color: var(--ds-gray-900);
+}

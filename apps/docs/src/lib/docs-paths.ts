@@ -8,6 +8,7 @@ export const docsSlugs = [
   "library",
   "security",
   "reference",
+  "changelog",
 ] as const;
 
 export function isSafePathSegments(segments: readonly string[]): boolean {

@@ -335,6 +335,7 @@ try {
       "package.json",
       "LICENSE",
       "README.md",
+      "CHANGELOG.md",
       "SECURITY.md",
       "skills/issue-graph/SKILL.md",
       "skill-data/core/SKILL.md",
@@ -355,7 +356,9 @@ try {
   for (const file of files) {
     const name = file.slice("package/".length);
     assert.ok(
-      /^(?:package\.json|README\.md|LICENSE|SECURITY\.md|CONTRIBUTING\.md)$/.test(name) ||
+      /^(?:package\.json|README\.md|CHANGELOG\.md|LICENSE|SECURITY\.md|CONTRIBUTING\.md)$/.test(
+        name,
+      ) ||
         /^dist\/.+\.(?:js|d\.ts)$/.test(name) ||
         name === "skills/issue-graph/SKILL.md" ||
         name === "skill-data/core/SKILL.md" ||

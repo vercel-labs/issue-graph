@@ -1,6 +1,7 @@
-import graph from "@/lib/example-graph.json";
+import { terminalExampleCatalog, toTerminalExample } from "@/lib/terminal-examples";
 import { TerminalDemo } from "./terminal-demo";
 
 export function GraphProof() {
-  return <TerminalDemo command={graph.command} output={graph.terminalOutput} />;
+  const [first, ...rest] = terminalExampleCatalog;
+  return <TerminalDemo examples={[toTerminalExample(first), ...rest.map(toTerminalExample)]} />;
 }

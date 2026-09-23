@@ -6,9 +6,13 @@
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
 </p>
 
-Find related GitHub issues, competing pull requests, and unresolved follow-ups before you start work.
+Find related issues, competing changes, and unresolved follow-ups before you start work.
 
 `issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, graph classification, and ranking need no model. Semantic `classify` inference can incur charges; preview it first with `--dry-run`. Root-cause clustering is an optional agent step.
+
+![issue-graph demo](https://issue-graph.dev/issue-graph-demo.png)
+
+Example output, not a live feed or complete history. [Capture details](https://issue-graph.dev/docs/graph).
 
 ## Start here
 
@@ -148,6 +152,7 @@ Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), 
 - [Library](apps/docs/content/docs/library.mdx): core, shell, and HTTP integrations
 - [Security](apps/docs/content/docs/security.mdx): permissions and private data
 - [Reference](apps/docs/content/docs/reference.mdx): commands and output contracts
+- [Changelog](https://issue-graph.dev/docs/changelog): release notes
 
 ## Limits and privacy
 
