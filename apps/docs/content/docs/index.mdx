@@ -1,47 +1,47 @@
 ---
 title: Overview
-description: Inspect GitHub relationships, PR status, and backlog actions with bounded, model-free evidence.
-lastModified: 2026-09-22
+description: Find related issues, check pull request status, and plan backlog reviews from your terminal.
+lastModified: 2026-09-23
 ---
 
-## Start with the work in front of you
+`issue-graph` is a CLI for tracing related GitHub issues and pull requests. Use it to find existing fixes, check review status, and choose what to review next.
 
-`issue-graph` is a CLI and library for understanding related GitHub work before you implement, review, or clean up a backlog. It follows text mentions and structural links, retains attribution where available, and derives triage signals from the evidence it can read.
+## Install
 
-Crawling, classification, status aggregation, and queue ordering require no model. Root-cause clustering is a separate, optional agent step.
-
-## Install before running examples
-
-[`issue-graph`](https://www.npmjs.com/package/issue-graph) is published on npm with the CLI and library. Try the latest published CLI without a global installation:
+Requires Node.js 20+ and [GitHub CLI](https://cli.github.com).
 
 ```bash
-npx issue-graph@latest --help
+npm install --global issue-graph@latest
+gh auth login
 ```
 
-For the installed `issue-graph` command used throughout these docs, run `npm install --global issue-graph@latest`. Node.js 20 or later and authenticated GitHub CLI access are required for GitHub queries. The source repository remains **INTERNAL**; installing the public package does not require or grant source access.
+You can also try the [npm package](https://www.npmjs.com/package/issue-graph) with `npx issue-graph@latest --help`.
 
-Follow [Get started](/docs/get-started) for prerequisites, authentication, and a first graph around public [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113):
+## Trace an issue
 
 ```bash
 issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
 ```
 
-The bounded capture from 2026-09-22 contains five nodes, all in `vercel-labs/agent-browser`: closed issue #1113, merged PR #1137, closed regression #1148, and open follow-ups #1371 and #1607. It is not a live feed or complete history. A merged fix and closed seed do not prove that related follow-ups are resolved.
+The result shows linked issues and PRs, their current states, and possible follow-ups. Use an issue URL or replace the repository and number with your own.
 
-## Choose a workflow
+See [Get started](/docs/get-started) for a walkthrough and example output.
 
-| Question | Start here |
-| --- | --- |
-| What is linked to this issue or PR? | [Graph](/docs/graph) |
-| How many open PRs do these authors have in these repositories? | [Status and history](/docs/status) |
-| What should we verify, review, or investigate next? | [Backlog reconciliation and planning](/docs/backlog) |
-| How should a coding agent use the tool? | [Agents and skill setup](/docs/agents) |
-| How do I embed graph or status collection? | [Library](/docs/library) |
-| What gets read, saved, or shared? | [Permissions and privacy](/docs/security) |
-| Which flags and output formats are supported? | [Command reference](/docs/reference) |
+## Commands
 
-## Evidence, not a merge gate
+| Task | Command | Guide |
+| --- | --- | --- |
+| Trace linked issues and PRs | `issue-graph <issue-or-pr>` | [Graph](/docs/graph) |
+| Count PRs by author and review state | `issue-graph status` | [Status and history](/docs/status) |
+| Find backlog items to verify | `issue-graph reconcile` | [Reconcile and plan](/docs/backlog) |
+| Choose the next review or investigation | `issue-graph plan` | [Reconcile and plan](/docs/backlog) |
 
-Shared files, closing relationships, and review states help decide what to inspect. They do not prove that two fixes are duplicates, an issue is resolved, or a PR is ready to merge. Graphs are bounded, inaccessible references remain uncertain, and status reports incomplete coverage explicitly.
+## Use with agents and applications
 
-The CLI does not mutate GitHub. Graph and reconcile commands save local snapshots by default; status saves only with `--save`, and plan does not save snapshots. Exports and agent prompts can include private metadata. Read the [security guidance](/docs/security) before sharing them.
+Install the [agent skill](/docs/agents) to use issue-graph from a coding agent. The [library](/docs/library) exposes the same collectors and renderers for your application. Both support structured results.
+
+## Review results
+
+The CLI reads GitHub data and reports gaps caused by access errors or crawl limits. Check those gaps and inspect the linked code before closing an issue or merging a PR.
+
+Graph and reconcile save local history by default. See [Permissions and privacy](/docs/security) for storage controls and [Command reference](/docs/reference) for flags and output formats.

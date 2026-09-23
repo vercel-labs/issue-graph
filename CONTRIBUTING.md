@@ -119,4 +119,4 @@ Only HTTPS `registry.npmjs.org` URLs without credentials, nondefault ports, quer
 
 If this verification fails after publication, retain the artifact and investigate. Re-run only the read-only verification with the same approved context, not the publish workflow; the latter intentionally rejects the already-existing version.
 
-Do not set the site's `packageReleasePending` to false until actual publication is verified, or `repositoryIsPublic` to true while the repository is internal. Confirm a fresh install after publication before updating installation claims.
+Confirm publication with a fresh install before updating installation claims. Keep `repositoryIsPublic` false while the repository is internal.

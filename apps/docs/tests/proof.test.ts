@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { prepareExample } from "../scripts/prepare-example";
 import graph from "../src/lib/example-graph.json";
 import { workflows } from "../src/lib/landing-content";
-import { exampleCommand, packageReleasePending, repositoryIsPublic } from "../src/lib/site";
+import { exampleCommand, repositoryIsPublic } from "../src/lib/site";
 
 function preparationInput() {
   return {
@@ -189,7 +189,6 @@ describe("public launch proof", () => {
 
   test("integrates the captured command and published package with site constants", () => {
     expect.soft(graph.command).toBe(exampleCommand);
-    expect.soft(packageReleasePending).toBe(false);
     expect(repositoryIsPublic).toBe(false);
     for (const workflow of workflows) {
       expect(workflow.command.startsWith("issue-graph ")).toBe(true);

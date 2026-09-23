@@ -21,14 +21,16 @@ describe("launch feedback", () => {
     expect(layout).not.toContain("LogoVercelLabs");
   });
 
-  test("renders one canonical headline without periods or forced line breaks", () => {
+  test("keeps the canonical headline with a line break after work", () => {
     const html = renderToStaticMarkup(createElement(Home));
     const headings = html.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g);
     expect(landingTitle).toBe("Find related work before you start");
     expect(metadata.title).toEqual({ absolute: `${siteName} | ${landingTitle}` });
-    expect(headings).toEqual([`<h1 id="hero-title">${landingTitle}</h1>`]);
+    expect(headings).toEqual(['<h1 id="hero-title">Find related work<br/>before you start</h1>']);
+    expect(headings?.[0]?.replace(/<br\s*\/?>(?:\s*)/g, " ").replace(/<[^>]+>/g, "")).toBe(
+      landingTitle,
+    );
     expect(headings?.[0]).not.toContain(".");
-    expect(headings?.[0]).not.toMatch(/<br\b/);
   });
 
   test("removes the hero eyebrow and exposes the audience selector", () => {
@@ -75,8 +77,8 @@ describe("launch feedback", () => {
     expect(plannedInstallCommand).toBe("npm install -g issue-graph@latest");
   });
 
-  test("agent setup uses release-aware docs rather than an unavailable source skill", () => {
-    expect(agentSetupPrompt).toBe("npx skills@latest add https://issue-graph.dev");
+  test("agent setup uses the repository shorthand and retains public discovery", () => {
+    expect(agentSetupPrompt).toBe("npx skills@latest add vercel-labs/issue-graph");
     const index = JSON.parse(read("../public/.well-known/skills/index.json"));
     expect(index.skills[0]).toMatchObject({ name: "issue-graph", files: ["SKILL.md"] });
     expect(agentSetupPrompt.length).toBeLessThan(60);

@@ -5,12 +5,6 @@ import type { TerminalDemoProps } from "@/lib/terminal-demo";
 import { renderTerminalCommand, TerminalOutput } from "./terminal-output";
 import "./terminal-demo.css";
 
-const purposes: Record<string, string> = {
-  graph: "Trace fixes and open follow-ups",
-  status: "Spot PRs waiting for review",
-  plan: "Choose what to tackle next",
-};
-
 export function TerminalDemo({ examples }: TerminalDemoProps) {
   const instanceId = useId();
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -113,8 +107,7 @@ export function TerminalDemo({ examples }: TerminalDemoProps) {
         ))}
       </div>
       <p className="ig-demo-summary" aria-live="polite" aria-atomic="true">
-        <span className="ig-demo-purpose">{purposes[examples[selectedIndex].id]}</span>
-        <span>{examples[selectedIndex].summary}</span>
+        {examples[selectedIndex].summary}
       </p>
       <div className="ig-demo-frame">
         <div className="ig-demo-bar">

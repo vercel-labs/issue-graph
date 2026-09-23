@@ -64,7 +64,6 @@ describe("documentation content contract", () => {
       expect(page).toContain("npx issue-graph@latest --help");
       expect(page).toContain("npm install --global issue-graph@latest");
       expect(page).toContain("https://www.npmjs.com/package/issue-graph)");
-      expect(page).toContain("INTERNAL");
     }
     expect(start).toContain("npm install --global issue-graph@latest");
     expect(start.indexOf("## Install from npm")).toBeLessThan(
@@ -76,8 +75,7 @@ describe("documentation content contract", () => {
     expect(library).toContain('from "issue-graph/transport/shell"');
     expect(library).not.toContain("file:../issue-graph");
     expect(reference).toContain("npx issue-graph@latest");
-    expect(start).toContain("Check your installed command's help");
-    expect(start).toContain("not unreleased source capabilities");
+    expect(start).toContain("supported by your installed release");
     expect(security).toContain("INTERNAL");
     expect(security.toLowerCase()).toContain("snapshot");
     const files = (await readdir(contentRoot)).filter((name) => name.endsWith(".mdx"));
@@ -119,20 +117,21 @@ describe("documentation content contract", () => {
     ]);
     for (const page of pages) {
       expect(page).toContain(example.command);
-      expect(page).toContain(example.capturedAt.slice(0, 10));
-      expect(page).toContain("not a live feed or complete history");
       expect(page).not.toContain("issue-graph 427");
+    }
+    for (const page of pages.slice(1)) {
+      expect(page).toContain(example.capturedAt.slice(0, 10));
       for (const node of example.nodes) expect(page).toContain(`#${node.number}`);
     }
+    expect(pages[0]).toContain("[Get started](/docs/get-started)");
     const start = pages[1] ?? "";
     for (const node of example.nodes) {
       const row = start.split("\n").find((line) => line.includes(`](${node.url}) |`));
       expect(row).toContain(`| ${node.state} |`);
     }
-    for (const page of pages.slice(1, 3)) {
-      expect(page).toContain(`${example.coverage.beyondDepthReferences} references`);
-      expect(page).toContain(`${example.coverage.omittedEdges} edges`);
-    }
+    expect(start).toContain("[Graph](/docs/graph)");
+    expect(pages[2]).toContain(`${example.coverage.beyondDepthReferences} references`);
+    expect(pages[2]).toContain(`${example.coverage.omittedEdges} edges`);
     expect(pages[3]).toContain("[Capture details](https://issue-graph.dev/docs/graph)");
   });
 
@@ -165,6 +164,7 @@ describe("documentation content contract", () => {
       expect(page).not.toMatch(/outdated|source-only|newer source stub|not available in npm/i);
       expect(page).not.toMatch(/do not (?:install|pair).*stub|npm root --global|cp -R/i);
       expect(page).toContain("npm install --global issue-graph@latest");
+      expect(page).toContain("npx skills@latest add vercel-labs/issue-graph");
       expect(page).toContain("npx skills@latest add https://issue-graph.dev");
       expect(page).toContain("same canonical");
       expect(page).toContain("/skill.md");
@@ -174,9 +174,9 @@ describe("documentation content contract", () => {
       expect(page).toContain("authorized setup correction");
     }
     for (const heading of [
-      "## Match guidance to the installed release",
-      "## Route the request before collecting evidence",
-      "## Preserve evidence and uncertainty",
+      "## Load the command guidance",
+      "## Choose a command",
+      "## Report findings",
       "## Optional root-cause clustering",
     ]) {
       expect(agents).toContain(heading);

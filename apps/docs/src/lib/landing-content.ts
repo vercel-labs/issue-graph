@@ -1,32 +1,32 @@
 export const landingTitle = "Find related work before you start";
-export const landingLastModified = "2026-09-22";
+export const landingLastModified = "2026-09-23";
 export const landingDescription =
-  "The fix might already be in another pull request. Trace the issues, competing changes, and follow-ups around your next task, without opening another dozen tabs.";
+  "Trace linked issues and pull requests. Find existing fixes and open follow-ups in your terminal.";
 
 export const workflows = [
   {
     number: "01",
-    title: "See what is connected",
+    title: "Trace related work",
     description:
-      "Start with an issue or PR. Follow references across repositories and find the work you should read first.",
+      "Start with an issue or PR to find linked fixes, competing changes, and open follow-ups.",
     command: "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
     href: "/docs/graph",
     link: "Trace a graph",
   },
   {
     number: "02",
-    title: "Know what needs attention",
+    title: "Check PR status",
     description:
-      "Get PR status by author and project, with the underlying evidence and explicit gaps in coverage.",
+      "Count open PRs by author and repository. See which need review, have approval, or have conflicts.",
     command: "issue-graph status --repo vercel-labs/portless --author Railly",
     href: "/docs/status",
     link: "Inspect PR status",
   },
   {
     number: "03",
-    title: "Give the backlog a next step",
+    title: "Review your backlog",
     description:
-      "Reconcile open work, even without labels. Get a review queue, not a bot that closes things for you.",
+      "Find issues linked to merged fixes and PRs ready for review. Get a suggested next action.",
     command: "issue-graph plan --repo vercel-labs/portless",
     href: "/docs/backlog",
     link: "Reconcile a backlog",

@@ -106,19 +106,20 @@ describe("public well-known skill", () => {
     expect(core).toContain("Check those boundaries before running or sending private evidence");
   });
 
-  test("leads the guide with public skill installation and retains operational guidance", async () => {
+  test("leads with repository skill installation and offers public fallback", async () => {
     const agents = await readAgents();
     const firstCommand = agents.match(/^```bash\n([\s\S]*?)\n```/m)?.[1];
-    expect(firstCommand).toBe("npx skills@latest add https://issue-graph.dev");
-    expect(agents).toContain("npx skills@latest add https://issue-graph.dev --list");
-    expect(agents).toContain("It does not install the CLI");
+    expect(firstCommand).toBe("npx skills@latest add vercel-labs/issue-graph");
+    expect(agents).toContain("npx skills@latest add vercel-labs/issue-graph --list");
+    expect(agents).toContain("npx skills@latest add https://issue-graph.dev");
+    expect(agents).toContain("The skill provides agent instructions");
     expect(agents).toContain("issue-graph skills get core");
     expect(agents).not.toMatch(/\b\d+\.\d+\.\d+\b|outdated.*notes|newer source stub/i);
     expect(agents).not.toContain("cp -R");
     for (const heading of [
       "Install the CLI separately",
-      "Route the request before collecting evidence",
-      "Preserve evidence and uncertainty",
+      "Choose a command",
+      "Report findings",
       "Optional root-cause clustering",
     ]) {
       expect(agents).toContain(`## ${heading}`);

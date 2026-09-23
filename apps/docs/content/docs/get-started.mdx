@@ -1,35 +1,29 @@
 ---
 title: Get started
-description: Install the published npm CLI, authenticate GitHub, and inspect a public issue with a merged fix and open follow-ups.
-lastModified: 2026-09-22
+description: Install issue-graph, sign in with GitHub CLI, and trace your first issue.
+lastModified: 2026-09-23
 ---
 
 ## Prerequisites
 
-[`issue-graph`](https://www.npmjs.com/package/issue-graph) is available on npm with a working CLI and library. No source checkout is required.
-
-You need:
-
-- Node.js 20 or later, with npm and npx.
-- [GitHub CLI](https://cli.github.com) (`gh`) on your `PATH` for GitHub queries.
-- GitHub authentication with access to the repositories you query.
+- Node.js 20 or later
+- [GitHub CLI](https://cli.github.com) on your `PATH`
+- read access to the repositories you want to query
 
 ## Install from npm
-
-Inspect the CLI without installing it globally:
-
-```bash
-npx issue-graph@latest --help
-```
-
-npx downloads the package when needed and runs its executable. Help does not require GitHub authentication. For repeated use and the `issue-graph` command used throughout these docs:
 
 ```bash
 npm install --global issue-graph@latest
 issue-graph --help
 ```
 
-To use npx instead, replace `issue-graph` at the start of a workflow command with `npx issue-graph@latest`. Installing the CLI does not automatically install an agent skill; see [Agents and skills](/docs/agents).
+To try the [npm package](https://www.npmjs.com/package/issue-graph) without a global installation:
+
+```bash
+npx issue-graph@latest --help
+```
+
+You can replace `issue-graph` with `npx issue-graph@latest` in any CLI example.
 
 ## Authenticate GitHub
 
@@ -38,60 +32,59 @@ gh auth login
 gh auth status
 ```
 
-The CLI uses the credentials available to `gh`. Private repositories and cross-repository references still require permission, including any organization SSO authorization. Do not paste tokens into command examples or commit them to configuration. The source repository remains **INTERNAL**, but its access restrictions do not prevent installing the public npm package.
+issue-graph uses your GitHub CLI credentials. For private repositories, your account needs access and any SSO authorization required by the organization.
 
-## Get your first real result
+## Trace an issue
 
-Inspect the neighborhood of [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113), a report about orphaned Chrome processes:
+Start with [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113):
 
 ```bash
 issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
 ```
 
-The equivalent URL form is:
+You can also pass its URL:
 
 ```bash
 issue-graph https://github.com/vercel-labs/agent-browser/issues/1113 --depth 1 --max-nodes 12 --no-snapshot
 ```
 
-Graph mode prints Markdown, even in a pipe. The bounded example captured on 2026-09-22 contains five nodes, all in `vercel-labs/agent-browser`:
+The command prints a Markdown report. This example, captured on 2026-09-22, found a merged fix and two open follow-ups:
 
-| Captured node | State at capture | What to inspect |
+| Issue or PR | Captured state | Description |
 | --- | --- | --- |
-| [Issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) | CLOSED | The original orphaned Chrome report |
-| [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) | MERGED | The fix with a closing link to #1113 |
-| [Issue #1148](https://github.com/vercel-labs/agent-browser/issues/1148) | CLOSED | A regression report referencing that fix |
-| [Issue #1371](https://github.com/vercel-labs/agent-browser/issues/1371) | OPEN | A high-CPU Chrome Helper follow-up |
-| [Issue #1607](https://github.com/vercel-labs/agent-browser/issues/1607) | OPEN | A macOS GUI Chrome launch follow-up |
+| [Issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) | CLOSED | Original orphaned Chrome report |
+| [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) | MERGED | Fix linked to #1113 |
+| [Issue #1148](https://github.com/vercel-labs/agent-browser/issues/1148) | CLOSED | Regression after the fix |
+| [Issue #1371](https://github.com/vercel-labs/agent-browser/issues/1371) | OPEN | Chrome Helper using high CPU |
+| [Issue #1607](https://github.com/vercel-labs/agent-browser/issues/1607) | OPEN | GUI Chrome launch problem on macOS |
 
-This is not a live feed or complete history. The capture includes every fetched node but leaves 19 references beyond the depth boundary and omits 22 edges to unfetched references from the displayed graph. States were read during a capture window, not atomically. Re-running the command queries current GitHub evidence and may return different results.
+Each run queries GitHub, so your results may differ. The flags limit this run to depth 1 and 12 fetched nodes, and disable saving a new snapshot. Check the report's missing references and limits before acting. See [Graph](/docs/graph) for the capture details and crawl limits.
 
-The merged fix and closed seed do not establish that the open follow-ups are resolved. Inspect their scope and current behavior before proposing any action.
+## Save an explorer
 
-Before acting, inspect failed or unfetched nodes, the node-cap section, and hubs not expanded. `--depth 1` bounds recursion and `--max-nodes 12` limits fetched nodes; `--no-snapshot` avoids saving a new history file. None of these makes the graph exhaustive.
-
-## Save an explorer when you want a file
+Add `--json` and `--html` to save the results:
 
 ```bash
 issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
 ```
 
-Open `graph.html` in your browser. These are explicit local writes even with `--no-snapshot`. Inspect their contents before sharing them, especially after querying private repositories.
+Open `graph.html` in your browser. Export flags write files even with `--no-snapshot`; choose new filenames if you want to keep earlier results.
 
-## Update an npm installation
-
-After reviewing the release you want to use:
+## Update
 
 ```bash
 npm install --global issue-graph@latest
-issue-graph --help
 ```
 
-`@latest` selects the latest published release, not unreleased source capabilities. Check your installed command's help before relying on features described by a newer source checkout.
+Use `issue-graph --help` to check the commands supported by your installed release.
+
+## Troubleshooting
+
+If the command is missing, check your npm global installation and `PATH`, or use npx. For GitHub access errors, run `gh auth status` and check repository permissions and SSO authorization.
 
 ## Optional source development
 
-Source development requires access to the **INTERNAL** `vercel-labs/issue-graph` repository. Public npm installation does not grant that access. Contributors use pnpm and Node.js 20.19.x or 22.12+; Node.js 24 is recommended:
+Contributors with repository access can build from source using pnpm and Node.js 20.19.x or 22.12+. Node.js 24 is recommended.
 
 ```bash
 gh repo clone vercel-labs/issue-graph
@@ -101,8 +94,4 @@ pnpm build
 node dist/bin.js --help
 ```
 
-A source build can contain unreleased features. It is not required to use the published CLI.
-
-If the installed command is unavailable, check your `PATH` and npm global installation, or use the npx command above. For GitHub access errors, check `gh auth status` and repository permissions. An inaccessible reference does not mean the work is closed or absent.
-
-Continue with [Graph](/docs/graph), [Status](/docs/status), or [Agents](/docs/agents).
+Continue with [Graph](/docs/graph), [Status and history](/docs/status), or [Agents and skills](/docs/agents).

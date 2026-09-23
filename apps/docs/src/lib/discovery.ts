@@ -1,15 +1,13 @@
 import { markdownPath } from "./docs-paths";
 import { geistdocsSource } from "./geistdocs/source";
-import { canonicalUrl, packageReleasePending, siteDescription, siteName } from "./site";
+import { canonicalUrl, siteDescription, siteName } from "./site";
 
 export function documentationPages() {
   return geistdocsSource.source.getPages("en");
 }
 
 export function releaseNotice(): string {
-  return packageReleasePending
-    ? "The npm release is pending. Installation instructions for a published package are not yet available."
-    : "Install from npm with npm install -g issue-graph@latest, or run npx issue-graph@latest --help. Requires Node.js 20+ and GitHub CLI authentication for GitHub queries.";
+  return "Install with npm install -g issue-graph@latest, or try npx issue-graph@latest --help. Requires Node.js 20+ and GitHub CLI authentication.";
 }
 
 export function llmsIndex(): string {
