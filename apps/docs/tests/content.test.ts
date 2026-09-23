@@ -115,8 +115,11 @@ describe("documentation content contract", () => {
       read("content/docs/index.mdx"),
       read("content/docs/get-started.mdx"),
       read("content/docs/graph.mdx"),
-      read("../../README.md"),
     ]);
+    const readme = await read("../../README.md");
+    expect(readme).toContain(
+      "issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot",
+    );
     for (const page of pages) {
       expect(page).toContain(example.command);
       expect(page).toContain(example.capturedAt.slice(0, 10));
@@ -133,7 +136,7 @@ describe("documentation content contract", () => {
       expect(page).toContain(`${example.coverage.beyondDepthReferences} references`);
       expect(page).toContain(`${example.coverage.omittedEdges} edges`);
     }
-    expect(pages[3]).toContain("[Capture details](https://issue-graph.dev/docs/graph)");
+    expect(readme).toContain("[Capture details](https://issue-graph.dev/docs/graph)");
   });
 
   test("root guidance separates published installation from future release authorization", async () => {

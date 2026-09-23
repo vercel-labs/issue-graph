@@ -22,6 +22,23 @@ export * from "./reconcile.js";
 export * from "./refs.js";
 export * from "./render.js";
 export * from "./schema.js";
+export {
+  buildClassificationPreview,
+  buildEvaluationInput,
+  fingerprintInput,
+  SEMANTIC_MAX_INPUT_BYTES,
+  SEMANTIC_MAX_TAXONOMY_BYTES,
+  SEMANTIC_MODEL,
+  SEMANTIC_POLICY_VERSION,
+  SEMANTIC_PROJECTION_VERSION,
+  SEMANTIC_RUBRIC_VERSION,
+  validateSemanticRepo,
+  validateTaxonomy,
+} from "./semantic.js";
+export * from "./semantic-evaluation.js";
+export * from "./semantic-github.js";
+export * from "./semantic-render.js";
+export * from "./semantic-types.js";
 export * from "./status.js";
 export * from "./status-history.js";
 export * from "./status-history-render.js";

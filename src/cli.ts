@@ -13,6 +13,7 @@ import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
 import { ISSUE_GRAPH_SCHEMA } from "./schema.js";
+import { runSemanticCli } from "./semantic-cli.js";
 import { runSkills } from "./skills-cli.js";
 import {
   diffReconcileSnapshots,
@@ -38,6 +39,7 @@ const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
        issue-graph reconcile --repo owner/repo [options]
        issue-graph plan --repo owner/repo [options]
        issue-graph status --repo owner/repo --author login[,login] [options]
+       issue-graph classify --repo owner/repo --dry-run [options]
        issue-graph schema
        issue-graph skills [list]
        issue-graph skills get core [--full] [--json]
@@ -188,6 +190,14 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
   if (argv[0] === "skills") {
     process.exitCode = await runSkills(argv.slice(1), {
+      stdout: (value) => process.stdout.write(value),
+      stderr: (value) => process.stderr.write(value),
+    });
+    return;
+  }
+  if (argv[0] === "classify") {
+    process.exitCode = await runSemanticCli(argv.slice(1), shellTransport(), {
+      isTTY: Boolean(process.stdout.isTTY),
       stdout: (value) => process.stdout.write(value),
       stderr: (value) => process.stderr.write(value),
     });

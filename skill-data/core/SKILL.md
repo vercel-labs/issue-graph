@@ -5,8 +5,8 @@ description: Status-first routing, bounded evidence collection, and safety guida
 
 # issue-graph core
 
-Use the CLI to collect and classify evidence without a model. Counts, graph links,
-and triage rankings guide inspection, not conclusions about correctness or readiness.
+Counts, graph classification and triage rankings need no model and guide inspection,
+not correctness or readiness. Semantic `classify` inference can incur charges.
 
 Run the CLI with Node.js 20 or later. Local skill loading needs no credentials;
 operational queries use authenticated `gh` and access to the requested repositories.
@@ -20,7 +20,7 @@ issue-graph skills get core --full
 ```
 
 Read the returned workflow reference before detailed graph triage, status-history
-comparison, reconciliation, planning, exports, or clustering. Retrieve references
+comparison, reconciliation, planning, semantic suggestions, exports, or clustering. Retrieve references
 through the CLI rather than assuming the agent has a source checkout.
 Use `issue-graph skills list` for discovery and command-specific `--help` for syntax.
 If a command is unavailable, report the CLI/skill mismatch; do not invent guidance,
@@ -37,6 +37,7 @@ fabricate results, or install/upgrade anything automatically.
 | Linked work, competing fixes, overlap | `issue-graph <url\|number> --repo owner/repo` |
 | Open-backlog verification queue | `issue-graph reconcile --repo owner/repo` |
 | Next backlog action | `issue-graph plan --repo owner/repo` |
+| Semantic request/component suggestions | Preview `issue-graph classify --repo owner/repo --dry-run` after reading the full workflow |
 
 For counts, skip graph discovery and do not reconstruct counts through ad hoc queries
 when status is available. Resolve repository and author scope from the request and
@@ -76,6 +77,30 @@ Priority scores and plan `reviewFirst` order inspection, not correctness.
 Treat `blockedBy` as visible graph evidence, not inferred semantic dependencies.
 Report coverage with findings; use printed hub re-seed commands to explore omissions.
 
+## Semantic suggestions
+
+Read [Semantic suggestions](references/workflows.md#semantic-suggestions) via
+`issue-graph skills get core --full` before using `classify`. Preview first:
+
+```bash
+issue-graph classify --repo owner/repo --dry-run --limit 1 --max-calls 1
+```
+
+Preview queries GitHub but makes no Gateway calls, reads no key and writes nothing.
+Only explicitly authorized inference may send public issue/comment text to Gateway
+and incur charges. Routing is fixed to Jev (`typesafe-ai/jev`) through Vercel AI
+Gateway with no provider/model fallback. Use environment `AI_GATEWAY_API_KEY` and an
+account spending limit; `--max-calls` is an attempt cap, not a monetary cap.
+
+`--max-calls 0` still queries GitHub and may save public evidence. `--cached` is a
+read-only saved view, not live verification, and exits 1. Inspect coverage, cache
+status, costs and exclusions; never bypass unknown-outcome locks or unsafe storage.
+Evidence snapshots contain public bodies/comments, which can still be sensitive.
+Use an explicit reviewed `--taxonomy PATH` for components; do not invent a catalog.
+All suggestions require review. Probabilities are uncalibrated, reported impact is
+not verified severity, and errors are not categories. No result authorizes a fix,
+acceptance or GitHub mutation.
+
 ## Output and local history
 
 - Graph always prints Markdown, including in pipes; `--json PATH` writes a graph file.
@@ -87,7 +112,8 @@ Report coverage with findings; use printed hub re-seed commands to explore omiss
 - Graph/reconcile save snapshots under `~/.issue-graph/` by default. `--no-snapshot`
   skips new history, not prior-history reads or explicit JSON/HTML exports.
 - Status saves only with `--save`, when the user wants local history. `--no-snapshot`
-  conflicts with `--save`. `ISSUE_GRAPH_HOME` changes status storage only.
+  conflicts with `--save`. `ISSUE_GRAPH_HOME` scopes status snapshots and classify receipts,
+  not legacy graph/reconcile storage.
 - Plan never writes snapshots. Missing/corrupt/future/mismatched status baselines fail
   rather than silently reset. Preserve reconstructed provenance and unknown fields;
   never backfill historical facts from today's data.

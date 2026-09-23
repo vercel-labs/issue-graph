@@ -8,7 +8,7 @@
 
 Find related issues, competing changes, and unresolved follow-ups before you start work.
 
-`issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, classification, and ranking need no model. Root-cause clustering is an optional agent step.
+`issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, graph classification, and ranking need no model. Semantic `classify` inference can incur charges; preview it first with `--dry-run`. Root-cause clustering is an optional agent step.
 
 ![issue-graph demo](https://issue-graph.dev/issue-graph-demo.png)
 
@@ -16,7 +16,7 @@ Example output, not a live feed or complete history. [Capture details](https://i
 
 ## Start here
 
-[`issue-graph`](https://www.npmjs.com/package/issue-graph) is published on npm with a CLI and library. Use [Node.js](https://nodejs.org) 20 or later with npm/npx. GitHub queries also need an authenticated [GitHub CLI](https://cli.github.com). No source checkout is required; the source repository remains **INTERNAL**, and installing the public package does not grant repository access.
+[`issue-graph`](https://www.npmjs.com/package/issue-graph) is published on npm with a CLI and library. Use [Node.js](https://nodejs.org) 20 or later with npm/npx. GitHub queries also need an authenticated [GitHub CLI](https://cli.github.com). No source checkout is required.
 
 Try the CLI without a global installation:
 
@@ -33,15 +33,13 @@ gh auth login
 gh auth status
 ```
 
-Run a bounded graph around public [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) without saving a snapshot:
+Inspect an issue in your repository without saving a snapshot:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot
 ```
 
-To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. At the 2026-09-22 capture, issue #1113 was closed, [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) was merged, [regression #1148](https://github.com/vercel-labs/agent-browser/issues/1148) was closed, and follow-ups [#1371](https://github.com/vercel-labs/agent-browser/issues/1371) and [#1607](https://github.com/vercel-labs/agent-browser/issues/1607) were open. A merged fix and closed seed do not establish that related follow-ups are resolved.
-
-Read the nodes, typed references, and cleanup candidates, then check for failed fetches, node caps, and unexpanded hubs before drawing conclusions. States were read during a capture window, not atomically. New runs query current GitHub evidence, not a fixed demo output.
+To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. Check failed fetches, node caps and unexpanded hubs before drawing conclusions. A closed seed or merged fix does not prove related follow-ups are resolved.
 
 ### Update an npm installation
 
@@ -57,22 +55,53 @@ npm install --global issue-graph@latest
 
 | Need | Installed command |
 | --- | --- |
-| Inspect an issue or PR before starting work | `issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot` |
+| Inspect an issue or PR before starting work | `issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot` |
 | Survey labeled open issues | `issue-graph --label bug --repo owner/repo --prioritize` |
-| Count open PRs by author | `issue-graph status --repo vercel-labs/portless --author ctate,Railly` |
-| See PR evidence, assignees, and requested reviewers | `issue-graph status --repo vercel-labs/portless --author ctate --view prs` |
+| Count open PRs by author | `issue-graph status --repo owner/repo --author login,other` |
+| See PR evidence, assignees, and requested reviewers | `issue-graph status --repo owner/repo --author login --view prs` |
 | Reconcile an open backlog, with or without labels | `issue-graph reconcile --repo owner/repo --format json --no-snapshot` |
 | Select the next backlog action | `issue-graph plan --repo owner/repo --format json` |
 | Inspect the machine contract | `issue-graph schema` |
 
 Graph mode prints Markdown, even when piped; `--json PATH` writes a graph file. Reconcile and plan default to Markdown in a terminal and versioned JSON in a pipe. Status defaults to a terminal table or JSON in a pipe; its `--json` is a boolean stdout flag, not a filename.
 
+## Semantic suggestions
+
+`classify` suggests request types, components and reported signals for open issues in one public repository. Every suggestion requires human review; probabilities are uncalibrated, reported impact is not verified severity, and errors are not categories. It never changes GitHub.
+
+Preview evidence, taxonomy and cache eligibility before authorizing inference. Preview queries GitHub but makes no Gateway calls, reads no Gateway key and writes nothing:
+
+```bash
+issue-graph classify --repo owner/repo --dry-run --limit 1 --max-calls 1 --format json
+```
+
+After review, explicitly allow a small number of new calls, or reuse results without new inference:
+
+```bash
+issue-graph classify --repo owner/repo --limit 1 --max-calls 1 --format json
+issue-graph classify --repo owner/repo --limit 1 --max-calls 0 --format json
+issue-graph classify --repo owner/repo --limit 1 --cached --format json
+```
+
+- New inference needs environment `AI_GATEWAY_API_KEY`. Never put keys in commands or chat. `--max-calls` caps HTTP attempts, not spending; configure an account spending limit. Unknown costs are not zero, and historical cache costs are separate from current spending.
+- Routing is fixed: `https://ai-gateway.vercel.sh/v1/evaluate`, model `typesafe-ai/jev`, `providerOptions.gateway.only: ["typesafe-ai"]`. There is no provider/model fallback. Requests are capped at 24,000 UTF-8 bytes, with a 30-second deadline and 256 KiB response cap; oversized evidence is not truncated.
+- `--max-calls 0` still queries GitHub and can save eligible public evidence. `--cached` uses the same saved repository and limit without network, keys or writes. It is not live verification and exits 1 even when all saved answers hit. Missing evidence fails without network fallback.
+- Response reuse expires 24 hours after evaluation and rechecks input identity, receipts, locks and current policy. `--refresh` requests fresh evidence/evaluation but cannot bypass locks or unsafe storage. Do not blindly retry unknown outcomes or delete locks.
+- Active inference sends titles, bodies and comments to Gateway. Local evidence snapshots also contain public text; reports, receipts and response cache exclude raw bodies/comments. Review provider policy and local retention. `ISSUE_GRAPH_HOME` defaults to `~/.issue-graph`, with owned `0700` directories and regular single-link `0600` files, no symlinks. Permissions are not encryption.
+- `--no-snapshot` disables evidence/cache/receipt storage and durable locks, not the `classify/STOP` check. It has no crash recovery and is not a safe bypass for unknown requests. STOP blocks new calls, not valid hits or in-flight completion.
+
+For component suggestions, adapt the fictional [taxonomy example](skill-data/core/examples/taxonomy.json) and pass the same `--taxonomy PATH` to preview and inference. It uses `schemaVersion: 1` and catalog version `"1"`; it is not a maintainer-approved catalog. Without it, components are unavailable rather than invented.
+
+Output is Markdown in a terminal and schemaVersion 1 JSON in pipes; `--json` is boolean. Exit 0 means complete live scope, including valid abstentions or zero-call reuse; 1 means partial coverage, failure, deferred work or saved-only `--cached`; 2 means invalid usage/configuration. No exit code authorizes acceptance or GitHub changes.
+
+See [Semantic suggestions](skill-data/core/references/workflows.md#semantic-suggestions) for taxonomy limits, scheduling, review policy, cache provenance and storage behavior. Agents can retrieve it with `issue-graph skills get core --full`.
+
 ## Explore and compare
 
 Export a graph and a self-contained HTML explorer:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
+issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
 ```
 
 Open `graph.html` in a browser. It includes typed relationships, node evidence, a cleanup checklist, and an Impact view projecting relationships visible in this graph. No server is needed. Impact is not proof of causality.
@@ -82,8 +111,8 @@ Graph and reconcile runs save local history under `~/.issue-graph/` by default. 
 Status history is opt-in:
 
 ```bash
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --save
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --since last --save
+issue-graph status --repo owner/repo --author login,other --save
+issue-graph status --repo owner/repo --author login,other --since last --save
 ```
 
 Status reports unknown counts as `?` or `null`, never a fabricated zero. Check coverage before using totals. Approval is not merge readiness: status does not inspect CI checks or coding-review threads, and a missing PR is not assumed merged.
@@ -133,7 +162,7 @@ Snapshots, exports, logs, and cluster prompts can contain private repository met
 
 ## Source development
 
-Source development is optional and requires access to the **INTERNAL** `vercel-labs/issue-graph` repository. Use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and authenticated GitHub CLI access. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
+The source repository is INTERNAL and requires repository access; installing the public npm package does not grant that access. For source development, use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and an authenticated GitHub CLI. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
 
 From an authorized checkout, after preserving local changes, update a source installation with:
 
