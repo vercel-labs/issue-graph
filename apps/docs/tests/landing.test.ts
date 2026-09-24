@@ -6,6 +6,7 @@ import Home, { metadata } from "../src/app/page";
 import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
+import { TerminalPresentation } from "../src/components/terminal-output";
 import { landingTitle, workflows } from "../src/lib/landing-content";
 import { agentSetupPrompt, plannedInstallCommand, siteName } from "../src/lib/site";
 import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
@@ -98,28 +99,31 @@ describe("launch feedback", () => {
     expect(html).toContain('aria-label="Copy prompt"');
   });
 
-  test("server-renders the catalog's three static terminal examples without replay chrome or metadata", () => {
+  test("server-renders the catalog's semantic examples in Home without raw or replay chrome", () => {
     const html = renderToStaticMarkup(createElement(GraphProof));
+    const home = renderToStaticMarkup(createElement(Home));
     expect(html).toContain('aria-label="issue-graph terminal examples"');
     expect(html.match(/role="tab"/g)).toHaveLength(3);
     expect(html.match(/role="tabpanel"/g)).toHaveLength(3);
     expect(html.match(/hidden=""/g)).toHaveLength(2);
-    const panels = html.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+    const panels = html.split(/(?=<div\b[^>]*role="tabpanel")/).slice(1);
     for (const [index, example] of terminalExampleCatalog.map(toTerminalExample).entries()) {
       expect(html).toContain(`>${example.label}</button>`);
-      const code = panels[index]?.match(/<pre><code>[\s\S]*?<\/code><\/pre>/)?.[0];
-      expect(code).toBeDefined();
-      expect(renderToStaticMarkup(createElement(Home))).toContain(code);
-      expect(code?.replace(/<\/?span\b[^>]*>/g, "")).toBe(
-        renderToStaticMarkup(
-          createElement(
-            "pre",
-            null,
-            createElement("code", null, `$ ${example.command}\n\n${example.output}`),
-          ),
-        ),
+      const content = renderToStaticMarkup(
+        createElement(TerminalPresentation, {
+          output: example.output,
+          exampleId: example.id,
+        }),
       );
+      expect(panels[index]).toContain(content);
+      expect(home).toContain(content);
+      const command = panels[index]?.match(/<div class="ig-demo-command">[\s\S]*?<\/div>/)?.[0];
+      expect(command).toBeDefined();
+      expect(home).toContain(command);
     }
+    expect(html).not.toMatch(
+      /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
+    );
     expect(html).toContain("Approval does not imply merge readiness.");
     expect(html).not.toMatch(/Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
     expect(html).not.toMatch(/stdoutSha256|excerptSha256|receiptFile|lineRanges|captureStartedAt/);

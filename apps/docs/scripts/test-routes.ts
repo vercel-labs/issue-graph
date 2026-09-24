@@ -6,6 +6,7 @@ import { docsSlugs, markdownPath } from "../src/lib/docs-paths";
 import { landingTitle } from "../src/lib/landing-content";
 import { canonicalUrl, repositoryUrl } from "../src/lib/site";
 import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
+import { statusPresentation, terminalPresentation } from "../src/lib/terminal-presentation";
 import { testUrl } from "./test-url";
 
 const origin = testUrl();
@@ -45,12 +46,21 @@ function htmlAttribute(html: string, tag: string, key: string, value: string, at
 }
 
 function staticTerminal(html: string) {
-  const terminal = html.match(/<section\b[^>]*class="ig-demo"[^>]*>[\s\S]*?<\/section>/)?.[0];
+  const terminal = html
+    .match(/<section\b[^>]*class="ig-demo"[^>]*>[\s\S]*?<\/section>/)?.[0]
+    ?.replace(/<!--[\s\S]*?-->/g, "");
   assert.ok(terminal, "Terminal examples are present in the server HTML");
   assert.match(terminal, /aria-label="issue-graph terminal examples"/);
   assert.equal((terminal.match(/role="tablist"/g) ?? []).length, 1, "One terminal tablist");
   const tabs = terminal.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
-  const panels = terminal.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+  const panels = terminal.split(/(?=<div\b[^>]*role="tabpanel")/).slice(1);
+  const commands = [
+    "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
+    "issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects",
+    "issue-graph plan --repo vercel-labs/wterm",
+  ];
+  const escaped = (value: string) =>
+    renderToStaticMarkup(createElement("span", null, value)).replace(/<\/?span>/g, "");
   assert.equal(tabs.length, 3, "Three terminal tabs");
   assert.equal(panels.length, 3, "Three server-rendered panels");
   const ids = new Set<string>();
@@ -72,24 +82,111 @@ function staticTerminal(html: string) {
       `Inactive panel hidden: ${example.id}`,
     );
     assert.ok(tab.includes(`>${example.label}</button>`), `Tab label: ${example.id}`);
-    const code = panel.match(/<pre><code>[\s\S]*?<\/code><\/pre>/)?.[0];
-    assert.ok(code, `SSR pre/code: ${example.id}`);
     assert.equal(
-      code.replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?span\b[^>]*>/g, ""),
-      renderToStaticMarkup(
-        createElement(
-          "pre",
-          null,
-          createElement("code", null, `$ ${example.command}\n\n${example.output}`),
-        ),
-      ),
-      `Complete captured excerpt, not an animated prefix: ${example.id}`,
+      htmlAttribute(panel, "div", "role", "tabpanel", "tabindex"),
+      index === 0 ? "0" : "-1",
     );
+    const command = panel.match(/<div class="ig-demo-command">[\s\S]*?<\/div>/)?.[0];
+    assert.ok(command, `Immediate display command: ${example.id}`);
+    assert.equal(
+      command.replace(/<\/?span\b[^>]*>/g, ""),
+      renderToStaticMarkup(
+        createElement("div", { className: "ig-demo-command" }, `$ ${commands[index]}`),
+      ),
+      `Approved shortened command: ${example.id}`,
+    );
+    const text = panel.replace(/<[^>]+>/g, "");
+    const contains = (value: string) =>
+      assert.ok(text.includes(escaped(value)), `Immediate ${example.id} content: ${value}`);
+    if (example.id === "status") {
+      const status = statusPresentation(example.output);
+      assert.ok(status, "Captured status is recognized");
+      const tables = panel.match(/<table\b[^>]*>[\s\S]*?<\/table>/g) ?? [];
+      assert.equal(
+        tables.length,
+        status.projects.reduce((count, project) => count + (project.authors.length ? 1 : 0) + 1, 0),
+      );
+      assert.equal((panel.match(/<h3>/g) ?? []).length, status.projects.length);
+      for (const project of status.projects) {
+        assert.ok(panel.includes(renderToStaticMarkup(createElement("h3", null, project.name))));
+        contains(`${project.open} open PR${project.open === "1" ? "" : "s"}`);
+        for (const [label, countLabel, rows] of [
+          ["Author", "Open PRs", project.authors],
+          ["Review state", "PRs", project.reviews],
+        ] as const) {
+          if (!rows.length) continue;
+          const name = `${project.name} ${label}`;
+          const table = tables.find(
+            (value) => htmlAttribute(value, "table", "aria-label", name, "aria-label") === name,
+          );
+          assert.ok(table, `Separate SSR table: ${name}`);
+          const cells = (table.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) ?? []).map((row) =>
+            Array.from(
+              row.matchAll(/<(?:th|td)\b[^>]*>([^<]*)<\/(?:th|td)>/g),
+              (match) => match[1],
+            ),
+          );
+          assert.deepEqual(
+            cells,
+            [[label, countLabel], ...rows.map((row) => [escaped(row.label), escaped(row.value)])],
+            `Captured cells: ${name}`,
+          );
+        }
+        contains(`${project.conflicts} conflicts`);
+      }
+      for (const flag of status.flags) contains(`${flag.value} ${flag.label}`);
+      contains(status.capture);
+      contains(`Coverage ${status.coverage}`);
+      for (const caveat of status.caveats.split("\n")) contains(caveat);
+    } else {
+      const rows = terminalPresentation(example.output, example.id);
+      assert.ok(rows, `Captured ${example.id} is recognized`);
+      assert.equal(
+        (panel.match(/class="ig-demo-item-title"/g) ?? []).length,
+        rows.filter((row) => row.kind === "item").length,
+      );
+      for (const row of rows) {
+        if (row.kind === "item") {
+          assert.ok(
+            panel.includes(
+              renderToStaticMarkup(
+                createElement("span", { className: "ig-demo-identity" }, row.reference),
+              ),
+            ),
+          );
+          assert.ok(
+            panel.includes(
+              renderToStaticMarkup(
+                createElement("span", { className: "ig-demo-item-title" }, row.title),
+              ),
+            ),
+          );
+          if (row.state) contains(row.state);
+          for (const detail of row.details) contains(detail);
+          if (row.metrics) {
+            contains(row.metrics);
+            for (const detail of row.details)
+              assert.ok(
+                text.indexOf(escaped(detail)) < text.indexOf(escaped(row.metrics)),
+                "Action precedes secondary metrics",
+              );
+          }
+        } else {
+          for (const value of row.kind === "summary" ? row.text.split(" · ") : [row.text])
+            contains(value);
+        }
+      }
+    }
   }
   assert.equal(ids.size, 6, "Unique tab and panel identifiers");
   assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate Graph takeaway");
   assert.match(terminal, /aria-live="polite"/);
-  assert.match(terminal, /Unknown=review unknown; \?=unknown, not zero\./);
+  assert.match(terminal, /\? means unknown, not zero\./);
+  assert.match(terminal, /Flags overlap review states\./);
+  assert.doesNotMatch(
+    terminal,
+    /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
+  );
   assert.match(terminal, /Approval does not imply merge readiness\./);
   assert.match(terminal, /Validate repository-specific behavior before mutating GitHub\./);
   assert.doesNotMatch(terminal, /Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);

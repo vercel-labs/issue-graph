@@ -8,7 +8,18 @@ describe("ISSUE_GRAPH_SCHEMA", () => {
       "~/.issue-graph snapshots unless --no-snapshot is set",
     ]);
     expect(ISSUE_GRAPH_SCHEMA.commands.plan.localWrites).toEqual([]);
-    expect(ISSUE_GRAPH_SCHEMA.commands.plan.formats).toEqual(["json", "markdown"]);
+    expect(ISSUE_GRAPH_SCHEMA.commands.plan.formats).toEqual(["json", "markdown", "text"]);
+    expect(ISSUE_GRAPH_SCHEMA.commands.plan.defaultFormat).toEqual({ tty: "text", pipe: "json" });
+    expect(ISSUE_GRAPH_SCHEMA.commands.graph.formats).toEqual(["text", "markdown"]);
+    expect(ISSUE_GRAPH_SCHEMA.commands.graph.defaultFormat).toEqual({
+      tty: "text",
+      pipe: "markdown",
+    });
+    expect(ISSUE_GRAPH_SCHEMA.commands.graph.jsonFlag).toContain("--json PATH");
+    expect(ISSUE_GRAPH_SCHEMA.commands.graph.jsonFlag).toContain(
+      "--format json keeps Markdown stdout",
+    );
+    expect(ISSUE_GRAPH_SCHEMA.commands.reconcile.formats).toEqual(["json", "markdown"]);
     expect(ISSUE_GRAPH_SCHEMA.commands.schema.localWrites).toEqual([]);
   });
 

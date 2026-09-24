@@ -24,3 +24,251 @@
 .ig-demo-line-muted {
   color: var(--ds-gray-900);
 }
+
+.ig-demo-status-prose {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-status,
+.ig-demo-project {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ig-demo-status {
+  gap: 16px;
+}
+
+.ig-demo-status-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+
+.ig-demo-status-capture,
+.ig-demo-status .ig-demo-status-zero {
+  color: var(--ig-demo-muted);
+  font-weight: 400;
+}
+
+.ig-demo-status-capture {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-status .ig-demo-status-unknown {
+  color: var(--ig-demo-fg);
+  font-weight: 600;
+}
+
+.ig-demo-status-tables {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px 40px;
+  margin-block: 8px;
+}
+
+.ig-demo-status-tables table {
+  width: 100%;
+  border-collapse: collapse;
+  font: inherit;
+  text-align: left;
+}
+
+.ig-demo-status-tables th,
+.ig-demo-status-tables td {
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-status-tables tbody th {
+  font-weight: 400;
+}
+
+.ig-demo-status-tables thead th,
+.ig-demo-status-tables td,
+.ig-demo-status-heading strong {
+  font-weight: 600;
+}
+
+.ig-demo-status-tables th:last-child,
+.ig-demo-status-tables td {
+  padding-inline-start: 16px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ig-demo-status-tables .ig-demo-status-zero td {
+  font-weight: 400;
+}
+
+.ig-demo-status-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .ig-demo-status-tables {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ig-demo-project h3 {
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-counts strong {
+  font-weight: 600;
+}
+
+.ig-demo-secondary {
+  color: var(--ig-demo-muted);
+  font-size: 12px;
+}
+
+.ig-demo-reading-summary {
+  grid-column: 1 / -1;
+}
+
+.ig-demo-reading {
+  display: grid;
+  grid-template-columns: fit-content(40%) max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.ig-demo-reading-context,
+.ig-demo-reading-heading,
+.ig-demo-reading-text {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-reading-context {
+  color: var(--ig-demo-muted);
+}
+
+.ig-demo-reading-heading {
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.ig-demo-item {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  row-gap: 4px;
+  min-width: 0;
+}
+
+.ig-demo-identity,
+.ig-demo-state,
+.ig-demo-detail {
+  color: var(--ig-demo-muted);
+}
+
+.ig-demo-identity {
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-item-title {
+  min-width: 0;
+  font-weight: 500;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-detail {
+  grid-column: 3;
+  padding-inline-start: 1ch;
+  text-indent: -1ch;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-reading-text {
+  padding-inline-start: 2ch;
+  text-indent: -2ch;
+}
+
+.ig-demo-reading-plan {
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+}
+
+.ig-demo-reading-plan .ig-demo-detail {
+  grid-column: 2;
+  color: var(--ig-demo-fg);
+}
+
+.ig-demo-reading-plan .ig-demo-item-title {
+  overflow: visible;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-reading-plan .ig-demo-detail:not(.ig-demo-metrics) {
+  font-weight: 500;
+}
+
+.ig-demo-reading-plan .ig-demo-metrics {
+  color: var(--ig-demo-muted);
+  font-size: 12px;
+}
+
+.ig-demo .ig-demo-token-reference,
+.ig-demo .ig-demo-token-positive,
+.ig-demo .ig-demo-token-merged,
+.ig-demo .ig-demo-token-attention,
+.ig-demo .ig-demo-token-strong,
+.ig-demo .ig-demo-state {
+  color: var(--ig-demo-fg);
+  font-weight: 600;
+}
+
+.ig-demo .ig-demo-token-muted {
+  color: var(--ig-demo-muted);
+  font-weight: 400;
+}
+
+.ig-demo .ig-terminal-command,
+.ig-demo .ig-terminal-command .ig-demo-token-reference,
+.ig-demo .ig-terminal-command .ig-demo-token-positive {
+  color: var(--ig-demo-muted);
+  font-weight: 400;
+}
+
+.ig-demo .ig-demo-line-heading,
+.ig-demo .ig-demo-reading-heading {
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .ig-demo-reading {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    column-gap: 12px;
+  }
+
+  .ig-demo-item-title,
+  .ig-demo-detail,
+  .ig-demo-reading-plan .ig-demo-detail {
+    grid-column: 1 / -1;
+  }
+}

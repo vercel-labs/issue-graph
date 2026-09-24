@@ -63,7 +63,9 @@ Use `issue-graph --help` to check the commands supported by your installed relea
 | Select the next backlog action | `issue-graph plan --repo owner/repo --format json` |
 | Inspect the machine contract | `issue-graph schema` |
 
-Graph mode prints Markdown, even when piped; `--json PATH` writes a graph file. Reconcile and plan default to Markdown in a terminal and versioned JSON in a pipe. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
+Graph and plan default to compact human output in a terminal. Graph still prints Markdown in a pipe; plan prints versioned JSON. Use `--format text` for the human view outside a terminal, or `--format markdown` for Markdown. Plan also supports `--format json`. Human output wraps at up to 100 columns; monochrome bold/dim styling requires a TTY and is disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
+
+Graph `--json PATH` writes a graph file; its legacy `--format json` still prints Markdown, not JSON. Reconcile keeps terminal Markdown and piped JSON defaults and does not support `--format text`. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
 
 ## Explore and compare
 

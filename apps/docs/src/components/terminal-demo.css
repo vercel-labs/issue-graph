@@ -6,7 +6,8 @@
   --ig-demo-pill-bg: var(--ds-background-100);
   width: 100%;
   min-width: 0;
-  max-width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
   color: var(--ig-demo-fg);
   text-align: left;
 }
@@ -97,7 +98,7 @@
 
 .ig-demo .ig-demo-tab:focus-visible,
 .ig-demo-panel:focus-visible {
-  outline: 2px solid var(--ds-blue-900);
+  outline: 2px solid var(--ig-demo-fg);
   outline-offset: -3px;
 }
 
@@ -160,7 +161,6 @@
 
 .ig-demo-panel {
   min-width: 0;
-  overflow-x: auto;
   padding: 18px 22px;
   font-size: 13px;
   line-height: 21px;
@@ -187,10 +187,18 @@
   word-break: normal;
 }
 
-.ig-demo-panel[data-example="graph"] pre,
-.ig-demo-panel[data-example="graph"] code,
-.ig-demo-panel[data-example="plan"] pre,
-.ig-demo-panel[data-example="plan"] code {
+.ig-demo-panel[data-example="status"] {
+  overflow-x: auto;
+}
+
+.ig-demo-panel .ig-demo-verbatim,
+.ig-demo-panel .ig-demo-verbatim code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-command {
+  margin-bottom: 20px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

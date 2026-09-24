@@ -6,6 +6,7 @@ import { clusterPayload, clusterPrompt, runAgent } from "./cluster.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
 import { type ClustersConfig, renderHtml } from "./html.js";
+import { renderHumanOutput } from "./human-output.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
 import { prioritize, renderPriority } from "./priority.js";
@@ -60,7 +61,12 @@ const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
   --json PATH         write the machine-readable graph
   --html PATH         graph only: write a self-contained HTML explorer
   --clusters PATH     group the explorer by agent-named clusters
-  --format F          reconcile/plan output: auto, json, or markdown (default auto)
+  --format F          auto (default), text, markdown, or json
+                      graph: TTY text / pipe markdown; --json PATH exports JSON
+                      graph --format json retains Markdown stdout
+                      plan: TTY text / pipe JSON; reconcile: TTY markdown / pipe JSON
+                      text is graph/plan only; bold/dim requires TTY
+                      NO_COLOR, CI, or TERM=dumb disables styling
   --no-snapshot       do not persist this run to ~/.issue-graph/
   -h, --help          show this`;
 
@@ -81,7 +87,7 @@ interface Args {
   clusterRun: string;
   noSnapshot: boolean;
   prioritize: boolean;
-  format: "auto" | "json" | "markdown";
+  format: "auto" | "json" | "markdown" | "text";
   help: boolean;
 }
 
@@ -126,7 +132,7 @@ export function parseArgs(argv: string[]): Args {
     else if (arg === "--concurrency") a.concurrency = Number(argv[++i]);
     else if (arg === "--format") {
       const format = argv[++i];
-      if (format !== "auto" && format !== "json" && format !== "markdown") {
+      if (format !== "auto" && format !== "json" && format !== "markdown" && format !== "text") {
         throw new UsageError(`unknown format: ${format}\n\n${USAGE}`);
       }
       a.format = format;
@@ -146,6 +152,9 @@ export function parseArgs(argv: string[]): Args {
   }
   if (!Number.isInteger(a.concurrency) || a.concurrency < 1 || a.concurrency > 32) {
     throw new UsageError("--concurrency must be an integer from 1 to 32");
+  }
+  if (a.format === "text" && a.command !== "graph" && a.command !== "plan") {
+    throw new UsageError(`${a.command} does not support --format text`);
   }
   if (a.command === "plan" && a.htmlOut) {
     throw new UsageError("plan does not support --html");
@@ -196,7 +205,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (argv[0] === "status") {
     process.exitCode = await runStatus(argv.slice(1), shellTransport(), {
       isTTY: Boolean(process.stdout.isTTY),
-      noColor: process.env.NO_COLOR !== undefined,
+      noColor: process.env.NO_COLOR !== undefined || process.env.TERM === "dumb",
       ci: Boolean(process.env.CI),
       width: process.stdout.columns,
       stdout: (value) => process.stdout.write(value),
@@ -213,6 +222,16 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     console.log(JSON.stringify(ISSUE_GRAPH_SCHEMA, null, 2));
     return;
   }
+  const human = (output: string, kind: "graph" | "plan") =>
+    renderHumanOutput(output, {
+      kind,
+      width: process.stdout.columns,
+      color:
+        Boolean(process.stdout.isTTY) &&
+        process.env.NO_COLOR === undefined &&
+        !process.env.CI &&
+        process.env.TERM !== "dumb",
+    });
   const transport = shellTransport();
   const seeds = await resolveSeeds(args, transport);
   if (!seeds.length && args.command !== "reconcile" && args.command !== "plan") {
@@ -257,10 +276,22 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       cappedOut,
     });
     const format =
-      args.format === "auto" ? (process.stdout.isTTY ? "markdown" : "json") : args.format;
+      args.format === "auto"
+        ? process.stdout.isTTY
+          ? args.command === "plan"
+            ? "text"
+            : "markdown"
+          : "json"
+        : args.format;
     if (args.command === "plan") {
       const plan = buildPlanReport(report, nodes, prioritize(nodes, new Date()));
-      console.log(format === "json" ? JSON.stringify(plan, null, 2) : renderPlan(plan));
+      console.log(
+        format === "json"
+          ? JSON.stringify(plan, null, 2)
+          : format === "text"
+            ? human(renderPlan(plan), "plan")
+            : renderPlan(plan),
+      );
     } else {
       const dir = reconcileSnapshotDir(primary.owner, primary.repo);
       const previousFiles = listSnapshots(dir);
@@ -310,7 +341,13 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     md += "\n## Snapshot\n\n- first snapshot for this seed; re-run later to see changes\n";
   }
 
-  console.log(md);
+  const printGraph = (output: string) =>
+    console.log(
+      args.format === "text" || (args.format === "auto" && process.stdout.isTTY)
+        ? human(output, "graph")
+        : output,
+    );
+  printGraph(md);
 
   if (args.cluster) {
     const prompt = clusterPrompt(
@@ -320,19 +357,19 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     if (args.clusterRun) {
       process.stderr.write(`\nclustering via ${args.clusterRun}...\n`);
       try {
-        console.log(
+        printGraph(
           `\n## Root-cause clusters (${args.clusterRun})\n\n${runAgent(args.clusterRun, prompt).trim()}\n`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.log(
+        printGraph(
           `\n## Root-cause clusters\n\n(agent '${args.clusterRun}' failed: ${msg}. Prompt below.)\n`,
         );
-        console.log(`\`\`\`\n${prompt}\n\`\`\``);
+        printGraph(`\`\`\`\n${prompt}\n\`\`\``);
       }
     } else {
-      console.log("\n## Cluster step (run this prompt in your agent context)\n");
-      console.log(`\`\`\`cluster-prompt\n${prompt}\n\`\`\``);
+      printGraph("\n## Cluster step (run this prompt in your agent context)\n");
+      printGraph(`\`\`\`cluster-prompt\n${prompt}\n\`\`\``);
     }
   }
 

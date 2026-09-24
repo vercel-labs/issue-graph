@@ -78,11 +78,14 @@ Report coverage with findings; use printed hub re-seed commands to explore omiss
 
 ## Output and local history
 
-- Graph always prints Markdown, including in pipes; `--json PATH` writes a graph file.
+- Graph/plan default to human text on TTY; pipes retain graph Markdown and plan JSON.
+  `--format text` selects human output even in a pipe; `--format markdown` selects Markdown.
+  Bold/dim is TTY-only, disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
+- Graph `--json PATH` writes a file; legacy `--format json` keeps Markdown stdout.
 - Status defaults to a terminal table or versioned JSON in a pipe. `--json` is a
   boolean stdout flag; `--format table|markdown|json` selects output explicitly.
-- Reconcile/plan default to terminal Markdown or versioned JSON in a pipe.
-  Use `--format json` for automation and `issue-graph schema` for durable integrations;
+- Reconcile keeps terminal Markdown or piped JSON; `--format text` is unsupported.
+  For reconcile/plan automation use `--format json`. Read `issue-graph schema`;
   inspect both `githubMutations` and `localWrites`.
 - Graph/reconcile save snapshots under `~/.issue-graph/` by default. `--no-snapshot`
   skips new history, not prior-history reads or explicit JSON/HTML exports.
