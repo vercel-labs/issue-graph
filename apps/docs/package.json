@@ -11,7 +11,7 @@
     "sync:changelog": "tsx scripts/sync-changelog.ts",
     "start": "next start",
     "postinstall": "fumadocs-mdx",
-    "typecheck": "fumadocs-mdx && next typegen && tsc --noEmit",
+    "typecheck": "next typegen && fumadocs-mdx && tsc --noEmit",
     "lint": "biome check .",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "test": "vitest run",
