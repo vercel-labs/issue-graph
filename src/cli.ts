@@ -7,6 +7,7 @@ import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
 import { type ClustersConfig, renderHtml } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
+import { runJira } from "./jira-cli.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
 import { prioritize, renderPriority } from "./priority.js";
@@ -31,6 +32,7 @@ import {
 import { runStatus } from "./status-cli.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
+import { twgJiraClient } from "./transports/twg.js";
 import type { NodeKey, Seed } from "./types.js";
 
 const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
@@ -39,12 +41,14 @@ const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
        issue-graph reconcile --repo owner/repo [options]
        issue-graph plan --repo owner/repo [options]
        issue-graph status --repo owner/repo --author login[,login] [options]
+       issue-graph jira ISSUE-KEY [options]
        issue-graph schema
        issue-graph skills [list]
        issue-graph skills get core [--full] [--json]
 
   skills --help      bundled agent guides, no network or authentication
   status --help      PR counts by author/project and an evidence ledger
+  jira --help        Jira relationship graph through an authenticated TWG CLI
   --repo owner/repo   required for a bare number, --seeds, or --label
   --depth N           same-repo recursion depth (default 2); cross-repo refs
                       are fetched one hop and not expanded
@@ -197,6 +201,14 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
   if (argv[0] === "skills") {
     process.exitCode = await runSkills(argv.slice(1), {
+      stdout: (value) => process.stdout.write(value),
+      stderr: (value) => process.stderr.write(value),
+    });
+    return;
+  }
+  if (argv[0] === "jira") {
+    process.exitCode = await runJira(argv.slice(1), twgJiraClient(), {
+      isTTY: Boolean(process.stdout.isTTY),
       stdout: (value) => process.stdout.write(value),
       stderr: (value) => process.stderr.write(value),
     });

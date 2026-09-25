@@ -1,14 +1,14 @@
 ---
 title: Overview
-description: Find related issues, check pull request status, and plan backlog reviews from your terminal.
-lastModified: 2026-09-23
+description: Trace related GitHub or Jira work, check pull request status, and plan reviews.
+lastModified: 2026-09-26
 ---
 
-`issue-graph` is a CLI for tracing related GitHub issues and pull requests. Use it to find existing fixes, check review status, and choose what to review next.
+`issue-graph` traces related GitHub issues and pull requests, and Jira work-item relationships through the customer-facing TWG CLI. Use it to find existing fixes, check review status, and choose what to inspect next.
 
 ## Install
 
-Requires Node.js 20+ and [GitHub CLI](https://cli.github.com).
+Requires Node.js 20+. GitHub workflows use [GitHub CLI](https://cli.github.com); Jira workflows optionally use an authenticated customer `twg` installation.
 
 ```bash
 npm install --global issue-graph@latest
@@ -32,6 +32,7 @@ See [Get started](/docs/get-started) for a walkthrough and example output.
 | Task | Command | Guide |
 | --- | --- | --- |
 | Trace linked issues and PRs | `issue-graph <issue-or-pr>` | [Graph](/docs/graph) |
+| Trace related Jira work | `issue-graph jira ISSUE-KEY` | [Jira through TWG](/docs/jira) |
 | Count PRs by author and review state | `issue-graph status` | [Status and history](/docs/status) |
 | Find backlog items to verify | `issue-graph reconcile` | [Reconcile and plan](/docs/backlog) |
 | Choose the next review or investigation | `issue-graph plan` | [Reconcile and plan](/docs/backlog) |
@@ -42,6 +43,6 @@ Install the [agent skill](/docs/agents) to use issue-graph from a coding agent. 
 
 ## Review results
 
-The CLI reads GitHub data and reports gaps caused by access errors or crawl limits. Check those gaps and inspect the linked code before closing an issue or merging a PR.
+The CLI reads GitHub data or Jira data through TWG and reports gaps caused by access errors or crawl limits. Check those gaps and inspect the linked code before closing an issue or merging a PR.
 
 Graph and reconcile save local history by default. See [Permissions and privacy](/docs/security) for storage controls and [Command reference](/docs/reference) for flags and output formats.

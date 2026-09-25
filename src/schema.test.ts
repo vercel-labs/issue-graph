@@ -39,6 +39,18 @@ describe("ISSUE_GRAPH_SCHEMA", () => {
     expect(status.countShape.count).toBe("number | null");
   });
 
+  test("publishes the read-only Jira TWG surface", () => {
+    const jira = ISSUE_GRAPH_SCHEMA.commands.jira;
+    expect(jira.githubMutations).toBe(false);
+    expect(jira.jiraMutations).toBe(false);
+    expect(jira.localWrites).toEqual([]);
+    expect(jira.outputSchemaVersion).toBe(1);
+    expect(jira.defaultFormat).toEqual({ tty: "markdown", pipe: "json" });
+    expect(jira.authentication).toContain("does not read or store Atlassian tokens");
+    expect(jira.limits.maxDepth).toEqual({ default: 2, minimum: 0, maximum: 10 });
+    expect(jira.exitCodes.incompleteOrFailure).toBe(1);
+  });
+
   test("publishes offline version-matched skill discovery", () => {
     const skills = ISSUE_GRAPH_SCHEMA.commands.skills;
     expect(skills.githubMutations).toBe(false);
