@@ -25,6 +25,28 @@ export const ISSUE_GRAPH_SCHEMA = {
       textFormat: "Monochrome human output; styling only on TTY without NO_COLOR, CI, or TERM=dumb",
       description: "Crawl and render the reference graph around explicit seeds.",
     },
+    jira: {
+      githubMutations: false,
+      jiraMutations: false,
+      localWrites: [],
+      network: "Read-only Jira work-item calls through the installed customer TWG CLI",
+      authentication:
+        "Uses TWG CLI credentials; issue-graph does not read or store Atlassian tokens",
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json"],
+      defaultFormat: { tty: "markdown", pipe: "json" },
+      required: ["ISSUE-KEY"],
+      optional: ["--site SITE (required when TWG has no configured default site)"],
+      limits: {
+        maxDepth: { default: 2, minimum: 0, maximum: 10 },
+        maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+        hubThreshold: { default: 12, minimum: 0, maximum: 1000 },
+        concurrency: { default: 4, minimum: 1, maximum: 32 },
+      },
+      exitCodes: { complete: 0, incompleteOrFailure: 1, usageError: 2 },
+      description:
+        "Trace Jira issue links and references through TWG. Same-project links recurse; cross-project issues are one-hop boundaries; non-Jira remote links are reported but not fetched.",
+    },
     reconcile: {
       githubMutations: false,
       localWrites: ["~/.issue-graph snapshots unless --no-snapshot is set"],

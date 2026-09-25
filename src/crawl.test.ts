@@ -1,8 +1,8 @@
 import { setTimeout } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
-import { components, crawl } from "./crawl.js";
+import { components, crawl, crawlGraph } from "./crawl.js";
 import type { FetchNode } from "./github.js";
-import type { Edge, GraphNode, NodeKey } from "./types.js";
+import type { CrawlNode, Edge, GraphFetchNode, GraphNode, NodeKey } from "./types.js";
 
 /** Build an offline FetchNode from a fixture of key -> outgoing edge targets. */
 function fakeFetch(graph: Record<NodeKey, Array<Partial<Edge> & { to: NodeKey }>>): FetchNode {
@@ -33,6 +33,80 @@ const opts = (over: Partial<Parameters<typeof crawl>[1]> = {}) => ({
   concurrency: 4,
   primaryRepo: { owner: "o", repo: "r" },
   ...over,
+});
+
+interface FixtureNode extends CrawlNode {
+  source: string;
+  label: string;
+}
+
+function fakeGraphFetch(graph: Record<NodeKey, NodeKey[]>): GraphFetchNode<FixtureNode> {
+  return async (key, depth) => ({
+    key,
+    depth,
+    edges: (graph[key] ?? []).map((to) => ({ to })),
+    source: key.split(":", 1)[0],
+    label: `node ${key}`,
+  });
+}
+
+describe("crawlGraph", () => {
+  test("follows arbitrary keys, dedupes cycles, and preserves collector fields", async () => {
+    const fetch = fakeGraphFetch({
+      "jira:PROJ-1": ["jira:PROJ-2"],
+      "jira:PROJ-2": ["jira:PROJ-1"],
+    });
+    const { nodes } = await crawlGraph(
+      [{ key: "jira:PROJ-1" }],
+      { maxDepth: 2, maxNodes: 80, hubThreshold: 12, concurrency: 2 },
+      fetch,
+    );
+
+    expect([...nodes.keys()].sort()).toEqual(["jira:PROJ-1", "jira:PROJ-2"]);
+    expect(nodes.get("jira:PROJ-2")).toMatchObject({
+      depth: 1,
+      source: "jira",
+      label: "node jira:PROJ-2",
+    });
+    expect(components(nodes)).toEqual([["jira:PROJ-1", "jira:PROJ-2"]]);
+  });
+
+  test("fetches a cross-source boundary without expanding it", async () => {
+    const fetch = fakeGraphFetch({
+      "jira:PROJ-1": ["github:o/r#7"],
+      "github:o/r#7": ["github:o/r#8"],
+    });
+    const { nodes } = await crawlGraph(
+      [{ key: "jira:PROJ-1" }],
+      {
+        maxDepth: 2,
+        maxNodes: 80,
+        hubThreshold: 12,
+        depthForEdge: ({ edge, sourceDepth, maxDepth }) =>
+          edge.to.startsWith("jira:") ? sourceDepth + 1 : maxDepth,
+      },
+      fetch,
+    );
+
+    expect(nodes.get("github:o/r#7")?.depth).toBe(2);
+    expect(nodes.has("github:o/r#8")).toBe(false);
+  });
+
+  test("rejects invalid edge depths instead of silently corrupting BFS order", async () => {
+    const fetch = fakeGraphFetch({ "jira:PROJ-1": ["jira:PROJ-2"] });
+    await expect(
+      crawlGraph(
+        [{ key: "jira:PROJ-1" }],
+        {
+          maxDepth: 2,
+          maxNodes: 80,
+          hubThreshold: 12,
+          depthForEdge: () => 0,
+        },
+        fetch,
+      ),
+    ).rejects.toThrow(/depthForEdge/);
+  });
 });
 
 describe("crawl", () => {

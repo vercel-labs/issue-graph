@@ -90,7 +90,8 @@ describe("public well-known skill", () => {
     const core = (await readCore()).replace(/\s+/g, " ");
     expect(core).toContain("issue-graph status");
     expect(core).toContain("For counts, skip graph discovery");
-    expect(core).toContain("Keep GitHub read-only");
+    expect(core).toContain("Keep GitHub and Jira read-only");
+    expect(core).toContain("issue-graph jira PROJ-123");
     expect(core).toContain("Any mutation needs a separately explicitly authorized workflow");
     expect(core).toContain("CLI read-only access is not freedom from local writes");
     expect(core).toContain("Status saves only with `--save`, when the user wants local history");

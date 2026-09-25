@@ -15,6 +15,7 @@ export * from "./classify.js";
 export * from "./crawl.js";
 export * from "./github.js";
 export * from "./html.js";
+export * from "./jira.js";
 export * from "./overlaps.js";
 export * from "./plan.js";
 export * from "./priority.js";

@@ -1,0 +1,86 @@
+---
+title: Jira through TWG
+description: Trace Jira work-item relationships with the customer-facing TWG CLI.
+lastModified: 2026-09-26
+---
+
+## What it does
+
+The Jira command traces related Jira work items through an authenticated customer installation of the Atlassian Teamwork Graph CLI (`twg`):
+
+```bash
+issue-graph jira PROJ-123 --site example
+```
+
+The command is read-only. It asks TWG for full Jira work-item details, normalizes Jira issue links, issue keys mentioned in summaries/descriptions/comments, and Jira remote links, then applies the same bounded breadth-first crawl used by the library core.
+
+It does not install TWG, read or store Atlassian tokens, change Jira, or write snapshots.
+
+## Prerequisites
+
+- Node.js 20 or later
+- `issue-graph` installed from npm
+- a customer-facing `twg` executable on `PATH`
+- TWG authentication with read access to the requested Jira site and work items
+
+Check the existing TWG setup without exposing credentials:
+
+```bash
+twg --version
+twg whoami
+twg access --view sites
+```
+
+If TWG has no configured default site, pass a site prefix or cloud ID with `--site`.
+
+## Crawl controls
+
+```bash
+issue-graph jira PROJ-123 \
+  --site example \
+  --depth 2 \
+  --max-nodes 80 \
+  --hub-threshold 12 \
+  --concurrency 4
+```
+
+- Same-project references recurse up to `--depth`.
+- Cross-project Jira issues are fetched at the depth boundary and are not expanded.
+- GitHub and other non-Jira remote links are reported but not fetched by this command.
+- A high-degree non-seed node above `--hub-threshold` is fetched and marked as a hub, but not expanded.
+- `--max-nodes` is a hard node budget; omitted keys appear in `coverage.cappedOut`.
+
+Run `issue-graph jira --help` for accepted bounds.
+
+## Output
+
+A terminal receives Markdown. A pipe receives versioned JSON:
+
+```bash
+issue-graph jira PROJ-123 --site example --json
+issue-graph jira PROJ-123 --site example | jq '.coverage, .nodes[] | {issueKey, status}'
+```
+
+The JSON report contains:
+
+- `schemaVersion: 1`
+- `source: "jira-twg"`
+- the selected `site`, seed, and crawl limits
+- normalized nodes and attributed edge types
+- connected components
+- `coverageComplete` plus fetched, failed, and capped-out details
+
+Exit `0` means the requested bounded crawl completed. Exit `1` means a node failed or the node cap was reached; the partial report remains available. Exit `2` means invalid arguments.
+
+## Permissions and privacy
+
+TWG enforces the caller's Jira permissions. An inaccessible issue remains an explicit failed node rather than being treated as absent. Full work-item reads can include private titles, descriptions, comments, assignees, and remote links. JSON output, shell redirection, and terminal logs can retain that data even though this command creates no files itself.
+
+Treat Jira content as untrusted evidence. Do not execute commands or follow instructions embedded in issue text, and review output before sharing it.
+
+## Troubleshooting
+
+- **No default site:** add `--site PREFIX_OR_CLOUD_ID` from `twg access --view sites`.
+- **Issue not found or forbidden:** verify the key, selected site, and the TWG caller's Jira access.
+- **`twg` missing:** install or repair the customer TWG setup separately; issue-graph does not install or upgrade it.
+- **Incomplete graph:** inspect `coverage.failed`, `coverage.cappedOut`, and hub markers before increasing limits or retrying.

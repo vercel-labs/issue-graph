@@ -148,13 +148,39 @@ if (fields.query.includes("issueOrPullRequest(number:$n)")) {
 console.log(JSON.stringify({ data: { repository } }));
 `;
 
+const fakeTwg = `#!/usr/bin/env node
+const assert = require("node:assert/strict");
+const args = process.argv.slice(2);
+assert.deepEqual(args.slice(0, 8), [
+  "--site", "package-smoke", "--output", "json", "--output-summary", "none", "jira", "workitem",
+]);
+assert.deepEqual(args.slice(8, 10), ["get", args[9]]);
+assert.equal(args[10], "--full");
+const key = args[9];
+assert.ok(key === "PKG-1" || key === "PKG-2");
+const links = key === "PKG-1" ? [{
+  type: { name: "Relates", outward: "relates to" },
+  outwardIssue: { key: "PKG-2" },
+}] : [];
+console.log(JSON.stringify({ data: { issue: {
+  key,
+  self: "https://package-smoke.atlassian.net/rest/api/3/issue/" + key,
+  fields: {
+    summary: "Package smoke " + key,
+    status: { name: "Open" },
+    issuetype: { name: "Task" },
+    issuelinks: links,
+  },
+} } }));
+`;
+
 const guard = `
 const assert = require("node:assert/strict");
 const { readdirSync } = require("node:fs");
 assert.equal(process.release.name, "node", "consumer must run under Node.js");
 const bin = process.env.PACKAGE_TEST_BIN;
 assert.ok(bin, "consumer requires an isolated tool directory");
-assert.deepEqual(readdirSync(bin).sort(), ["dirname", "gh", "node", "package.json", "pnpm", "sed", "uname"]);
+assert.deepEqual(readdirSync(bin).sort(), ["dirname", "gh", "node", "package.json", "pnpm", "sed", "twg", "uname"]);
 process.env.PATH = bin;
 require("node:net").Socket.prototype.connect = function () {
   throw new Error("Network forbidden in package smoke consumer");
@@ -170,12 +196,28 @@ const name = ${JSON.stringify(packageName)};
 const core = await import(name);
 const { httpTransport } = await import(name + "/transport/http");
 const { shellTransport } = await import(name + "/transport/shell");
+const { twgJiraClient } = await import(name + "/transport/twg");
 assert.ok(import.meta.resolve(name).endsWith("/dist/index.js"));
 assert.equal(typeof core.crawl, "function");
+assert.equal(typeof core.crawlGraph, "function");
 assert.equal(typeof core.parseNodeResponse, "function");
 assert.equal(typeof core.collectStatus, "function");
 assert.equal(typeof httpTransport, "function");
 assert.equal(typeof shellTransport, "function");
+assert.equal(typeof twgJiraClient, "function");
+assert.equal(typeof core.normalizeJiraPayload, "function");
+const custom = await core.crawlGraph(
+  [{ key: "jira:PKG-1" }],
+  { maxDepth: 1, maxNodes: 4, hubThreshold: 4 },
+  async (key, depth) => ({
+    key,
+    depth,
+    edges: key === "jira:PKG-1" ? [{ to: "jira:PKG-2" }] : [],
+    status: "OPEN",
+  }),
+);
+assert.deepEqual([...custom.nodes.keys()], ["jira:PKG-1", "jira:PKG-2"]);
+assert.equal(custom.nodes.get("jira:PKG-2").status, "OPEN");
 const expected = {
   data: { repository: { issueOrPullRequest: {
     __typename: "Issue", title: "HTTP fixture", state: "OPEN", body: "",
@@ -201,7 +243,7 @@ assert.equal(shell.key, "package-smoke/fixture#1");
 assert.equal(shell.title, "Package smoke issue");
 assert.equal(shell.fetched, true);
 assert.ok(shell.edges.some((edge) => edge.to === "package-smoke/fixture#2"));
-console.log("core/http/shell exports passed");
+console.log("core/http/shell/twg exports passed");
 `;
 
 const tools: Record<string, string> = {
@@ -245,6 +287,8 @@ try {
   writeFileSync(join(bin, "package.json"), JSON.stringify({ type: "commonjs" }));
   writeFileSync(join(bin, "gh"), fakeGh);
   chmodSync(join(bin, "gh"), 0o755);
+  writeFileSync(join(bin, "twg"), fakeTwg);
+  chmodSync(join(bin, "twg"), 0o755);
   const guardPath = join(owned, "guard.cjs");
   writeFileSync(guardPath, guard);
   for (const dir of [consumer, dlxConsumer]) {
@@ -379,10 +423,12 @@ try {
   assert.equal(manifest.exports["."].import, "./dist/index.js");
   assert.equal(manifest.exports["./transport/http"].import, "./dist/transports/http.js");
   assert.equal(manifest.exports["./transport/shell"].import, "./dist/transports/shell.js");
+  assert.equal(manifest.exports["./transport/twg"].import, "./dist/transports/twg.js");
   assert.equal(manifest.types, "./dist/index.d.ts");
   assert.equal(manifest.exports["."].types, "./dist/index.d.ts");
   assert.equal(manifest.exports["./transport/http"].types, "./dist/transports/http.d.ts");
   assert.equal(manifest.exports["./transport/shell"].types, "./dist/transports/shell.d.ts");
+  assert.equal(manifest.exports["./transport/twg"].types, "./dist/transports/twg.d.ts");
   assert.equal(
     readFileSync(join(installed, "dist/bin.js"), "utf8").split("\n")[0],
     "#!/usr/bin/env node",
@@ -394,11 +440,13 @@ try {
     run([pnpm, "exec", "issue-graph", ...args], consumer, { ...env, ...overrides }, expected);
   assert.match(invoke(["--help"]).stdout, /usage: issue-graph/);
   assert.match(invoke(["status", "--help"]).stdout, /--save/);
+  assert.match(invoke(["jira", "--help"]).stdout, /--site SITE/);
   const schema = JSON.parse(invoke(["schema"]).stdout);
   assert.equal(schema.name, "issue-graph");
   assert.deepEqual(schema.exitCodes, { success: 0, runtimeFailure: 1, usageError: 2 });
   assert.ok(schema.commands.status);
   assert.ok(schema.commands.graph);
+  assert.equal(schema.commands.jira.jiraMutations, false);
   assert.match(invoke([], 2).stderr, /usage: issue-graph/);
   assert.match(invoke(["--not-a-real-option"], 2).stderr, /unknown flag/);
   assert.match(invoke(["status", "--repo", fixtureRepo], 2).stderr, /requires --repo and --author/);
@@ -467,6 +515,7 @@ try {
   const dlx = (args: string[], expected = 0) =>
     run([pnpm, `--package=${tarball}`, "dlx", "issue-graph", ...args], dlxConsumer, env, expected);
   assert.match(dlx(["--help"]).stdout, /usage: issue-graph/);
+  assert.match(dlx(["jira", "--help"]).stdout, /read-only/);
   assert.deepEqual(JSON.parse(dlx(["schema"]).stdout), schema);
   assert.match(dlx(["--not-a-real-option"], 2).stderr, /unknown flag/);
   assert.equal(dlx(["skills", "get", "core"]).stdout, core);
@@ -474,7 +523,21 @@ try {
 
   const probe = join(consumer, "exports.mjs");
   writeFileSync(probe, exportProbe);
-  assert.equal(run([node, probe], consumer, env).stdout.trim(), "core/http/shell exports passed");
+  assert.equal(
+    run([node, probe], consumer, env).stdout.trim(),
+    "core/http/shell/twg exports passed",
+  );
+  const jira = JSON.parse(
+    invoke(["jira", "PKG-1", "--site", "package-smoke", "--depth", "1", "--json"]).stdout,
+  );
+  assert.equal(jira.schemaVersion, 1);
+  assert.equal(jira.source, "jira-twg");
+  assert.equal(jira.coverageComplete, true);
+  assert.deepEqual(
+    jira.nodes.map((node: { issueKey: string }) => node.issueKey),
+    ["PKG-1", "PKG-2"],
+  );
+  assert.ok(!existsSync(join(home, ".issue-graph")), "Jira must not persist snapshots");
   const statusArgs = ["status", "--repo", fixtureRepo, "--author", fixtureAuthor, "--json"];
   const status = JSON.parse(invoke(statusArgs).stdout);
   assert.equal(status.coverageComplete, true);
@@ -561,7 +624,7 @@ try {
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 44 : 45;
+  const expectedChecks = suppliedTarball ? 47 : 48;
   assert.equal(
     checks,
     expectedChecks,

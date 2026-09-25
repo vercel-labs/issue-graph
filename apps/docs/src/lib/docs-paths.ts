@@ -2,6 +2,7 @@ export const docsSlugs = [
   "",
   "get-started",
   "graph",
+  "jira",
   "status",
   "backlog",
   "agents",

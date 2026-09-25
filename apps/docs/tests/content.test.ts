@@ -73,10 +73,12 @@ describe("documentation content contract", () => {
     expect(library).toContain('from "issue-graph"');
     expect(library).toContain('from "issue-graph/transport/http"');
     expect(library).toContain('from "issue-graph/transport/shell"');
+    expect(library).toContain('from "issue-graph/transport/twg"');
     expect(library).not.toContain("file:../issue-graph");
     expect(reference).toContain("npx issue-graph@latest");
     expect(start).toContain("supported by your installed release");
-    expect(security).toContain("INTERNAL");
+    expect(security).toContain("source repository are public");
+    expect(security).toContain("Jira access through TWG");
     expect(security.toLowerCase()).toContain("snapshot");
     const files = (await readdir(contentRoot)).filter((name) => name.endsWith(".mdx"));
     for (const file of files) {
@@ -161,7 +163,7 @@ describe("documentation content contract", () => {
       expect(page).toContain("npm install --global issue-graph@latest");
       expect(page).toContain("npm install issue-graph@latest");
       expect(page).toContain("npx issue-graph@latest --help");
-      expect(page).toContain("INTERNAL");
+      expect(page.toLowerCase()).toContain("public");
       expect(page).not.toMatch(/publication is (?:still )?pending|pending publication/i);
     }
     expect(contributing).not.toMatch(/expected_version=\d+\.\d+\.\d+/);

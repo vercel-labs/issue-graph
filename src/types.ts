@@ -1,20 +1,76 @@
 /** What a node is. `Unknown` covers a node that could not be fetched. */
 export type Kind = "Issue" | "PullRequest" | "Unknown";
 
-/** Canonical node identity: `${owner}/${repo}#${number}`. */
+/** Collector-defined canonical identity. GitHub collectors use `owner/repo#number`. */
 export type NodeKey = string;
 
-/** How one node came to reference another. */
+/** The minimum directed edge shape required by the source-neutral crawler. */
+export interface CrawlEdge {
+  to: NodeKey;
+}
+
+/** How one GitHub node came to reference another. */
 export type Via = "text" | "cross-ref" | "connected" | "closes";
 
-/** A directed reference from one node to another, with attribution. */
-export interface Edge {
-  to: NodeKey;
+/** A GitHub reference edge with attribution. */
+export interface Edge extends CrawlEdge {
   via: Via;
   /** Account that created the reference (comment/timeline actor, or PR author). */
   by?: string;
   /** ISO timestamp of the reference, when the source provides one. */
   at?: string;
+}
+
+/**
+ * The minimum node shape required by the source-neutral graph crawler.
+ * Collectors may add any source-specific fields; the crawler preserves them.
+ */
+export interface CrawlNode {
+  key: NodeKey;
+  /** BFS distance from the nearest seed. */
+  depth: number;
+  edges: CrawlEdge[];
+  /** High-degree node: fetched but not expanded, to bound the crawl. */
+  hub?: boolean;
+}
+
+/** A source-neutral seed identified by its collector-defined canonical key. */
+export interface GraphSeed {
+  key: NodeKey;
+}
+
+/** Context passed to a source adapter when choosing how far an edge may recurse. */
+export interface EdgeDepthContext {
+  sourceKey: NodeKey;
+  edge: CrawlEdge;
+  sourceDepth: number;
+  maxDepth: number;
+}
+
+/** Bounds and traversal policy for the source-neutral graph crawler. */
+export interface GraphCrawlOptions {
+  maxDepth: number;
+  maxNodes: number;
+  hubThreshold: number;
+  concurrency?: number;
+  /**
+   * Return the target depth for an edge, or null to leave it unfetched.
+   * The default is sourceDepth + 1. Returning maxDepth fetches a boundary
+   * node without expanding it, which is useful for cross-source references.
+   */
+  depthForEdge?: (context: EdgeDepthContext) => number | null;
+}
+
+/** Fetch one node by its source-defined canonical key. */
+export type GraphFetchNode<TNode extends CrawlNode = CrawlNode> = (
+  key: NodeKey,
+  depth: number,
+) => Promise<TNode>;
+
+/** Result of a source-neutral crawl, preserving the collector's node type. */
+export interface GraphCrawlResult<TNode extends CrawlNode = CrawlNode> {
+  nodes: Map<NodeKey, TNode>;
+  cappedOut: Set<NodeKey>;
 }
 
 /** PR-only triage metadata, fetched in the same node query (no extra request). */
@@ -50,8 +106,7 @@ export interface HeatMeta {
 }
 
 /** A crawled issue or PR and everything it points to. */
-export interface GraphNode {
-  key: NodeKey;
+export interface GraphNode extends CrawlNode {
   owner: string;
   repo: string;
   number: number;
@@ -60,8 +115,6 @@ export interface GraphNode {
   /** OPEN | CLOSED | MERGED | UNKNOWN | NOT_FOUND | FETCH_ERROR. */
   state: string;
   url: string;
-  /** BFS distance from the nearest seed. */
-  depth: number;
   edges: Edge[];
   /** Non-GitHub URLs mentioned, with noise (loopback/example/CI) filtered out. */
   externalLinks: string[];
@@ -74,8 +127,6 @@ export interface GraphNode {
   verdict?: string;
   /** Derived triage annotations: competing PRs, claims-close-no-link, etc. */
   flags?: string[];
-  /** High-degree node: fetched but not expanded, to bound the crawl. */
-  hub?: boolean;
   /** PR-only triage metadata; present when `kind === "PullRequest"`. */
   pr?: PullRequestMeta;
   /** Discussion-heat signals; present when the node was fetched. */

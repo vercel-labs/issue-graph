@@ -1,7 +1,7 @@
 ---
 title: Command reference
 description: Look up CLI commands, flags, output formats, storage options, and exit codes.
-lastModified: 2026-09-23
+lastModified: 2026-09-26
 ---
 
 ## Help and schema
@@ -10,6 +10,7 @@ Use command-specific help to check your installed version. You can also run thes
 
 ```bash
 issue-graph --help
+issue-graph jira --help
 issue-graph status --help
 issue-graph reconcile --help
 issue-graph plan --help
@@ -25,13 +26,30 @@ issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot
 issue-graph https://github.com/vercel-labs/portless/pull/427 --no-snapshot
 issue-graph --seeds 64,246,281 --repo owner/repo --no-snapshot
 issue-graph --label bug --repo owner/repo --prioritize --no-snapshot
+issue-graph jira PROJ-123 --site example --depth 1
 issue-graph status --repo vercel-labs/portless --author ctate,Railly --json
 issue-graph reconcile --repo owner/repo --format json --no-snapshot
 issue-graph plan --repo owner/repo --format json
 issue-graph schema
 ```
 
-Graph is the default mode. Replace `owner/repo`, label names, and seed numbers with your scope. Use one seed-selection form per command.
+Graph is the default mode. Replace `owner/repo`, label names, seed numbers, Jira keys, and sites with your scope. Use one seed-selection form per command.
+
+## Jira through TWG
+
+| Flag | Meaning |
+| --- | --- |
+| `ISSUE-KEY` | Required Jira key such as `PROJ-123` |
+| `--site SITE` | Optional site prefix or cloud ID; required when TWG has no configured default |
+| `--depth N` | Same-project recursion depth, default 2; integer from 0 to 10 |
+| `--max-nodes N` | Total Jira nodes, default 80; integer from 1 to 1000 |
+| `--hub-threshold N` | Fetch but do not expand high-degree non-seed nodes above this degree, default 12 |
+| `--concurrency N` | Concurrent TWG reads, default 4; integer from 1 to 32 |
+| `--format auto|markdown|json` | Auto is Markdown in a TTY and JSON in a pipe |
+| `--json` | Boolean JSON stdout shorthand; takes no filename |
+| `-h`, `--help` | Print Jira-specific usage without invoking TWG |
+
+The command runs `twg jira workitem get ISSUE-KEY --full` with direct JSON output. It reads Jira only, uses TWG credentials without copying tokens, and writes no snapshots. Same-project links recurse; cross-project issues are fetched at the boundary; non-Jira links are reported but not fetched. JSON has `schemaVersion: 1` and explicit coverage. Exit 1 preserves partial data when reads fail or the node cap is reached.
 
 ## Graph selection and crawl controls
 
@@ -86,12 +104,13 @@ Status PR pages contain 50 PRs; assignees and reviewer requests are also paginat
 | Mode | stdout | Local persistence |
 | --- | --- | --- |
 | Graph | Markdown regardless of TTY; graph JSON only via `--json PATH` | Snapshots by default; explicit JSON/HTML paths write independently |
+| Jira | Markdown in TTY, versioned JSON in a pipe; `--json` forces JSON | None |
 | Reconcile | `--format auto|json|markdown`; auto is Markdown in TTY, JSON in pipe | Repository history by default unless `--no-snapshot` |
 | Plan | Same format selection as reconcile | No snapshots |
 | Status | `--format auto|table|markdown|json`; auto is table in TTY, JSON in pipe | Only with `--save` |
 | Schema | JSON | None |
 
-Reconcile, plan, and status reports currently have `schemaVersion: 1`. Graph JSON currently has no report version field. It contains `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Use the schema for the mode you are consuming.
+Jira, reconcile, plan, and status reports currently have `schemaVersion: 1`. Graph JSON currently has no report version field. It contains `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Use the schema for the mode you are consuming.
 
 Status history adds `history` on comparison and `snapshot` on save. Graph/reconcile can read earlier history even with `--no-snapshot`. Progress and file-write notices go to stderr. See [Security](/docs/security) for sensitive-data handling.
 
@@ -103,10 +122,10 @@ Status history adds `history` on comparison and `snapshot` on save. Graph/reconc
 | `CI` | Suppresses status color when set |
 | `ISSUE_GRAPH_HOME` | Status storage root; default `~/.issue-graph` |
 
-Graph and reconcile use `~/.issue-graph/`. The CLI authenticates through `gh`; HTTP library callers supply a token. These commands run without a model.
+Graph and reconcile use `~/.issue-graph/`. GitHub CLI modes authenticate through `gh`; HTTP library callers supply a token. Jira authenticates through the installed `twg` CLI and accepts `--site`; issue-graph does not read Atlassian tokens. These commands run without a model.
 
 ## Exit codes and coverage
 
 Commands return `0` for success, `1` for runtime failure, and `2` for usage errors. Status also returns `1` for incomplete inventory or comparison and preserves available partial results.
 
-Graph, reconcile, and plan can exit successfully with incomplete results. Check graph fetch state and `cappedOut`, reconcile `limits`, and plan's provisional or blocked items before acting.
+Jira and status return exit 1 for incomplete coverage while preserving partial structured output. Graph, reconcile, and plan can exit successfully with incomplete results. Check graph fetch state and `cappedOut`, reconcile `limits`, and plan's provisional or blocked items before acting.

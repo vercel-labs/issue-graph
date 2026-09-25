@@ -23,6 +23,7 @@ import {
   renderDashboard,
 } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
+import { runJira } from "./jira-cli.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
 import { prioritize, renderPriority } from "./priority.js";
@@ -53,6 +54,7 @@ import {
 import { runStatus } from "./status-cli.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
+import { twgJiraClient } from "./transports/twg.js";
 import type { NodeKey, Seed } from "./types.js";
 
 const USAGE = `usage: issue-graph [command] [scope...] [options]
@@ -68,10 +70,11 @@ commands
   reconcile [repo]         open-backlog verification queue
   plan [repo]              next backlog action
   status [repo...] --author login[,login]   PR counts by author, project, or review state
+  jira <issue-key>          read-only Jira relationship graph through an authenticated TWG CLI
   dashboard                every saved run in one explorer, with a project switcher
   runs [list | rm <repo>]  saved runs behind the dashboard
   auth [status]            provider sign-in state
-  schema                   JSON contract for reconcile, plan, and status
+  schema                   JSON contract for Jira, reconcile, plan, and status
   skills [list | get core] bundled agent guides
 
 scope
@@ -418,6 +421,14 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
   if (argv[0] === "skills") {
     process.exitCode = await runSkills(argv.slice(1), {
+      stdout: (value) => process.stdout.write(value),
+      stderr: (value) => process.stderr.write(value),
+    });
+    return;
+  }
+  if (argv[0] === "jira") {
+    process.exitCode = await runJira(argv.slice(1), twgJiraClient(), {
+      isTTY: Boolean(process.stdout.isTTY),
       stdout: (value) => process.stdout.write(value),
       stderr: (value) => process.stderr.write(value),
     });

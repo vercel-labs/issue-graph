@@ -1,7 +1,7 @@
 ---
 title: Library
-description: Use issue-graph in your application with a GitHub CLI or HTTP transport.
-lastModified: 2026-09-23
+description: Use issue-graph with GitHub transports or a custom graph collector.
+lastModified: 2026-09-26
 ---
 
 ## Install
@@ -17,6 +17,7 @@ The package provides ESM imports and TypeScript declarations. It declares Node.j
 | `issue-graph` | Core collectors, classification, ranking, and rendering |
 | `issue-graph/transport/shell` | Node-compatible child processes and authenticated `gh` |
 | `issue-graph/transport/http` | `fetch` and a GitHub token |
+| `issue-graph/transport/twg` | Node-compatible child processes and authenticated customer `twg` |
 
 CLI snapshot storage and the headless agent runner are separate from the core exports. Your application manages persistence and agent execution.
 
@@ -86,6 +87,88 @@ const transport = shellTransport();
 
 Pass this transport to `makeFetchNode`. It runs `gh api` with the process's GitHub CLI credentials and requires child-process support. Authentication and retries are handled by `gh`.
 
+## Crawl Jira through TWG
+
+The Node-only TWG client runs the public `twg jira workitem get` command with direct JSON output. The runtime-agnostic core normalizes work items and preserves failed reads as explicit nodes:
+
+```ts
+import {
+  buildJiraReport,
+  crawlGraph,
+  fetchJiraNode,
+  jiraDepthForEdge,
+  jiraNodeKey,
+} from "issue-graph";
+import { twgJiraClient } from "issue-graph/transport/twg";
+
+const issueKey = "PROJ-123";
+const site = "example";
+const limits = {
+  maxDepth: 2,
+  maxNodes: 80,
+  hubThreshold: 12,
+  concurrency: 4,
+};
+const reader = twgJiraClient();
+const result = await crawlGraph(
+  [{ key: jiraNodeKey(issueKey) }],
+  { ...limits, depthForEdge: jiraDepthForEdge(issueKey) },
+  (key, depth) => fetchJiraNode(reader, key, depth, site),
+);
+const report = buildJiraReport(issueKey, site, limits, result);
+```
+
+`twgJiraClient` accepts `binary`, `timeoutMs`, `maxBufferBytes`, or an injected `runner`. It never reads a token; the spawned TWG process resolves its own authentication. Omit `site` only when TWG has a configured default. Consumers must inspect `report.coverageComplete`, `coverage.failed`, and `coverage.cappedOut`.
+
+## Crawl with a custom source
+
+`crawlGraph` provides the bounded traversal engine without assuming GitHub key syntax or a transport. A collector defines canonical keys, returns a minimal `CrawlNode`, and may retain additional source fields:
+
+```ts
+import { crawlGraph, type CrawlNode, type GraphFetchNode } from "issue-graph";
+
+interface JiraNode extends CrawlNode {
+  summary: string;
+  status: string;
+}
+
+declare function readJiraIssue(key: string): Promise<{
+  summary: string;
+  status: string;
+  linkedKeys: string[];
+}>;
+
+const fetchJiraNode: GraphFetchNode<JiraNode> = async (key, depth) => {
+  const issue = await readJiraIssue(key);
+  return {
+    key,
+    depth,
+    edges: issue.linkedKeys.map((linkedKey) => ({ to: `jira:${linkedKey}` })),
+    summary: issue.summary,
+    status: issue.status,
+  };
+};
+
+const { nodes, cappedOut } = await crawlGraph(
+  [{ key: "jira:PROJ-123" }],
+  {
+    maxDepth: 2,
+    maxNodes: 80,
+    hubThreshold: 12,
+    concurrency: 4,
+    depthForEdge: ({ edge, sourceDepth, maxDepth }) =>
+      edge.to.startsWith("jira:") ? sourceDepth + 1 : maxDepth,
+  },
+  fetchJiraNode,
+);
+```
+
+The default edge policy advances one level. `depthForEdge` can return `maxDepth` to fetch a cross-source boundary without expanding it, or `null` to leave an edge unfetched. Invalid depths fail instead of producing a misleading partial traversal. The node cap, hub guard, cycle deduplication, and concurrency bound match the GitHub crawler.
+
+The packaged `issue-graph/transport/twg` adapter is one implementation of this custom-source boundary. Applications may provide another collector without changing the traversal core. The package does not install TWG or authenticate Jira on the caller's behalf.
+
+GitHub-specific classification, PR overlap, backlog reconciliation, and rendering still expect `GraphNode`; custom-source callers should apply only analysis functions that support their node shape.
+
 ## Collect PR status
 
 With either transport:
@@ -107,4 +190,4 @@ Keep `coverageComplete` and per-repository coverage alongside the counts. A `nul
 
 ## Protect credentials and results
 
-Keep GitHub tokens server-side and check access before showing private repository results to other users. See [Permissions and privacy](/docs/security).
+Keep GitHub tokens server-side and check access before showing private results. For Jira, preserve the TWG caller's permission boundary and never expose raw work-item output to unauthorized users. See [Permissions and privacy](/docs/security).

@@ -10,6 +10,8 @@
 - Explicit `--format text` for Graph and Plan. Existing JSON/Markdown contracts remain unchanged, including piped defaults and Graph `--json PATH` exports.
 - Plain output in pipes and when `NO_COLOR`, `CI`, or `TERM=dumb` disables terminal styling.
 - Narrower docs examples with the same human-output hierarchy and natural title wrapping.
+- Additive source-neutral `crawlGraph` library API for bounded traversal of collector-defined node keys while preserving the existing GitHub crawler.
+- Read-only `issue-graph jira ISSUE-KEY` workflow through the customer-facing TWG CLI, with explicit site selection, bounded cross-project traversal, versioned JSON coverage, and a packaged `issue-graph/transport/twg` adapter.
 
 <!-- release:end -->
 

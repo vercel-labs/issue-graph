@@ -22,6 +22,10 @@
     "./transport/http": {
       "types": "./dist/transports/http.d.ts",
       "import": "./dist/transports/http.js"
+    },
+    "./transport/twg": {
+      "types": "./dist/transports/twg.d.ts",
+      "import": "./dist/transports/twg.js"
     }
   },
   "main": "./dist/index.js",
@@ -59,6 +63,9 @@
   ],
   "keywords": [
     "github",
+    "jira",
+    "atlassian",
+    "teamwork-graph",
     "cli",
     "pull-request",
     "issue",

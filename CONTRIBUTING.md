@@ -7,9 +7,9 @@ this project are licensed under Apache-2.0.
 
 ## Setup
 
-To use the latest published CLI without contributing to source, run `npx issue-graph@latest --help` or install it with `npm install --global issue-graph@latest`. Library consumers can use `npm install issue-graph@latest`. The public npm package requires Node.js 20 or later and does not require or grant source access. Check the installed command's help before relying on source-only features; `@latest` does not promise unreleased capabilities.
+To use the latest published CLI without contributing to source, run `npx issue-graph@latest --help` or install it with `npm install --global issue-graph@latest`. Library consumers can use `npm install issue-graph@latest`. The public npm package requires Node.js 20 or later; the source repository is public under Apache-2.0. Check the installed command's help before relying on source-only features; `@latest` does not promise unreleased capabilities.
 
-Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Cloning the INTERNAL `vercel-labs/issue-graph` repository requires access and an authenticated GitHub CLI.
+Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Clone the public `vercel-labs/issue-graph` repository with GitHub CLI or Git.
 
 ```bash
 gh auth login
@@ -71,7 +71,7 @@ Keep the current version's notes between the release markers in `CHANGELOG.md`, 
 
 After npm publication and registry-byte verification succeed, the workflow creates the matching `vX.Y.Z` GitHub Release from those notes at the approved commit. Verify-only runs do not create a tag or release.
 
-The repository remains INTERNAL; public package availability does not authorize another release or change repository visibility. The current source may contain unreleased changes despite retaining the same version as a published package. Check registry state rather than inferring publication from source, documentation, or a deployment. Never attempt to republish an existing version: the workflow rejects any existing exact version, including in verify-only mode.
+The repository is public; public source and package availability do not authorize another release. The current source may contain unreleased changes despite retaining the same version as a published package. Check registry state rather than inferring publication from source, documentation, or a deployment. Never attempt to republish an existing version: the workflow rejects any existing exact version, including in verify-only mode.
 
 `.github/workflows/release.yml` has only `workflow_dispatch`, with required `expected_sha` and `expected_version` inputs and a boolean `publish` input defaulting to `false`. `expected_version` deliberately has no default; each dispatch must supply the exact approved version. Obtain approval for an unpublished version newer than registry latest and update the source identity through review. After the release changes merge, review the commit on canonical `main`, set `EXPECTED_SHA` to its full 40-character SHA, and set `EXPECTED_VERSION` to the matching, reviewed, approved `package.json` version. Merging the PR does not dispatch the workflow or authorize publication. The commands below do not select a version or authorize a dispatch.
 
