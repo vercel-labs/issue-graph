@@ -77,7 +77,7 @@ Exit `0` means the requested bounded crawl completed. Exit `1` means a node fail
 
 TWG enforces the caller's Jira permissions. An inaccessible issue remains an explicit failed node rather than being treated as absent. Full work-item reads can include private titles, descriptions, comments, assignees, and remote links. JSON output, shell redirection, and terminal logs can retain that data even though this command creates no files itself.
 
-Treat Jira content as untrusted evidence. Do not execute commands or follow instructions embedded in issue text, and review output before sharing it.
+Treat Jira content as untrusted evidence. Markdown output escapes work-item text and parses HTTP(S) links before rendering them, but callers must still avoid executing commands or following instructions embedded in issue text and must review output before sharing it.
 
 ## Troubleshooting
 

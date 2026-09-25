@@ -65,28 +65,35 @@ export async function crawlGraph<TNode extends CrawlNode>(
   const nodes = new Map<NodeKey, TNode>();
   const cappedOut = new Set<NodeKey>();
   const seedKeys = new Set(seeds.map((seed) => seed.key));
-  let frontier = seeds.map((seed) => ({ key: seed.key, depth: 0 }));
+  const pending = new Map<NodeKey, number>();
+  for (const seed of seeds) pending.set(seed.key, 0);
 
-  while (frontier.length) {
-    // Admit as much of this level as the cap allows, dropping the rest by key
-    // so the caller can report what it did not inspect.
-    const admitted: Array<{ key: NodeKey; depth: number }> = [];
-    const claimed = new Set<NodeKey>();
-    for (const current of frontier) {
-      if (nodes.has(current.key) || claimed.has(current.key)) continue;
-      if (nodes.size + admitted.length >= opts.maxNodes) {
-        cappedOut.add(current.key);
-        continue;
-      }
-      claimed.add(current.key);
-      admitted.push(current);
+  while (pending.size) {
+    // A depth policy may jump directly to maxDepth, so pending candidates are
+    // not necessarily one BFS level. Always finish the minimum known depth
+    // before admitting deeper candidates, and lower a pending depth when a
+    // shorter path is discovered.
+    let layerDepth = Number.POSITIVE_INFINITY;
+    for (const depth of pending.values()) layerDepth = Math.min(layerDepth, depth);
+    const layer: Array<{ key: NodeKey; depth: number }> = [];
+    for (const [key, depth] of pending) {
+      if (depth !== layerDepth) continue;
+      pending.delete(key);
+      layer.push({ key, depth });
+    }
+
+    const available = Math.max(0, opts.maxNodes - nodes.size);
+    const admitted = layer.slice(0, available);
+    for (const current of layer.slice(available)) cappedOut.add(current.key);
+    if (!admitted.length) {
+      for (const key of pending.keys()) cappedOut.add(key);
+      break;
     }
 
     const fetched = await mapConcurrent(admitted, opts.concurrency ?? 4, (current) =>
       fetch(current.key, current.depth),
     );
 
-    const next: Array<{ key: NodeKey; depth: number }> = [];
     for (let index = 0; index < admitted.length; index++) {
       const current = admitted[index];
       const node = fetched[index];
@@ -107,10 +114,16 @@ export async function crawlGraph<TNode extends CrawlNode>(
       for (const edge of node.edges) {
         if (nodes.has(edge.to)) continue;
         const depth = targetDepth(opts, current.key, edge, current.depth);
-        if (depth !== null) next.push({ key: edge.to, depth });
+        if (depth === null) continue;
+        const knownDepth = pending.get(edge.to);
+        if (knownDepth === undefined || depth < knownDepth) pending.set(edge.to, depth);
       }
     }
-    frontier = next;
+
+    if (nodes.size >= opts.maxNodes) {
+      for (const key of pending.keys()) cappedOut.add(key);
+      break;
+    }
   }
 
   return { nodes, cappedOut };

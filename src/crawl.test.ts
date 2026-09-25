@@ -92,6 +92,51 @@ describe("crawlGraph", () => {
     expect(nodes.has("github:o/r#8")).toBe(false);
   });
 
+  test("admits nearer nodes before earlier deeper boundaries when capped", async () => {
+    const fetch = fakeGraphFetch({
+      "jira:PROJ-1": ["jira:TEAM-1", "jira:PROJ-2"],
+      "jira:TEAM-1": [],
+      "jira:PROJ-2": [],
+    });
+    const { nodes, cappedOut } = await crawlGraph(
+      [{ key: "jira:PROJ-1" }],
+      {
+        maxDepth: 2,
+        maxNodes: 2,
+        hubThreshold: 12,
+        depthForEdge: ({ edge, sourceDepth, maxDepth }) =>
+          edge.to === "jira:TEAM-1" ? maxDepth : sourceDepth + 1,
+      },
+      fetch,
+    );
+
+    expect([...nodes.keys()]).toEqual(["jira:PROJ-1", "jira:PROJ-2"]);
+    expect(cappedOut).toEqual(new Set(["jira:TEAM-1"]));
+  });
+
+  test("lowers a pending depth when a shorter path is discovered before fetch", async () => {
+    const fetch = fakeGraphFetch({
+      "jira:PROJ-1": ["jira:PROJ-3", "jira:PROJ-2"],
+      "jira:PROJ-2": ["jira:PROJ-3"],
+      "jira:PROJ-3": ["jira:PROJ-4"],
+      "jira:PROJ-4": [],
+    });
+    const { nodes } = await crawlGraph(
+      [{ key: "jira:PROJ-1" }],
+      {
+        maxDepth: 3,
+        maxNodes: 10,
+        hubThreshold: 12,
+        depthForEdge: ({ sourceKey, edge, sourceDepth, maxDepth }) =>
+          sourceKey === "jira:PROJ-1" && edge.to === "jira:PROJ-3" ? maxDepth : sourceDepth + 1,
+      },
+      fetch,
+    );
+
+    expect(nodes.get("jira:PROJ-3")?.depth).toBe(2);
+    expect(nodes.get("jira:PROJ-4")?.depth).toBe(3);
+  });
+
   test("rejects invalid edge depths instead of silently corrupting BFS order", async () => {
     const fetch = fakeGraphFetch({ "jira:PROJ-1": ["jira:PROJ-2"] });
     await expect(

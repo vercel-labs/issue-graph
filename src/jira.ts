@@ -413,46 +413,75 @@ export function buildJiraReport(
   };
 }
 
-function safeText(value: string): string {
-  return cleanText(value);
+const MARKDOWN_SPECIAL = new Set("\\`*_{}[]()<>#!|~".split(""));
+
+function markdownText(value: string): string {
+  let escaped = "";
+  for (const character of cleanText(value))
+    escaped += MARKDOWN_SPECIAL.has(character) ? `\\${character}` : character;
+  return escaped;
+}
+
+function normalizedHttpUrl(value: string): string | null {
+  try {
+    const url = new URL(cleanText(value));
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.href
+      .replaceAll("\\", "%5C")
+      .replaceAll("(", "%28")
+      .replaceAll(")", "%29")
+      .replaceAll("[", "%5B")
+      .replaceAll("]", "%5D");
+  } catch {
+    return null;
+  }
+}
+
+function markdownLink(label: string, value: string): string {
+  const url = normalizedHttpUrl(value);
+  return url ? `[${markdownText(label)}](<${url}>)` : markdownText(label);
 }
 
 export function renderJiraReport(report: JiraReport): string {
   const lines = [
     `# Jira issue graph: ${report.seeds[0]}`,
     "",
-    `Source: TWG CLI${report.site ? ` · Site: ${safeText(report.site)}` : ""}`,
+    `Source: TWG CLI${report.site ? ` · Site: ${markdownText(report.site)}` : ""}`,
     `Nodes: ${report.nodes.length} · Coverage: ${report.coverageComplete ? "complete" : "incomplete"}`,
     "",
     "## Issues",
     "",
   ];
   for (const node of report.nodes) {
-    const title = safeText(node.title) || "(no title)";
-    const status = safeText(node.status);
-    const type = safeText(node.issueType);
-    const link =
-      node.url && /^https?:\/\//i.test(node.url)
-        ? `[${node.issueKey}](${node.url})`
-        : node.issueKey;
+    const title = markdownText(node.title) || "(no title)";
+    const status = markdownText(node.status);
+    const type = markdownText(node.issueType);
+    const link = markdownLink(node.issueKey, node.url);
     const hub = node.hub ? " · hub, not expanded" : "";
-    const failed = node.fetched ? "" : ` · FAILED: ${safeText(node.fetchError ?? "unknown error")}`;
+    const failed = node.fetched
+      ? ""
+      : ` · FAILED: ${markdownText(node.fetchError ?? "unknown error")}`;
     lines.push(
       `- **${link}** · ${type} · ${status} · depth ${node.depth}${hub}${failed} — ${title}`,
     );
     for (const edge of node.edges) {
       const target = edge.to.startsWith("jira:") ? edge.to.slice(5) : edge.to;
-      const relation = edge.relation ? `${safeText(edge.relation)} ` : "";
+      const relation = edge.relation ? `${markdownText(edge.relation)} ` : "";
       const boundary = report.nodes.some((candidate) => candidate.key === edge.to)
         ? ""
         : " _(not crawled)_";
-      lines.push(`  - ${relation}${edge.via} → ${safeText(target)}${boundary}`);
+      lines.push(`  - ${relation}${edge.via} → ${markdownText(target)}${boundary}`);
     }
-    for (const url of node.externalLinks) lines.push(`  - external → ${url}`);
+    for (const value of node.externalLinks) {
+      const url = normalizedHttpUrl(value);
+      lines.push(
+        url ? `  - external → [external link](<${url}>)` : `  - external → ${markdownText(value)}`,
+      );
+    }
   }
   if (report.coverage.cappedOut.length) {
     lines.push("", `## Not crawled (node cap): ${report.coverage.cappedOut.length}`, "");
-    for (const key of report.coverage.cappedOut) lines.push(`- ${safeText(key)}`);
+    for (const key of report.coverage.cappedOut) lines.push(`- ${markdownText(key)}`);
   }
   return `${lines.join("\n")}\n`;
 }

@@ -14,6 +14,7 @@ description: Release notes for issue-graph, covering agent guidance, CLI updates
 - Narrower docs examples with the same human-output hierarchy and natural title wrapping.
 - Additive source-neutral `crawlGraph` library API for bounded traversal of collector-defined node keys while preserving the existing GitHub crawler.
 - Read-only `issue-graph jira ISSUE-KEY` workflow through the customer-facing TWG CLI, with explicit site selection, confidence-aware cross-project traversal, versioned JSON coverage, and a packaged `issue-graph/transport/twg` adapter.
+- Preserve minimum-depth BFS admission when source policies jump depths, and escape untrusted Jira Markdown text while normalizing HTTP(S) link destinations.
 
 
 ## 0.3.1

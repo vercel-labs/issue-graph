@@ -163,7 +163,7 @@ const { nodes, cappedOut } = await crawlGraph(
 );
 ```
 
-The default edge policy advances one level. `depthForEdge` can return `maxDepth` to fetch a cross-source boundary without expanding it, or `null` to leave an edge unfetched. Invalid depths fail instead of producing a misleading partial traversal. The node cap, hub guard, cycle deduplication, and concurrency bound match the GitHub crawler.
+The default edge policy advances one level. `depthForEdge` can return `maxDepth` to fetch a cross-source boundary without expanding it, or `null` to leave an edge unfetched. Invalid depths fail instead of producing a misleading partial traversal. Pending nodes are always processed at the minimum known depth, so depth jumps cannot outrank nearer work under the node cap and later shorter paths lower a node before it is fetched. The node cap, hub guard, cycle deduplication, and concurrency bound match the GitHub crawler.
 
 The packaged `issue-graph/transport/twg` adapter is one implementation of this custom-source boundary. Applications may provide another collector without changing the traversal core. The package does not install TWG or authenticate Jira on the caller's behalf.
 

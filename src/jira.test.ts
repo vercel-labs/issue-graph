@@ -156,7 +156,19 @@ describe("Jira crawl integration", () => {
 
   test("builds versioned JSON and safe Markdown with coverage", () => {
     const root = normalizeJiraPayload(fixture, "PROJ-1", 0);
-    root.title = "Root\n## injected";
+    root.title = "Root **bold** [Injected](https://evil.example) \\ slash";
+    root.status = "[Done]";
+    root.issueType = "Task)";
+    root.url = "https://safe.example/) [Injected](https://evil.example";
+    root.externalLinks = [
+      root.url,
+      "https://safe.example/\\path)[Injected](https://evil.example",
+      "javascript:alert(1)",
+    ];
+    root.edges[0] = {
+      ...root.edges[0],
+      relation: "[blocks](https://evil.example)",
+    };
     const failed = {
       ...root,
       key: "jira:PROJ-2",
@@ -188,7 +200,26 @@ describe("Jira crawl integration", () => {
       cappedOut: ["jira:PROJ-7"],
     });
     const markdown = renderJiraReport(report);
-    expect(markdown).toContain("Root ## injected");
+    expect(markdown).toContain("Root \\*\\*bold\\*\\*");
+    expect(markdown).toContain("\\[Injected\\]\\(https://evil.example\\)");
+    expect(markdown).toContain("\\\\ slash");
+    expect(markdown).toContain("\\[Done\\]");
+    expect(markdown).toContain("Task\\)");
+    expect(markdown).toContain(
+      "[PROJ-1](<https://safe.example/%29%20%5BInjected%5D%28https://evil.example>)",
+    );
+    expect(markdown).toContain(
+      "[external link](<https://safe.example/%29%20%5BInjected%5D%28https://evil.example>)",
+    );
+    expect(markdown).toContain(
+      "[external link](<https://safe.example//path%29%5BInjected%5D%28https://evil.example>)",
+    );
+    expect(markdown).toContain("\\[blocks\\]\\(https://evil.example\\)");
+    expect(markdown).not.toContain("[blocks](https://evil.example)");
+    expect(markdown).not.toContain("https://safe.example/\\path");
+    expect(markdown).toContain("javascript:alert\\(1\\)");
+    expect(markdown).not.toContain(") [Injected](");
+    expect(markdown).not.toContain("[Injected](https://evil.example)");
     expect(markdown).toContain("Coverage: incomplete");
     expect(markdown).toContain("FAILED: denied");
   });

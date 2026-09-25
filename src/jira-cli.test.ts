@@ -132,6 +132,29 @@ describe("Jira command output", () => {
     expect(source.calls).not.toContainEqual(["TEAM-2", "demo"]);
   });
 
+  test("prioritizes a nearer same-project issue over an earlier cross-project boundary", async () => {
+    const source = reader({
+      "PROJ-1": payload("PROJ-1", ["TEAM-1", "PROJ-2"]),
+      "TEAM-1": payload("TEAM-1"),
+      "PROJ-2": payload("PROJ-2"),
+    });
+    const result = await capture(
+      ["PROJ-1", "--site", "demo", "--depth", "2", "--max-nodes", "2"],
+      source,
+    );
+    const report = JSON.parse(result.stdout);
+    expect(result.exit).toBe(1);
+    expect(report.nodes.map((node: { issueKey: string }) => node.issueKey)).toEqual([
+      "PROJ-1",
+      "PROJ-2",
+    ]);
+    expect(report.coverage.cappedOut).toEqual(["jira:TEAM-1"]);
+    expect(source.calls).toEqual([
+      ["PROJ-1", "demo"],
+      ["PROJ-2", "demo"],
+    ]);
+  });
+
   test("reports cross-project text tokens without fetching or degrading coverage", async () => {
     const source = reader({
       "PROJ-1": payload("PROJ-1", [], "See TEAM-4; supports UTF-8, SHA-1, ISO-8601, and RFC-2119."),
