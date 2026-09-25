@@ -298,25 +298,11 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .labs:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .labs-mark{height:16px;width:auto;display:block}
 .project-row{position:relative;display:flex;align-items:center;gap:4px;min-width:0}
-.project{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;height:26px;padding:0 6px;margin-left:-6px;border:0;border-radius:6px;background:none;font-family:var(--mono);font-size:12px;color:var(--muted)}
-.pbtn{cursor:pointer;transition:background 150ms,color 150ms}.pbtn:hover,.pbtn[aria-expanded="true"]{background:var(--bg2);color:var(--fg)}
-.pbtn:focus-visible,.project-gh:focus-visible,.ropt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.project{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;height:26px;font-family:var(--mono);font-size:12px;color:var(--muted)}
 .pname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pmuted,.plus{color:var(--muted);font-family:var(--sans)}.plus{white-space:nowrap}
-.pchev{width:12px;height:12px;flex-shrink:0;transition:transform 200ms cubic-bezier(.2,.8,.2,1)}
-.pbtn[aria-expanded="true"] .pchev{transform:rotate(180deg)}
 .project-gh{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--muted);font-size:12px;flex-shrink:0}
+.project-gh:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .project-gh:hover{background:var(--bg2);color:var(--fg);text-decoration:none}
-.repo-menu{position:absolute;top:30px;left:-6px;z-index:20;width:calc(100% + 12px);max-height:320px;overflow-y:auto;padding:4px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);transform-origin:top left;animation:menu-in 160ms cubic-bezier(.2,.8,.2,1)}
-@keyframes menu-in{from{opacity:0;transform:translateY(-4px) scale(.98)}}
-.ropt{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:6px;align-items:center;width:100%;height:32px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--fg);font-family:var(--sans);font-size:13px;text-align:left;cursor:pointer}
-.ropt:hover,.ropt:focus{background:var(--bg2);outline:none}
-.ropt b{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
-.rlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rlabel .mono{font-size:12px}
-.rname{display:inline-flex;align-items:center;gap:6px;min-width:0}.rname .gh-mark{width:13px;height:13px}
-.rcheck{font-size:12px;color:var(--fg)}
-.rsep{height:1px;background:var(--border);margin:4px 0}
-@media (prefers-reduced-motion:reduce){.repo-menu,.pchev{animation:none;transition:none}}
 .gh-mark{width:14px;height:14px;flex-shrink:0;display:block}
 .pv-slot{display:flex;flex-direction:column;gap:6px}
 .pv-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
@@ -593,12 +579,7 @@ const LABS_SVG =
 const APP = `
 const LABS_SVG=${JSON.stringify(LABS_SVG)};
 const DATA=JSON.parse(document.getElementById('data').textContent);
-const ALL=DATA.nodes;
-let N=ALL;
-// repos present in this run, primary first; a filter narrows N for every view
-const REPOS=(()=>{const m=new Map();Object.values(ALL).forEach(n=>m.set(n.repo,(m.get(n.repo)||0)+1));
-  return [...m].sort((a,b)=>(b[0]===DATA.repo)-(a[0]===DATA.repo)||b[1]-a[1]);})();
-let REPO=null;
+const N=DATA.nodes;
 const PV=DATA.provider;
 const repoUrl=r=>PV.repoUrl.replace('{repo}',r);
 const app=document.getElementById('app');
@@ -612,13 +593,6 @@ function statsOf(){
     superseded:prs.filter(n=>/SUPERSEDED/.test(n.verdict||'')).length,
     competing:prs.filter(n=>n.flags.some(f=>f.startsWith('competes'))).length,
     noClose:prs.filter(n=>n.flags.some(f=>f.includes('no closing link'))).length};
-}
-function setRepo(r){
-  // '*' is every repo except the primary one: cross-repo references are usually one node each
-  REPO=r;const keep=r==='*'?n=>n.repo!==DATA.repo:n=>n.repo===r;
-  N=r?Object.fromEntries(Object.entries(ALL).filter(([,n])=>keep(n))):ALL;
-  app.querySelector('.side').outerHTML=sidebar();wireSidebar();
-  lastHash=null;route();
 }
 const tone=s=>s==='OPEN'?'open':s==='MERGED'?'merged':s==='CLOSED'?'closed':'muted';
 let sel=null;
@@ -635,42 +609,9 @@ function kcls(n){
   return n.kind==='PullRequest'?'k-pr':'k-iss';
 }
 const statGrid=rows=>'<div class="stats">'+rows.map(t=>'<div class="stat '+(t[1]===0?'zero':t[2])+'"><div class="stat-n">'+t[1]+'</div><div class="stat-l">'+t[0]+'</div></div>').join('')+'</div>';
-const CHEV='<svg class="pchev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-// One control for "which repository am I looking at": the project name opens the filter.
-function repoLabel(){
-  if(!REPO)return esc(DATA.repo);
-  if(REPO==='*')return 'Linked repos';
-  return esc(REPO);
-}
-// every repository reads as provider mark + owner/name, so sources stay clear once there are several providers
-const repoName=r=>'<span class="rname">'+PV.logo+'<span class="mono">'+esc(r)+'</span></span>';
 function projectRow(){
-  const gh='<a class="project-gh" href="'+esc(repoUrl(REPO&&REPO!=='*'?REPO:DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a>';
-  const linked=REPOS.filter(r=>r[0]!==DATA.repo);
-  if(!linked.length)return '<div class="project-row"><span class="project">'+PV.logo+'<span class="pname">'+esc(DATA.repo)+'</span></span>'+gh+'</div>';
-  const primary=REPOS.find(r=>r[0]===DATA.repo)?.[1]||0,total=Object.keys(ALL).length;
-  const opt=(v,label,n)=>'<button class="ropt'+(REPO===v?' on':'')+'" role="option" aria-selected="'+(REPO===v)+'" data-repo="'+esc(v??'')+'">'+
-    '<span class="rcheck" aria-hidden="true">'+(REPO===v?'✓':'')+'</span><span class="rlabel">'+label+'</span><b>'+n+'</b></button>';
-  return '<div class="project-row"><button class="project pbtn" id="repo-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="repo-menu">'+
-      PV.logo+'<span class="pname">'+repoLabel()+'</span>'+(REPO?'':'<span class="plus">+'+linked.length+' linked</span>')+CHEV+'</button>'+gh+
-    '<div class="repo-menu" id="repo-menu" role="listbox" aria-label="Filter by repository" hidden>'+
-      opt(null,'All repositories',total)+opt('*','All linked repositories',total-primary)+
-      '<div class="rsep" role="separator"></div>'+
-      [[DATA.repo,primary]].concat(linked).map(r=>opt(r[0],repoName(r[0]),r[1])).join('')+'</div></div>';
-}
-function wireRepoMenu(){
-  const btn=document.getElementById('repo-btn'),menu=document.getElementById('repo-menu');if(!btn)return;
-  const opts=()=>[...menu.querySelectorAll('.ropt')];
-  const close=focusBtn=>{menu.hidden=true;btn.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',outside,true);if(focusBtn)btn.focus()};
-  const outside=e=>{if(!menu.contains(e.target)&&!btn.contains(e.target))close(false)};
-  btn.onclick=()=>{if(!menu.hidden)return close(false);
-    menu.hidden=false;btn.setAttribute('aria-expanded','true');
-    (menu.querySelector('.ropt.on')||opts()[0]).focus();document.addEventListener('pointerdown',outside,true)};
-  menu.onkeydown=e=>{const o=opts(),i=o.indexOf(document.activeElement);
-    if(e.key==='Escape'){e.preventDefault();close(true)}
-    else if(e.key==='ArrowDown'){e.preventDefault();o[Math.min(o.length-1,i+1)].focus()}
-    else if(e.key==='ArrowUp'){e.preventDefault();o[Math.max(0,i-1)].focus()}};
-  for(const o of opts())o.onclick=()=>{document.removeEventListener('pointerdown',outside,true);setRepo(o.dataset.repo||null)};
+  return '<div class="project-row"><span class="project">'+PV.logo+'<span class="pname">'+esc(DATA.repo)+'</span></span>'+
+    '<a class="project-gh" href="'+esc(repoUrl(DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a></div>';
 }
 function sidebar(){
   const s=statsOf(),all=Object.values(N);
@@ -1252,13 +1193,11 @@ function setView(next){
 function wire(){
   wireSidebar();
   app.addEventListener('click',e=>{const r=e.target.closest('.rellink');if(r&&r.dataset.key){e.preventDefault();
-    if(!N[r.dataset.key]&&ALL[r.dataset.key])setRepo(null);
     const g=[...app.querySelectorAll('.grp')].find(d=>[...d.querySelectorAll('.item')].some(i=>i.dataset.key===r.dataset.key));
     if(g)g.open=true;select(r.dataset.key);
     const it=app.querySelector('.item[data-key="'+CSS.escape(r.dataset.key)+'"]');if(it)it.scrollIntoView({block:'nearest'});}});
 }
 function wireSidebar(){
-  wireRepoMenu();
   const cb=document.getElementById('cleanup-btn');if(cb)cb.onclick=cleanupView;
   document.getElementById('explore-view').onclick=()=>exploreView();
   document.getElementById('impact-view').onclick=()=>impactView();
