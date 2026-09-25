@@ -10,9 +10,9 @@ Find related issues, competing changes, and unresolved follow-ups before you sta
 
 `issue-graph` traces linked GitHub issues and pull requests. Use it to find existing fixes, check PR status by author, and choose what to review next.
 
-![issue-graph demo](https://issue-graph.dev/issue-graph-demo.png)
+![issue-graph demo: related fixes and follow-ups, superseded PRs to review, and a per-author PR status ledger](https://issue-graph.dev/issue-graph-workflows.gif)
 
-Public CLI output captured on September 22, 2026. [Capture details](https://issue-graph.dev/docs/graph).
+Illustrated workflows: Graph → Reconcile → PR status. [Static version](https://issue-graph.dev/issue-graph-workflows.png) · [Explore the workflows](https://issue-graph.dev/docs).
 
 ## Start here
 
