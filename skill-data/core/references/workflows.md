@@ -3,7 +3,7 @@
 These detailed workflows accompany `issue-graph skills get core`. Load this reference
 with `issue-graph skills get core --full`; a source checkout is not required.
 
-Inspect the bounded reference neighborhood of a GitHub issue or PR before starting work. The CLI collects and classifies evidence without a model; use that evidence to identify related work and review candidates, not to guarantee that no duplicate or unresolved item exists. Semantic root-cause clustering is optional.
+Use bounded reference graphs to find related work and review candidates. Classifications are evidence, not conclusions; root-cause clustering is optional.
 
 ## Contents
 
@@ -24,10 +24,14 @@ loading use packaged assets without network or `gh` access. If a command is miss
 report the CLI/skill mismatch; do not fabricate guidance or automatically install,
 build, link, or upgrade anything. Setup needs separate authorization.
 
-Graph mode always prints Markdown; use `--json PATH` for a graph file. Reconcile and
-plan default to Markdown in a terminal and JSON in a pipe; status defaults to a
-table in a terminal and JSON in a pipe. Read the command-specific contract rather
-than assuming every mode has the same output or local-write behavior.
+Graph and plan default to compact human text in a terminal. Graph pipes remain
+Markdown; plan pipes remain JSON. `--format text` selects human output outside a
+terminal without ANSI; `--format markdown` selects Markdown. Human output uses
+monochrome bold/dim on TTY only, disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
+Graph `--json PATH` writes a file; legacy graph `--format json` keeps Markdown stdout.
+Reconcile keeps terminal Markdown and piped JSON; it rejects `--format text`.
+Use `--format json` for reconcile/plan automation. Status defaults to a terminal
+table and piped JSON. Read each command's output and local-write contract.
 
 For PR counts or status tables, go directly to **Status mode** below; skip the graph steps. Resolve explicit repository and author scope from the request and available context, rather than enumerating an entire organization or guessing its members. Run `issue-graph status --help` if the installed CLI contract is uncertain. If status is unavailable, report the version mismatch instead of fabricating counts.
 
@@ -135,7 +139,7 @@ If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limit
 
 Use `issue-graph plan --repo owner/repo --format json` when a human or agent needs the next safe backlog action. It returns a ready execution queue, an investigation queue, blocked work, a single `next` item when coverage permits, and a structured `decision` for its observed neighborhood. Competing pull requests include comparable draft, review, mergeability, diff, file-count, and update signals. A `reviewFirst` value orders inspection only; it never proves correctness or chooses the winning implementation. Failed neighbor references are quarantined to their affected items. The ordering is deterministic and uses reconcile action, PR readiness, discussion heat, and visible inbound references.
 
-The MVP does not infer semantic dependencies from issue prose. Treat `blockedBy` as visible graph evidence only, and re-run after each merge or closure.
+The plan does not infer semantic dependencies from issue prose. Treat `blockedBy` as visible graph evidence only, and re-run after each merge or closure.
 
 ## Flags
 

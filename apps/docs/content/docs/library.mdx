@@ -1,38 +1,28 @@
 ---
 title: Library
-description: Use the runtime-agnostic core with a local source dependency, a GitHub CLI transport, or an HTTP transport.
-lastModified: 2026-09-19
+description: Use issue-graph in your application with a GitHub CLI or HTTP transport.
+lastModified: 2026-09-23
 ---
 
-## Separate the core from GitHub access
+## Install
 
-The core exports graph types, crawling, classification, ranking, rendering, reconciliation, planning, and status helpers. It does not import Node built-ins. I/O comes from the transport you pass to collectors. Importing the core does not select credentials or automatically start a crawl.
-
-The CLI's filesystem snapshot store and headless clustering runner are not core exports. In a server integration, own your storage, authorization, retention, and agent policy explicitly.
-
-## Use the source package today
-
-The repository is INTERNAL, so the current path requires source access. Build the authorized checkout following [Get started](/docs/get-started), then reference it from a consumer using a local dependency. The local package identity is `issue-graph@0.2.0`, still pending publication:
-
-```json
-{
-  "dependencies": {
-    "issue-graph": "file:../issue-graph"
-  }
-}
+```bash
+npm install issue-graph@latest
 ```
 
-Run `pnpm install` in the consumer after the checkout has been built to resolve the local dependency. A local dependency is not a registry release. These docs do not claim that `issue-graph@0.2.0` is published.
+The package provides ESM imports and TypeScript declarations. It declares Node.js 20 or later. The core has no Node built-in imports; collectors use the transport you supply.
 
-| Current source import | Runtime requirements |
+| Import | Runtime requirements |
 | --- | --- |
-| `issue-graph` | Runtime-agnostic core; caller supplies transport and inputs |
-| `issue-graph/transport/shell` | Node-compatible child processes and authenticated `gh` on `PATH` |
+| `issue-graph` | Core collectors, classification, ranking, and rendering |
+| `issue-graph/transport/shell` | Node-compatible child processes and authenticated `gh` |
 | `issue-graph/transport/http` | `fetch` and a GitHub token |
+
+CLI snapshot storage and the headless agent runner are separate from the core exports. Your application manages persistence and agent execution.
 
 ## Crawl with HTTP
 
-This example is for the built local source dependency. Provide the token through your server's secret environment, not browser code:
+Store the token in your server's environment:
 
 ```ts
 import {
@@ -70,7 +60,7 @@ const unfetched = [...nodes.values()].filter((node) => !node.fetched);
 console.log({ priorities, overlaps, cappedOut: [...cappedOut], unfetched });
 ```
 
-Retain `cappedOut` and unfetched nodes when presenting results. Successful collection does not mean every relationship was visible. The same depth, hub, and per-node limits described in [Graph](/docs/graph) apply.
+Include `cappedOut` and unfetched nodes in your results. The [graph crawl limits](/docs/graph) apply to library calls too.
 
 `httpTransport` uses GitHub's public API host. Its `token` option accepts a string or a synchronous/asynchronous resolver. It handles bounded retries and exposes these options:
 
@@ -82,9 +72,9 @@ Retain `cappedOut` and unfetched nodes when presenting results. Successful colle
 | `maxBackoffMs` | 60000 |
 | `userAgent` | `issue-graph` |
 
-Transport concurrency is separate from crawl concurrency. Handle terminal errors and incomplete node evidence; retries are not a completeness guarantee.
+Transport concurrency is separate from crawl concurrency. Handle exhausted retries and report incomplete nodes.
 
-## Use authenticated GitHub CLI access
+## Use GitHub CLI authentication
 
 In a Node-compatible process, replace the HTTP transport with:
 
@@ -94,9 +84,9 @@ import { shellTransport } from "issue-graph/transport/shell";
 const transport = shellTransport();
 ```
 
-Pass this transport to `makeFetchNode` in the same crawl. It shells out to `gh api` using the credentials available to that process. It is not suitable for a browser or a runtime without child-process support. The shell transport delegates authentication and API behavior to `gh` rather than using the HTTP transport's retry settings.
+Pass this transport to `makeFetchNode`. It runs `gh api` with the process's GitHub CLI credentials and requires child-process support. Authentication and retries are handled by `gh`.
 
-## Collect status without a graph crawl
+## Collect PR status
 
 With either transport:
 
@@ -113,24 +103,8 @@ const report = await collectStatus(transport, {
 console.log({ coverageComplete: report.coverageComplete, totals: report.totals });
 ```
 
-Keep coverage and count provenance in your consumer. A `null` count is not zero. The collector does not make a PR merge-ready or save CLI snapshots for you. See [Status](/docs/status) for interpretation.
+Keep `coverageComplete` and per-repository coverage alongside the counts. A `null` count means unknown. See [Status and history](/docs/status) for the report fields and comparison behavior.
 
-## Public imports after a functional release
+## Protect credentials and results
 
-The public `issue-graph@0.1.0` is a placeholder with no CLI `bin`, not the functional library described here. The functional unscoped `issue-graph@0.2.0` release is selected but publication is still pending.
-
-Only after that release, the intended consumer installation is:
-
-```bash
-pnpm add issue-graph
-```
-
-After publication, the registry package uses the same import spellings as the local source dependency:
-
-```ts
-import { classify, crawl, makeFetchNode } from "issue-graph";
-import { httpTransport } from "issue-graph/transport/http";
-import { shellTransport } from "issue-graph/transport/shell";
-```
-
-These are not instructions to install today's placeholder. Until the functional release is confirmed, use the local file dependency above. Keep GitHub tokens server-side and review [permissions and privacy](/docs/security) before exposing results to other users.
+Keep GitHub tokens server-side and check access before showing private repository results to other users. See [Permissions and privacy](/docs/security).

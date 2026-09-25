@@ -8,46 +8,47 @@ const escapeXml = (value: string) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character] ??
       character,
   );
-const seed = graph.nodes.find((node) => node.key === graph.seed);
-if (!seed) throw new Error("The captured seed is missing.");
-const related = graph.edges.map((edge) => graph.nodes.find((node) => node.key === edge.to));
-if (related.some((node) => !node)) throw new Error("A captured reference is missing.");
 
-function lines(value: string, width: number) {
+function wrap(value: string, width: number) {
   const result: string[] = [];
-  let line = "";
-  for (const word of value.split(" ")) {
-    if (line.length && line.length + word.length + 1 > width) {
-      result.push(line);
-      line = word;
-    } else line += `${line ? " " : ""}${word}`;
+  let remaining = value;
+  while ([...remaining].length > width) {
+    const prefix = [...remaining].slice(0, width).join("");
+    const space = prefix.lastIndexOf(" ");
+    const at = space > width / 2 ? space : prefix.length;
+    result.push(remaining.slice(0, at));
+    remaining = `  ${remaining.slice(at).trimStart()}`;
   }
-  if (line) result.push(line);
+  result.push(remaining);
   return result;
 }
 
-function nodeCard(
-  node: NonNullable<typeof seed>,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  primary = false,
-) {
-  const title = lines(node.title, primary ? 34 : 43).slice(0, 2);
-  return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="9" fill="white" stroke="${primary ? "#0070f3" : "#e5e5e5"}"/><text x="${x + 18}" y="${y + 24}" font-size="11" fill="#666">${escapeXml(node.repository)} #${node.number}</text><text x="${x + w - 18}" y="${y + 24}" text-anchor="end" font-size="10" fill="${node.state === "OPEN" ? "#0070f3" : "#666"}">${escapeXml(node.state.toLowerCase())}</text>${title.map((line, i) => `<text x="${x + 18}" y="${y + 49 + i * 19}" font-size="${primary ? 16 : 13}" fill="#171717">${escapeXml(line)}</text>`).join("")}</g>`;
-}
-
-const cards = related
-  .map((node, i) => (node ? nodeCard(node, 568, 70 + i * 88, 390, 77) : ""))
+const commandLines = wrap(`$ ${graph.command}`, 132);
+const outputLines = graph.terminalOutput
+  .trimEnd()
+  .split("\n")
+  .flatMap((line) => wrap(line, 132));
+const lines = [...commandLines, "", ...outputLines];
+const width = 1200;
+const lineHeight = 19;
+const footerY = 86 + lines.length * lineHeight;
+const height = footerY + 106;
+const terminal = lines
+  .map((line, index) => {
+    const color =
+      index < commandLines.length
+        ? "#fafafa"
+        : line.startsWith("#")
+          ? "#93c5fd"
+          : line.includes("MERGED")
+            ? "#d8b4fe"
+            : line.includes("OPEN")
+              ? "#86efac"
+              : "#d4d4d4";
+    return `<text x="28" y="${83 + index * lineHeight}" fill="${color}" xml:space="preserve">${escapeXml(line)}</text>`;
+  })
   .join("");
-const wires = related
-  .map(
-    (_, i) =>
-      `<path d="M374 238H464V${108 + i * 88}H568" fill="none" stroke="#0070f3" stroke-opacity=".4" stroke-width="1.2"/>`,
-  )
-  .join("");
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500" viewBox="0 0 1000 500" role="img" aria-labelledby="title desc"><title id="title">issue-graph: related work around Portless PR 427</title><desc id="desc">A captured public graph with five pull requests across Portless and wterm. Four seed references connect the docs migration to related work. Capture date ${escapeXml(graph.capturedAt)}.</desc><rect width="1000" height="500" rx="14" fill="#fafafa"/><g font-family="Arial, Helvetica, sans-serif"><text x="34" y="35" font-size="14" font-weight="bold" fill="#171717">issue-graph</text><text x="966" y="35" text-anchor="end" font-size="11" fill="#666">Public reference graph · ${escapeXml(graph.capturedAt.slice(0, 10))}</text><path d="M0 53H1000M0 445H1000" stroke="#e5e5e5"/>${wires}<text x="46" y="156" font-size="10" fill="#666" letter-spacing="1.3">YOUR STARTING POINT</text>${nodeCard(seed, 44, 180, 330, 116, true)}<text x="46" y="322" font-size="12" fill="#666">Five pull requests. Two repositories. One view.</text>${cards}<text x="34" y="477" font-family="monospace" font-size="12" fill="#444">$ ${escapeXml(graph.command)}</text></g></svg>\n`;
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">issue-graph CLI: a merged Chrome-process fix and open follow-ups</title><desc id="desc">Actual issue-graph ${escapeXml(graph.cliVersion)} stdout excerpt for ${escapeXml(graph.seed)}. ${graph.nodes.length} public nodes in one repository, with typed closing links and the orphan checklist. Attribution and nonessential output omitted. Captured ${escapeXml(graph.capturedAt)}. Depth ${graph.limits.depth}, maximum ${graph.limits.maxNodes} nodes; ${graph.coverage.beyondDepthReferences} references beyond depth, not complete history.</desc><rect width="${width}" height="${height}" rx="14" fill="#111111"/><path d="M0 48H${width}M0 ${footerY}H${width}" stroke="#333333"/><g font-family="Arial, Helvetica, sans-serif"><text x="28" y="30" fill="#fafafa" font-size="14" font-weight="bold">issue-graph / terminal</text><text x="${width - 28}" y="30" text-anchor="end" fill="#a3a3a3" font-size="12">${escapeXml(graph.repository)} · CLI ${escapeXml(graph.cliVersion)}</text></g><g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">${terminal}</g><g font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#a3a3a3"><text x="28" y="${footerY + 27}">Captured ${escapeXml(graph.capturedAt)} · ${graph.nodes.length} nodes · ${graph.edges.length} typed edges · no nodes filtered</text><text x="28" y="${footerY + 50}">Depth ${graph.limits.depth} · max ${graph.limits.maxNodes} nodes · ${graph.coverage.beyondDepthReferences} beyond-depth references omitted · not complete history</text><text x="28" y="${footerY + 73}">Real stdout excerpt; attribution, non-closing edge lines, PR metadata, external links and snapshot section omitted.</text></g></svg>\n`;
 await mkdir(new URL("../public/", import.meta.url), { recursive: true });
 await writeFile(new URL("../public/issue-graph-demo.svg", import.meta.url), svg);
-console.log("Generated issue-graph-demo.svg (1000 x 500) from the checked-in public snapshot.");
+console.log(`Generated issue-graph-demo.svg (${width} x ${height}) from captured CLI stdout.`);

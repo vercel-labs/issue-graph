@@ -1,0 +1,9 @@
+{
+  "skills": [
+    {
+      "name": "issue-graph",
+      "description": "Read-only context for issues, pull requests, and backlogs. Use to trace related work, check review queues and PR counts, prioritize follow-ups, or compare snapshots.",
+      "files": ["SKILL.md"]
+    }
+  ]
+}

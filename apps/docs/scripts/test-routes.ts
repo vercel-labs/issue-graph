@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { docsSlugs, markdownPath } from "../src/lib/docs-paths";
+import { landingTitle } from "../src/lib/landing-content";
 import { canonicalUrl, repositoryUrl } from "../src/lib/site";
+import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
+import { statusPresentation, terminalPresentation } from "../src/lib/terminal-presentation";
 import { testUrl } from "./test-url";
 
 const origin = testUrl();
@@ -40,16 +45,183 @@ function htmlAttribute(html: string, tag: string, key: string, value: string, at
   return element?.match(new RegExp(`${attribute}="([^"]*)"`))?.[1];
 }
 
+function staticTerminal(html: string) {
+  const terminal = html
+    .match(/<section\b[^>]*class="ig-demo"[^>]*>[\s\S]*?<\/section>/)?.[0]
+    ?.replace(/<!--[\s\S]*?-->/g, "");
+  assert.ok(terminal, "Terminal examples are present in the server HTML");
+  assert.match(terminal, /aria-label="issue-graph terminal examples"/);
+  assert.equal((terminal.match(/role="tablist"/g) ?? []).length, 1, "One terminal tablist");
+  const tabs = terminal.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+  const panels = terminal.split(/(?=<div\b[^>]*role="tabpanel")/).slice(1);
+  const commands = [
+    "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
+    "issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects",
+    "issue-graph plan --repo vercel-labs/wterm",
+  ];
+  const escaped = (value: string) =>
+    renderToStaticMarkup(createElement("span", null, value)).replace(/<\/?span>/g, "");
+  assert.equal(tabs.length, 3, "Three terminal tabs");
+  assert.equal(panels.length, 3, "Three server-rendered panels");
+  const ids = new Set<string>();
+  for (const [index, example] of terminalExampleCatalog.map(toTerminalExample).entries()) {
+    const tab: string = tabs[index] ?? "";
+    const panel: string = panels[index] ?? "";
+    const tabId = htmlAttribute(tab, "button", "role", "tab", "id");
+    const panelId = htmlAttribute(panel, "div", "role", "tabpanel", "id");
+    assert.ok(tabId && panelId, `ARIA identifiers: ${example.id}`);
+    ids.add(tabId);
+    ids.add(panelId);
+    assert.equal(htmlAttribute(tab, "button", "role", "tab", "aria-controls"), panelId);
+    assert.equal(htmlAttribute(panel, "div", "role", "tabpanel", "aria-labelledby"), tabId);
+    assert.equal(htmlAttribute(tab, "button", "role", "tab", "aria-selected"), String(index === 0));
+    assert.equal(htmlAttribute(tab, "button", "role", "tab", "tabindex"), index === 0 ? "0" : "-1");
+    assert.equal(
+      /\bhidden(?:="")?(?:\s|>)/.test(panel),
+      index !== 0,
+      `Inactive panel hidden: ${example.id}`,
+    );
+    assert.ok(tab.includes(`>${example.label}</button>`), `Tab label: ${example.id}`);
+    assert.equal(
+      htmlAttribute(panel, "div", "role", "tabpanel", "tabindex"),
+      index === 0 ? "0" : "-1",
+    );
+    const command = panel.match(/<div class="ig-demo-command">[\s\S]*?<\/div>/)?.[0];
+    assert.ok(command, `Immediate display command: ${example.id}`);
+    assert.equal(
+      command.replace(/<\/?span\b[^>]*>/g, ""),
+      renderToStaticMarkup(
+        createElement("div", { className: "ig-demo-command" }, `$ ${commands[index]}`),
+      ),
+      `Approved shortened command: ${example.id}`,
+    );
+    const text = panel.replace(/<[^>]+>/g, "");
+    const contains = (value: string) =>
+      assert.ok(text.includes(escaped(value)), `Immediate ${example.id} content: ${value}`);
+    if (example.id === "status") {
+      const status = statusPresentation(example.output);
+      assert.ok(status, "Captured status is recognized");
+      const tables = panel.match(/<table\b[^>]*>[\s\S]*?<\/table>/g) ?? [];
+      assert.equal(
+        tables.length,
+        status.projects.reduce((count, project) => count + (project.authors.length ? 1 : 0) + 1, 0),
+      );
+      assert.equal((panel.match(/<h3>/g) ?? []).length, status.projects.length);
+      for (const project of status.projects) {
+        assert.ok(panel.includes(renderToStaticMarkup(createElement("h3", null, project.name))));
+        contains(`${project.open} open PR${project.open === "1" ? "" : "s"}`);
+        for (const [label, countLabel, rows] of [
+          ["Author", "Open PRs", project.authors],
+          ["Review state", "PRs", project.reviews],
+        ] as const) {
+          if (!rows.length) continue;
+          const name = `${project.name} ${label}`;
+          const table = tables.find(
+            (value) => htmlAttribute(value, "table", "aria-label", name, "aria-label") === name,
+          );
+          assert.ok(table, `Separate SSR table: ${name}`);
+          const cells = (table.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) ?? []).map((row) =>
+            Array.from(
+              row.matchAll(/<(?:th|td)\b[^>]*>([^<]*)<\/(?:th|td)>/g),
+              (match) => match[1],
+            ),
+          );
+          assert.deepEqual(
+            cells,
+            [[label, countLabel], ...rows.map((row) => [escaped(row.label), escaped(row.value)])],
+            `Captured cells: ${name}`,
+          );
+        }
+        contains(`${project.conflicts} conflicts`);
+      }
+      for (const flag of status.flags) contains(`${flag.value} ${flag.label}`);
+      contains(status.capture);
+      contains(`Coverage ${status.coverage}`);
+      for (const caveat of status.caveats.split("\n")) contains(caveat);
+    } else {
+      const rows = terminalPresentation(example.output, example.id);
+      assert.ok(rows, `Captured ${example.id} is recognized`);
+      assert.equal(
+        (panel.match(/class="ig-demo-item-title"/g) ?? []).length,
+        rows.filter((row) => row.kind === "item").length,
+      );
+      for (const row of rows) {
+        if (row.kind === "item") {
+          assert.ok(
+            panel.includes(
+              renderToStaticMarkup(
+                createElement("span", { className: "ig-demo-identity" }, row.reference),
+              ),
+            ),
+          );
+          assert.ok(
+            panel.includes(
+              renderToStaticMarkup(
+                createElement("span", { className: "ig-demo-item-title" }, row.title),
+              ),
+            ),
+          );
+          if (row.state) contains(row.state);
+          for (const detail of row.details) contains(detail);
+          if (row.metrics) {
+            contains(row.metrics);
+            for (const detail of row.details)
+              assert.ok(
+                text.indexOf(escaped(detail)) < text.indexOf(escaped(row.metrics)),
+                "Action precedes secondary metrics",
+              );
+          }
+        } else {
+          for (const value of row.kind === "summary" ? row.text.split(" · ") : [row.text])
+            contains(value);
+        }
+      }
+    }
+  }
+  assert.equal(ids.size, 6, "Unique tab and panel identifiers");
+  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate Graph takeaway");
+  assert.match(terminal, /aria-live="polite"/);
+  assert.match(terminal, /\? means unknown, not zero\./);
+  assert.match(terminal, /Flags overlap review states\./);
+  assert.doesNotMatch(
+    terminal,
+    /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
+  );
+  assert.match(terminal, /Approval does not imply merge readiness\./);
+  assert.match(terminal, /Validate repository-specific behavior before mutating GitHub\./);
+  assert.doesNotMatch(terminal, /Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
+  assert.doesNotMatch(
+    terminal,
+    /<(?:textarea|canvas|iframe)\b|stdoutSha256|excerptSha256|receiptFile/,
+  );
+  checks++;
+}
+
 const titles = new Set<string>();
 for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/docs"))]) {
   const html = await request(path);
   assert.equal(html.response.status, 200, path);
   assert.match(html.response.headers.get("content-type") ?? "", /text\/html/, path);
   assert.equal((html.body.match(/<h1(?:\s|>)/g) ?? []).length, 1, `One H1: ${path}`);
+  if (path === "/") {
+    staticTerminal(html.body);
+    const heading = html.body.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "";
+    assert.equal(
+      heading
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+      landingTitle,
+      "Canonical landing H1 sentence",
+    );
+  }
   assert.equal((html.body.match(/<main(?:\s|>)/g) ?? []).length, 1, `One main: ${path}`);
   assert.ok(html.body.includes('id="main-content"'), `Skip target: ${path}`);
   const title = html.body.match(/<title>([^<]+)<\/title>/)?.[1];
   assert.ok(title, `Title: ${path}`);
+  assert.ok(title.startsWith("issue-graph | "), `Product-first title: ${path}`);
+  assert.equal(htmlAttribute(html.body, "meta", "property", "og:title", "content"), title);
+  assert.equal(htmlAttribute(html.body, "meta", "name", "twitter:title", "content"), title);
   assert.ok(!titles.has(title), `Unique title: ${path}`);
   titles.add(title);
   const canonical = htmlAttribute(html.body, "link", "rel", "canonical", "href");
@@ -60,14 +232,24 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
   assert.equal(new URL(ogUrl).href, new URL(canonicalUrl(path)).href, `OG URL: ${path}`);
   const image = htmlAttribute(html.body, "meta", "property", "og:image", "content");
   assert.ok(image, `OG image metadata: ${path}`);
-  assert.ok(image.startsWith(canonicalUrl("/og")), `OG: ${path}`);
+  assert.equal(image, canonicalUrl(path === "/" ? "/og" : `/og${path}`), `OG: ${path}`);
   const imageResponse = await fetch(new URL(new URL(image).pathname, origin), {
     headers: { accept: "image/*" },
     redirect: "manual",
   });
   assert.equal(imageResponse.status, 200, `OG image: ${path}`);
-  assert.match(imageResponse.headers.get("content-type") ?? "", /^image\//);
-  assert.ok((await imageResponse.arrayBuffer()).byteLength > 0);
+  assert.match(imageResponse.headers.get("content-type") ?? "", /^image\/png(?:;|$)/);
+  const png = Buffer.from(await imageResponse.arrayBuffer());
+  assert.ok(png.byteLength > 33, `PNG body: ${path}`);
+  assert.deepEqual(
+    [...png.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10],
+    `PNG signature: ${path}`,
+  );
+  assert.equal(png.readUInt32BE(8), 13, `PNG IHDR length: ${path}`);
+  assert.equal(png.toString("ascii", 12, 16), "IHDR", `PNG header: ${path}`);
+  assert.equal(png.readUInt32BE(16), 1200, `OG width: ${path}`);
+  assert.equal(png.readUInt32BE(20), 630, `OG height: ${path}`);
   assert.ok(
     htmlAttribute(html.body, "meta", "name", "description", "content"),
     `Description: ${path}`,
@@ -76,6 +258,12 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
     assert.match(htmlAttribute(html.body, "meta", "name", "robots", "content") ?? "", /noindex/);
   const header = html.body.match(/<header\b[^>]*>[\s\S]*?<\/header>/)?.[0];
   assert.ok(header, `Navbar: ${path}`);
+  assert.equal(
+    htmlAttribute(header, "a", "aria-label", "Vercel Labs", "href"),
+    "https://vercel.com/labs",
+    `Native Labs branding: ${path}`,
+  );
+  assert.ok(!header.includes('aria-label="Vercel Open Source"'), `No OSS brand: ${path}`);
   assert.equal(
     htmlAttribute(header, "a", "aria-label", "GitHub repository", "href"),
     repositoryUrl,
@@ -115,6 +303,15 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
     isolated(result.response);
   }
   assert.equal(markdown.body, sibling.body, `Matching representations: ${path}`);
+  if (path === "/") {
+    for (const example of terminalExampleCatalog.map(toTerminalExample)) {
+      assert.ok(markdown.body.includes(example.command));
+      assert.ok(markdown.body.includes(example.summary));
+      assert.ok(markdown.body.includes(example.output));
+    }
+    assert.match(markdown.body, /This displayed excerpt omits other captured nodes/);
+    assert.doesNotMatch(markdown.body, /All fetched nodes are shown/);
+  }
   const after = await request(path);
   assert.match(after.response.headers.get("content-type") ?? "", /text\/html/);
   checks += 5;
@@ -200,7 +397,9 @@ assert.ok(Array.isArray(results) && results.length > 0, "Native search results")
 assert.ok(results.some((result: { url?: string }) => result.url?.startsWith("/docs")));
 const llms = await request("/llms.txt");
 assert.equal(llms.response.status, 200);
-assert.match(llms.body, /pending/i);
+assert.match(llms.body, /npm install -g issue-graph@latest/);
+assert.match(llms.body, /npx issue-graph@latest --help/);
+assert.doesNotMatch(llms.body, /release is pending/i);
 for (const slug of docsSlugs)
   assert.ok(llms.body.includes(canonicalUrl(slug ? `/docs/${slug}` : "/docs")));
 const sitemap = await request("/sitemap.xml");
@@ -229,6 +428,23 @@ const docsIndex = await request("/docs/index.md");
 assert.equal(docsIndex.response.status, 200);
 assert.equal(docsIndex.response.headers.get("link"), `<${canonicalUrl("/docs")}>; rel="canonical"`);
 checks += 7;
+const skillIndex = await request("/.well-known/skills/index.json", { accept: "application/json" });
+assert.equal(skillIndex.response.status, 200);
+assert.match(skillIndex.response.headers.get("content-type") ?? "", /application\/json/);
+const skillListing = JSON.parse(skillIndex.body);
+assert.deepEqual(
+  skillListing.skills.map((item: { name: string }) => item.name),
+  ["issue-graph"],
+);
+assert.deepEqual(skillListing.skills[0].files, ["SKILL.md"]);
+const publicSkill = await request("/.well-known/skills/issue-graph/SKILL.md", {
+  accept: "text/markdown",
+});
+assert.equal(publicSkill.response.status, 200);
+assert.match(publicSkill.body, /^---\nname: issue-graph\n/);
+assert.equal(publicSkill.body, skill.body);
+assert.match(publicSkill.body, /issue-graph skills get core/);
+checks += 2;
 console.log(
   `PASS: ${checks} route checks against ${origin.origin}${preview ? " (preview noindex)" : ""}`,
 );

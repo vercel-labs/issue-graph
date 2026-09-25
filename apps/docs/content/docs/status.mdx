@@ -1,65 +1,76 @@
 ---
 title: Status and history
-description: Count open PRs by repository and author, preserve unknown coverage, and compare observed state across captures.
-lastModified: 2026-09-18
+description: Count pull requests by author and repository, check review states, and compare saved reports.
+lastModified: 2026-09-23
 ---
 
-## Count open PRs without a graph crawl
+## Check PR status
 
-Use explicit repository and author scope:
+Specify repositories and authors:
 
 ```bash
 issue-graph status --repo vercel-labs/portless --author ctate,Railly
 issue-graph status --repo vercel-labs/agent-browser --repo vercel-labs/portless --author ctate,Railly
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects
-issue-graph status --repo vercel-labs/portless --author ctate --view prs
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --json
 ```
 
-Both `--repo` and `--author` are required. Repeat `--repo` for multiple repositories; repeat or comma-separate `--author`. Scope matching and deduplication are case-insensitive. Authors are not an inferred organization membership list.
+Both `--repo` and `--author` are required. Repeat `--repo` for more repositories. Repeat `--author` or separate authors with commas. Scope matching and deduplication are case-insensitive.
 
-The default `authors` view includes repository/author rows with zero counts when coverage supports zero. `projects` shows project totals and per-author counts. `prs` shows underlying PRs, titles, URLs, head evidence, assignees, requested reviewers, and follow-up graph commands.
+## Choose a view
+
+```bash
+issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects
+issue-graph status --repo vercel-labs/portless --author ctate --view prs
+```
+
+| View | Output |
+| --- | --- |
+| `authors` (default) | Counts by author and repository, including known zero counts |
+| `projects` | Repository totals and counts per author |
+| `prs` | PR titles, URLs, head identifiers, assignees, requested reviewers, and graph commands |
 
 ## Choose an output format
 
-TTY output defaults to an aligned table with narrow-terminal fallback. Pipes default to versioned JSON. Use `--format auto|table|markdown|json` to choose explicitly. `NO_COLOR` disables styling; progress and headings use stderr.
+A terminal gets an aligned table with a narrow-screen fallback. A pipe gets versioned JSON. Set `--format auto|table|markdown|json` to choose explicitly.
 
 ```bash
 issue-graph status --repo vercel-labs/portless --author ctate,Railly --format markdown
+issue-graph status --repo vercel-labs/portless --author ctate,Railly --json
 ```
 
-In status only, `--json` means JSON on stdout and takes no filename. Graph's `--json PATH` has a different contract. Status JSON schema version 1 includes scope, query timestamps, per-repository coverage, PR evidence, author and project rows, totals, and next steps.
+For status, `--json` writes to stdout and takes no filename. Schema version 1 includes scope, query timestamps, coverage, PR details, author and project rows, totals, and next steps. `NO_COLOR` disables styling. Progress messages go to stderr.
 
-## Read counts without losing uncertainty
+## Read the counts
 
-Each metric contains `count`, `prIds`, and `unknownIds`. A `null` count means unknown, not zero. Known matching IDs remain useful as a lower bound. Human views display `?` for unknown counts.
+Each metric contains `count`, `prIds`, and `unknownIds`. A `null` count, shown as `?` in human output, means the total is unknown. Known matching IDs provide a lower bound.
 
-Check `coverageComplete` and each repository's `coverage` before citing totals. A failed repository invalidates its own aggregate counts and portfolio totals, not complete sibling repositories. Query timestamps describe a collection window, not an atomic GitHub snapshot.
+Check `coverageComplete` and each repository's `coverage` before using totals. A failed repository makes its aggregate counts and portfolio totals unknown. Complete sibling repositories retain their counts. Query timestamps record the collection window.
 
-Review-required, changes-requested, approved, no-review-required, and unknown states partition open PRs. Draft, conflict, and unassigned indicators are independent and may overlap those states. Unknown mergeability is not evidence of being conflict-free.
+Review-required, changes-requested, approved, no-review-required, and unknown states partition open PRs. Draft, conflict, and unassigned flags are independent and can overlap.
 
-Ready-for-review means non-draft, not approved or merge-ready. For a non-draft/unassigned intersection, filter JSON `pullRequests` by `isDraft === false` and an explicitly empty `assignees` array. Do not subtract independent totals or treat unknown assignees as empty.
+Ready-for-review means the PR is non-draft. To find non-draft, unassigned PRs, filter `pullRequests` for `isDraft === false` and an explicitly empty `assignees` array. Unknown mergeability or assignees remain unknown.
 
-Approval is not merge readiness. Status does not inspect CI checks, bot review findings, or coding-review threads, and it does not verify that review comments were addressed. Use separate code and review gates before merging.
+Check CI, code review findings, and unresolved review threads separately before merging; status collects review state and metadata.
 
-## Understand pagination and exit codes
+## Pagination and exit codes
 
-Status paginates repository PR connections rather than relying on GitHub search results. PR pages contain 50 items. Assignee and reviewer-request connections are also paginated.
+Status paginates PRs in groups of 50 and also paginates assignees and reviewer requests.
 
 | Flag | Default | Range |
 | --- | --- | --- |
 | `--concurrency N` | 4 repositories | 1 to 32 |
 | `--max-pages N` | 100 pages per connection | 1 to 1000 |
 
-Caps, access failures, malformed responses, and detectable pagination drift produce incomplete coverage rather than confident totals.
+Caps, access failures, malformed responses, and detectable pagination drift produce incomplete coverage.
 
-- Exit `0`: complete inventory and, when requested, complete comparison.
-- Exit `1`: incomplete evidence or runtime failure. Inspect any partial report; do not treat it as an empty backlog.
-- Exit `2`: invalid arguments or incompatible scope/options.
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Complete inventory and any requested comparison |
+| `1` | Incomplete evidence or runtime failure; inspect any partial report |
+| `2` | Invalid arguments or incompatible options |
 
 ## Save and compare captures
 
-Status writes no snapshot by default. Opt in when you need history:
+Use `--save` to keep a local capture:
 
 ```bash
 issue-graph status --repo vercel-labs/portless --author ctate,Railly --save
@@ -67,16 +78,16 @@ issue-graph status --repo vercel-labs/portless --author ctate,Railly --since las
 issue-graph status --repo vercel-labs/portless --author ctate,Railly --since /path/to/previous.json --json
 ```
 
-`--save` writes an immutable local JSON capture under `~/.issue-graph/status/<scope-hash>/`. `ISSUE_GRAPH_HOME` changes the status storage root. Captures use restrictive local permissions but are not encrypted or automatically safe to share.
+Captures are immutable JSON files under `~/.issue-graph/status/<scope-hash>/`. Set `ISSUE_GRAPH_HOME` to change the storage root.
 
-`--since last` loads the latest capture for exactly the same repository/author scope before fetching or saving new evidence. Order and case can differ; the scope itself cannot. `--since PATH` can read a saved snapshot or an older exported status JSON report. Missing, corrupt, future, or mismatched baselines fail explicitly instead of being interpreted as no changes.
+`--since last` loads the latest capture for the same repository and author scope before fetching new data. Order and case can differ. `--since PATH` accepts a saved snapshot or an older status JSON export. Missing, corrupt, future, or mismatched baselines return an error.
 
-`--no-snapshot` forbids status snapshot writes and conflicts with `--save`. It can be used with `--since` to compare without saving the new capture.
+`--no-snapshot` prevents saving and conflicts with `--save`. You can combine it with `--since` to compare without saving the new capture.
 
-## Interpret changes as observations
+## Read changes
 
-Human output adds a Changes appendix. JSON adds `history` during comparison and `snapshot` with the saved path when saving. History covers review, draft, conflict, head, assignment, and reviewer-request transitions, plus additions, departures, uncertainty, and count deltas.
+Human output includes a Changes section. JSON adds `history` for comparisons and `snapshot` when saving. Changes cover review state, drafts, conflicts, heads, assignments, requested reviewers, additions, departures, and counts.
 
-PRs missing from the new inventory are queried explicitly to distinguish merged, closed, and unverified departures. Absence alone never means merged. Unknown metadata or incomplete baselines cannot prove an addition or transition. Reconstructed baselines retain their provenance and unknown fields; do not backfill historical facts from today's response.
+PRs missing from the new inventory are queried again to identify merged, closed, or unverified departures. Unknown data and incomplete baselines limit which transitions can be reported.
 
-These are observed state changes, not attribution of who submitted a review or proof of resolved comments. Follow [Graph](/docs/graph) for relationships and [Security](/docs/security) before retaining or sharing captures.
+See [Permissions and privacy](/docs/security) before storing or sharing captures.

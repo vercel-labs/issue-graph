@@ -1,15 +1,13 @@
 import { markdownPath } from "./docs-paths";
 import { geistdocsSource } from "./geistdocs/source";
-import { canonicalUrl, packageReleasePending, siteDescription, siteName } from "./site";
+import { canonicalUrl, siteDescription, siteName } from "./site";
 
 export function documentationPages() {
   return geistdocsSource.source.getPages("en");
 }
 
 export function releaseNotice(): string {
-  return packageReleasePending
-    ? "The npm release is pending. Installation instructions for a published package are not yet available."
-    : "See the getting-started guide for the current installation instructions.";
+  return "Install with npm install -g issue-graph@latest, or try npx issue-graph@latest --help. Requires Node.js 20+ and GitHub CLI authentication.";
 }
 
 export function llmsIndex(): string {
@@ -31,7 +29,7 @@ export function llmsIndex(): string {
     "",
     "## Agent resources",
     "",
-    `- [Canonical skill](${canonicalUrl("/skill.md")})`,
+    `- [Release-compatible agent setup](${canonicalUrl("/docs/agents.md")})`,
     `- [Markdown sitemap](${canonicalUrl("/sitemap.md")})`,
     `- [XML sitemap](${canonicalUrl("/sitemap.xml")})`,
     "",
@@ -49,7 +47,7 @@ export function sitemapMarkdown(): string {
       (page) =>
         `- [${page.data.title}](${canonicalUrl(page.url)}): ${page.data.description ?? ""} [Markdown](${canonicalUrl(markdownPath(page.url))})`,
     ),
-    `- [Skill](${canonicalUrl("/skill.md")})`,
+    `- [Release-compatible agent setup](${canonicalUrl("/docs/agents.md")})`,
     "",
   ].join("\n");
 }

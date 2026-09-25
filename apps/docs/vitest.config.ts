@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   test: {
+    server: { deps: { inline: ["@vercel/geistdocs"] } },
     environment: "node",
     globals: false,
     include: ["tests/**/*.test.ts"],

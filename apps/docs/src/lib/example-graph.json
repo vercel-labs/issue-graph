@@ -1,69 +1,162 @@
 {
-  "capturedAt": "2026-09-18T06:05:37.590Z",
-  "command": "issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot",
-  "seed": "vercel-labs/portless#427",
+  "capturedAt": "2026-09-22T15:57:30.057Z",
+  "captureStartedAt": "2026-09-22T15:57:27.320Z",
+  "repository": "vercel-labs/agent-browser",
+  "repositoryVisibility": "PUBLIC",
+  "visibilityCheckedAt": "2026-09-22T15:57:27.320Z",
+  "cliVersion": "0.2.0",
+  "command": "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot",
+  "seed": "vercel-labs/agent-browser#1113",
+  "limits": {
+    "depth": 1,
+    "maxNodes": 12,
+    "hubThreshold": 12,
+    "concurrency": 4
+  },
+  "coverage": {
+    "completeHistory": false,
+    "allCapturedNodesIncluded": true,
+    "capturedNodes": 5,
+    "omittedNodes": 0,
+    "crossRepoNodesFiltered": 0,
+    "cappedNodes": 0,
+    "unexpandedHubs": 0,
+    "beyondDepthReferences": 19,
+    "omittedEdges": 22,
+    "note": "Bounded depth-1 capture, not complete history. All fetched nodes are shown; edges to unfetched references are omitted. GitHub states were read during the capture window, not atomically."
+  },
   "nodes": [
     {
-      "key": "vercel-labs/portless#427",
-      "repository": "portless",
-      "number": 427,
-      "title": "Migrate portless docs to Geistdocs with WebMCP",
-      "state": "OPEN",
-      "url": "https://github.com/vercel-labs/portless/pull/427"
+      "key": "vercel-labs/agent-browser#1113",
+      "repository": "agent-browser",
+      "number": 1113,
+      "kind": "Issue",
+      "title": "Orphaned headless Chrome processes block normal Chrome from launching",
+      "state": "CLOSED",
+      "url": "https://github.com/vercel-labs/agent-browser/issues/1113"
     },
     {
-      "key": "vercel-labs/wterm#135",
-      "repository": "wterm",
-      "number": 135,
-      "title": "Migrate wterm docs to Geistdocs with WebMCP",
+      "key": "vercel-labs/agent-browser#1137",
+      "repository": "agent-browser",
+      "number": 1137,
+      "kind": "PullRequest",
+      "title": "fix: prevent orphaned Chrome processes on daemon exit",
       "state": "MERGED",
-      "url": "https://github.com/vercel-labs/wterm/pull/135"
+      "url": "https://github.com/vercel-labs/agent-browser/pull/1137"
     },
     {
-      "key": "vercel-labs/portless#387",
-      "repository": "portless",
-      "number": 387,
-      "title": "feat(docs): add agent-readable documentation",
-      "state": "MERGED",
-      "url": "https://github.com/vercel-labs/portless/pull/387"
+      "key": "vercel-labs/agent-browser#1148",
+      "repository": "agent-browser",
+      "number": 1148,
+      "kind": "Issue",
+      "title": "fix: PR_SET_PDEATHSIG kills Chrome in tokio multi-threaded runtime (v0.24.1 regression)",
+      "state": "CLOSED",
+      "url": "https://github.com/vercel-labs/agent-browser/issues/1148"
     },
     {
-      "key": "vercel-labs/portless#91",
-      "repository": "portless",
-      "number": 91,
-      "title": "feat(docs): add copy button to code blocks",
+      "key": "vercel-labs/agent-browser#1371",
+      "repository": "agent-browser",
+      "number": 1371,
+      "kind": "Issue",
+      "title": "Orphaned headless Chrome Helpers spin at high CPU under agent-browser-chrome temp profile",
       "state": "OPEN",
-      "url": "https://github.com/vercel-labs/portless/pull/91"
+      "url": "https://github.com/vercel-labs/agent-browser/issues/1371"
     },
     {
-      "key": "vercel-labs/portless#116",
-      "repository": "portless",
-      "number": 116,
-      "title": "feat: make docs chat LLM provider configurable, add MiniMax support (M3)",
+      "key": "vercel-labs/agent-browser#1607",
+      "repository": "agent-browser",
+      "number": 1607,
+      "kind": "Issue",
+      "title": "chrome: headless daemon blocks GUI Chrome from opening on macOS",
       "state": "OPEN",
-      "url": "https://github.com/vercel-labs/portless/pull/116"
+      "url": "https://github.com/vercel-labs/agent-browser/issues/1607"
     }
   ],
   "edges": [
     {
-      "from": "vercel-labs/portless#427",
-      "to": "vercel-labs/wterm#135",
+      "from": "vercel-labs/agent-browser#1113",
+      "to": "vercel-labs/agent-browser#1137",
+      "via": "cross-ref"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1113",
+      "to": "vercel-labs/agent-browser#1148",
+      "via": "cross-ref"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1113",
+      "to": "vercel-labs/agent-browser#1371",
+      "via": "cross-ref"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1113",
+      "to": "vercel-labs/agent-browser#1607",
+      "via": "cross-ref"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1137",
+      "to": "vercel-labs/agent-browser#1113",
+      "via": "closes"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1137",
+      "to": "vercel-labs/agent-browser#1148",
+      "via": "cross-ref"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1137",
+      "to": "vercel-labs/agent-browser#1371",
+      "via": "cross-ref"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1148",
+      "to": "vercel-labs/agent-browser#1137",
       "via": "text"
     },
     {
-      "from": "vercel-labs/portless#427",
-      "to": "vercel-labs/portless#387",
+      "from": "vercel-labs/agent-browser#1148",
+      "to": "vercel-labs/agent-browser#1113",
       "via": "text"
     },
     {
-      "from": "vercel-labs/portless#427",
-      "to": "vercel-labs/portless#91",
+      "from": "vercel-labs/agent-browser#1371",
+      "to": "vercel-labs/agent-browser#1607",
+      "via": "cross-ref"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1371",
+      "to": "vercel-labs/agent-browser#1113",
       "via": "text"
     },
     {
-      "from": "vercel-labs/portless#427",
-      "to": "vercel-labs/portless#116",
+      "from": "vercel-labs/agent-browser#1371",
+      "to": "vercel-labs/agent-browser#1137",
+      "via": "text"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1607",
+      "to": "vercel-labs/agent-browser#1113",
+      "via": "text"
+    },
+    {
+      "from": "vercel-labs/agent-browser#1607",
+      "to": "vercel-labs/agent-browser#1371",
       "via": "text"
     }
-  ]
+  ],
+  "terminalOutput": "# Reference graph: vercel-labs/agent-browser#1113\n\nSeeds: vercel-labs/agent-browser#1113\nNodes: 5\n\n## Nodes\n\n- **vercel-labs/agent-browser#1113** issue 🟣 CLOSED — Orphaned headless Chrome processes block normal Chrome from launching  _(depth 0)_\n- **vercel-labs/agent-browser#1137** PR 🟪 MERGED — fix: prevent orphaned Chrome processes on daemon exit  _(depth 1)_\n    - closes → vercel-labs/agent-browser#1113 🟣 CLOSED\n- **vercel-labs/agent-browser#1148** issue 🟣 CLOSED — fix: PR_SET_PDEATHSIG kills Chrome in tokio multi-threaded runtime (v0.24.1 regression)  _(depth 1)_\n- **vercel-labs/agent-browser#1371** issue 🟢 OPEN — Orphaned headless Chrome Helpers spin at high CPU under agent-browser-chrome temp profile  _(depth 1)_\n- **vercel-labs/agent-browser#1607** issue 🟢 OPEN — chrome: headless daemon blocks GUI Chrome from opening on macOS  _(depth 1)_\n\n## Orphan checklist (classified)\n\n- [ ] vercel-labs/agent-browser#1371 issue 🟢 OPEN — Orphaned headless Chrome Helpers spin at high CPU under agent-browser-chrome temp profile\n      → OPEN issue — referenced by merged work, verify if resolved\n- [ ] vercel-labs/agent-browser#1607 issue 🟢 OPEN — chrome: headless daemon blocks GUI Chrome from opening on macOS\n      → OPEN issue — related, untracked\n",
+  "terminalExcerpt": {
+    "source": "CLI stdout",
+    "excerpt": true,
+    "attributionRemoved": true,
+    "omitted": [
+      "Non-closing edge lines",
+      "PR review metadata and mention attribution",
+      "External links",
+      "Beyond-depth reference list",
+      "Snapshot comparison section"
+    ],
+    "stdoutSha256": "bcd9666eb8bc1bfdb0b5c69a522febd3b2080c7cff03b392f07929b8d262e1b7",
+    "note": "Actual CLI stdout excerpt. Author and edge-actor attribution removed; node summaries, closing links and the issue/PR orphan checklist retained. No model inference."
+  }
 }

@@ -6,7 +6,7 @@ import {
   type StatusReport,
   type StatusView,
 } from "./status.js";
-import { renderStatus, safeStatusText } from "./status-render.js";
+import { formatStatusCapture, renderStatus, safeStatusText, textWidth } from "./status-render.js";
 
 const start = "2026-09-09T10:00:00.000Z";
 const end = "2026-09-09T10:00:03.000Z";
@@ -63,23 +63,34 @@ function fixture(
 
 function body(output: string): string {
   return output
-    .split("Repository × author\n")[1]
-    .split("Incomplete count details")[0]
-    .split("Review=required;")[0];
+    .slice(output.indexOf("\n\n") + 2)
+    .split(/(?:Incomplete|Unknown) count details/)[0]
+    .split("? means unknown, not zero.")[0];
 }
 
-function cells(line: string, output: string): string[] {
-  const header = output
-    .split("\n")
-    .find((row) => /^(Repo|Project)\s/.test(row) && row.includes(" │ "));
-  if (!header) throw new Error("Expected a terminal table header");
-  const columns = [...header.matchAll(/[^\s│]+(?: \(open\))?/g)].map((match) => match.index);
-  return columns.map((start, index) =>
-    line
-      .slice(start, columns[index + 1])
-      .replace("│", "")
-      .trim(),
-  );
+function block(output: string, name: string): string {
+  const section = body(output)
+    .split(/(?=^(?:[\w.-]+\/[\w.-]+(?: ·[^\n]+)?|Total ·[^\n]+)$)/m)
+    .find((part) => part.startsWith(`${name}\n`) || part.startsWith(`${name} ·`));
+  if (!section) throw new Error(`Expected status block for ${name}`);
+  return section;
+}
+
+function tableRows(section: string, heading: string, count: number): string[][] {
+  const lines = section.split("\n");
+  const index = lines.findIndex((line) => line.includes(heading));
+  if (index < 0) throw new Error(`Expected table ${heading}`);
+  const from = lines[index].indexOf(heading);
+  const to =
+    heading === "Author" ? lines[index].indexOf("Open PRs") + "Open PRs".length : undefined;
+  return lines.slice(index + 1, index + 1 + count).map((line) => {
+    const row = line
+      .slice(from, to)
+      .trim()
+      .match(/^(.+?)\s+(\d+|\?)$/);
+    if (!row) throw new Error(`Expected labeled count: ${line}`);
+    return [row[1], row[2]];
+  });
 }
 
 const views: StatusView[] = ["authors", "projects", "prs"];
@@ -102,78 +113,122 @@ describe("safeStatusText", () => {
   });
 });
 
+describe("formatStatusCapture", () => {
+  test("uses the absolute UTC end date and measured duration, including year rollover", () => {
+    expect(formatStatusCapture("2026-09-22T20:49:02.373Z", "2026-09-22T20:49:05.606Z")).toBe(
+      "Captured Sep 22, 2026 at 20:49 UTC · Query 3.2s",
+    );
+    expect(formatStatusCapture("2026-12-31T23:59:58.500Z", "2027-01-01T00:00:01.000Z")).toBe(
+      "Captured Jan 1, 2027 at 00:00 UTC · Query 2.5s",
+    );
+    expect(formatStatusCapture("2024-02-29T23:59:59Z", "2024-03-01T00:00:00Z")).toBe(
+      "Captured Mar 1, 2024 at 00:00 UTC · Query 1.0s",
+    );
+  });
+
+  test("missing, impossible and backwards timestamps never invent a duration", () => {
+    for (const value of [
+      "",
+      "invalid",
+      "2026-02-30T10:00:00Z",
+      "2026-09-09T25:00:00Z",
+      "2026-09-09T10:00:00.000001Z",
+    ])
+      expect(formatStatusCapture(start, value)).toBe("Captured unknown · Query unknown");
+    expect(formatStatusCapture("", end)).toBe("Captured Sep 9, 2026 at 10:00 UTC · Query unknown");
+    expect(formatStatusCapture(end, start)).toBe(
+      "Captured Sep 9, 2026 at 10:00 UTC · Query unknown",
+    );
+  });
+
+  test("distinguishes a zero query from sub-tenth-second work without printing date milliseconds", () => {
+    expect(formatStatusCapture(start, start)).toBe(
+      "Captured Sep 9, 2026 at 10:00 UTC · Query 0.0s",
+    );
+    expect(formatStatusCapture(start, "2026-09-09T10:00:00.001Z")).toBe(
+      "Captured Sep 9, 2026 at 10:00 UTC · Query <0.1s",
+    );
+    expect(formatStatusCapture(start, "2026-09-09T10:00:00.100Z")).toBe(
+      "Captured Sep 9, 2026 at 10:00 UTC · Query 0.1s",
+    );
+  });
+});
+
 describe("renderStatus authors", () => {
-  test("leads with the query window, coverage and truthful totals", () => {
+  test("leads with an absolute UTC capture and preserves coverage and truthful totals", () => {
     const output = renderStatus(fixture());
-    const header = output.split("\n\n")[0].split("\n");
-    expect(header).toHaveLength(3);
-    expect(header[0]).toBe("issue-graph status · Owner: acme · 2 repos · Authors: alice, bob");
-    expect(header[1]).toBe(`Query window: ${start} → ${end} · Coverage: complete`);
-    expect(header[2]).toContain("Totals: Open 6 · Drafts ? (≥1 known) · Unassigned ? (≥1 known)");
-    expect(header[2]).toContain("Merge unknown 1");
+    expect(output.split("\n\n")[0].split("\n")).toEqual([
+      "issue-graph status",
+      "Captured Sep 9, 2026 at 10:00 UTC · Query 3.0s · Coverage complete",
+    ]);
+    expect(block(output, "Total")).toContain("Total · 6 open PRs");
+    const unwrapped = output.replaceAll("\n", "");
+    expect(unwrapped).toContain("Drafts ? (at least 1 known; 1 unknown PRs)");
+    expect(unwrapped).toContain("Unassigned ? (at least 1 known; 1 unknown PRs)");
+    expect(unwrapped).toContain("Merge unknown 1");
+    expect(output).toContain("Unknown count details");
+    expect(output).toContain("Conflicts: ? (at least 1 known; 1 unknown PRs)");
     expect(output).not.toContain("scanned");
-    expect(output).not.toContain("Flags and count details");
     expect(output).toContain("Approval does not imply merge readiness.");
+    expect(output).toContain("Flags overlap review states.");
     expect(output).not.toContain("Approved is not mergeable");
   });
 
-  test("has stable review columns, separated conflicts, grouped repositories and a total row", () => {
+  test("groups each repository once without losing per-author reviews or independent flags", () => {
     const output = renderStatus(fixture());
-    const lines = body(output).split("\n");
-    expect(cells(lines[0], output)).toEqual([
-      "Repo",
-      "Author",
-      "Open",
-      "Review",
-      "Changes",
-      "Approved",
-      "None",
-      "Unknown",
-      "Conflicts",
+    const app = block(output, "acme/app");
+    const api = block(output, "acme/api");
+    expect(body(output).match(/^acme\/(?:app|api)$/gm)).toHaveLength(2);
+    expect(tableRows(app, "Author", 2)).toEqual([
+      ["alice", "5"],
+      ["bob", "0"],
     ]);
-    expect(cells(lines.find((line) => line.startsWith("app ")) ?? "", output)).toEqual([
-      "app",
-      "alice",
-      "5",
-      "1",
-      "1",
-      "1",
-      "1",
-      "1",
-      "?",
+    expect(tableRows(api, "Author", 2)).toEqual([
+      ["alice", "0"],
+      ["bob", "1"],
     ]);
-    expect(cells(lines.find((line) => line.trimStart().startsWith("bob ")) ?? "", output)).toEqual([
-      "",
-      "bob",
-      "1",
+    expect(tableRows(app, "Review state · alice", 5)).toEqual([
+      ["Needs review", "1"],
+      ["Approved", "1"],
+      ["Changes requested", "1"],
+      ["Not required", "1"],
+      ["Unknown", "1"],
+    ]);
+    expect(tableRows(app, "Review state · bob", 5).map((row) => row[1])).toEqual([
       "0",
+      "0",
+      "0",
+      "0",
+      "0",
+    ]);
+    expect(tableRows(api, "Review state · bob", 5).map((row) => row[1])).toEqual([
       "0",
       "1",
       "0",
       "0",
       "0",
     ]);
-    expect(
-      lines.some(
-        (line) =>
-          JSON.stringify(cells(line, output)) ===
-          JSON.stringify(["api", "alice", "0", "0", "0", "0", "0", "0", "0"]),
-      ),
-    ).toBe(true);
-    expect(cells(lines.find((line) => line.startsWith("Total ")) ?? "", output)).toEqual([
-      "Total",
-      "",
-      "6",
-      "1",
+    expect(tableRows(api, "Review state · alice", 5).map((row) => row[1])).toEqual([
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+    ]);
+    expect(tableRows(block(output, "Total"), "Review state", 5).map((row) => row[1])).toEqual([
       "1",
       "2",
       "1",
       "1",
-      "?",
+      "1",
     ]);
-    expect(lines[0]).toContain(" │ Conflicts");
-    expect(output).not.toContain("acme/app / alice: Drafts");
-    expect(output).not.toContain("acme/app / bob: Drafts");
+    expect(app.replaceAll("\n", "")).toContain(
+      "Flags (alice): Drafts ? (at least 1 known; 1 unknown PRs) · Conflicts ?",
+    );
+    expect(app.replaceAll("\n", "")).toContain(
+      "Flags (bob): Drafts 0 · Conflicts 0 · Unassigned 0 · Merge unknown 0",
+    );
+    expect(output).not.toContain(" │ ");
   });
 
   test("uses supplied counts, never recalculates from evidence or subtracts review buckets", () => {
@@ -182,22 +237,23 @@ describe("renderStatus authors", () => {
     report.rows[0].counts.approved = { count: 99, prIds: [], unknownIds: [] };
     report.totals.open = { count: 200, prIds: [], unknownIds: [] };
     const output = renderStatus(report);
-    expect(output).toContain("Totals: Open 200");
-    expect(cells(body(output).split("\n")[2], output)).toEqual([
-      "api",
-      "alice",
-      "47",
-      "0",
-      "0",
-      "99",
-      "0",
-      "0",
-      "0",
+    expect(block(output, "Total")).toContain("Total · 200 open PRs");
+    const api = block(output, "acme/api");
+    expect(tableRows(api, "Author", 2)).toEqual([
+      ["alice", "47"],
+      ["bob", "0"],
+    ]);
+    expect(tableRows(api, "Review state · alice", 5)).toEqual([
+      ["Needs review", "0"],
+      ["Approved", "99"],
+      ["Changes requested", "0"],
+      ["Not required", "0"],
+      ["Unknown", "0"],
     ]);
     expect(body(output)).not.toMatch(/-\d/);
   });
 
-  test("five complete repositories and ten author rows fit in 32 lines with a full-scope drilldown", () => {
+  test("five repositories keep ten author rows grouped with a full-scope drilldown", () => {
     const repos = ["acme/alpha", "acme/bravo", "acme/charlie", "acme/delta", "acme/echo"];
     const report = fixture(
       repos.flatMap((repo, index) => [
@@ -207,23 +263,34 @@ describe("renderStatus authors", () => {
       repos.map((repo) => coverage(repo)),
     );
     const output = renderStatus(report);
-    expect(output.trimEnd().split("\n").length).toBeLessThanOrEqual(32);
-    expect(output.split("\n\n")[0].split("\n")).toHaveLength(3);
-    const rows = body(output)
-      .split("\n")
-      .filter((line) => line.includes(" │ "));
-    expect(rows).toHaveLength(12);
-    expect(cells(rows.at(-1) ?? "", output)).toEqual([
-      "Total",
-      "",
+    expect(output.trimEnd().split("\n").length).toBeLessThanOrEqual(110);
+    expect(output.split("\n\n")[0].split("\n")).toHaveLength(2);
+    expect(body(output).match(/^acme\/\w+$/gm)).toHaveLength(5);
+    for (const repo of repos) {
+      const section = block(output, repo);
+      expect(tableRows(section, "Author", 2)).toEqual([
+        ["alice", "1"],
+        ["bob", "1"],
+      ]);
+      for (const author of ["alice", "bob"])
+        expect(tableRows(section, `Review state · ${author}`, 5).map((row) => row[1])).toEqual([
+          "1",
+          "0",
+          "0",
+          "0",
+          "0",
+        ]);
+    }
+    const total = block(output, "Total");
+    expect(total).toContain("Total · 10 open PRs");
+    expect(tableRows(total, "Review state", 5).map((row) => row[1])).toEqual([
       "10",
-      "10",
-      "0",
       "0",
       "0",
       "0",
       "0",
     ]);
+    expect(total).toContain("Flags: Drafts 0 · Conflicts 0 · Unassigned 0 · Merge unknown 0");
     expect(output).not.toContain("count details");
     expect(output).not.toContain("scanned");
     const command = `issue-graph status ${repos.map((repo) => `--repo ${repo}`).join(" ")} --author alice,bob --view prs`;
@@ -235,7 +302,7 @@ describe("renderStatus authors", () => {
     expect(stripColor(renderStatus(report, { color: true }))).toBe(output);
   });
 
-  test("80-column TTY keeps ten author rows as a compact aligned table", () => {
+  test("80-column TTY aligns the compact tables and narrow output stacks without lost data", () => {
     const repos = [
       "vercel-labs/agent-browser",
       "vercel-labs/agent-skills",
@@ -252,62 +319,53 @@ describe("renderStatus authors", () => {
     );
     for (const width of [80, 120]) {
       const output = renderStatus(report, { width });
-      expect(output.trimEnd().split("\n").length).toBeLessThanOrEqual(35);
-      expect(output).not.toContain("  Open:");
-      const rows = body(output)
-        .split("\n")
-        .filter((line) => line.includes(" │ "));
-      expect(rows).toHaveLength(12);
-      const header = rows[0];
-      expect(header.indexOf("Author")).toBe(13 + (width === 80 ? 1 : 2));
-      expect(cells(header, output)).toEqual([
-        "Repo",
-        "Author",
-        "Open",
-        "Review",
-        "Changes",
-        "Approved",
-        "None",
-        "Unknown",
-        "Conflicts",
-      ]);
-      for (const row of rows) {
-        expect(row.indexOf("│")).toBe(header.indexOf("│"));
-        expect(row.length).toBe(header.length);
+      expect(output.trimEnd().split("\n").length).toBeLessThanOrEqual(112);
+      expect(body(output).match(/^vercel-labs\/[\w-]+$/gm)).toHaveLength(5);
+      for (const repo of repos) {
+        const section = block(output, repo);
+        const lines = section.split("\n");
+        const header = lines.findIndex((line) => line.startsWith("Author "));
+        expect(lines[header]).toContain("Review state · alice");
+        expect(tableRows(section, "Author", 2)).toEqual([
+          ["alice", "1"],
+          ["bob", "1"],
+        ]);
+        const numberEdge = lines[header].indexOf("Open PRs") + "Open PRs".length;
+        for (const line of lines.slice(header + 1, header + 3))
+          expect(line.slice(0, numberEdge).trimEnd().length).toBe(numberEdge);
+        for (const author of ["alice", "bob"])
+          expect(tableRows(section, `Review state · ${author}`, 5).map((row) => row[1])).toEqual([
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+          ]);
       }
-      const rules = body(output)
-        .split("\n")
-        .filter((line) => line.includes("┼"));
-      expect(rules).toHaveLength(2);
-      for (const rule of rules) {
-        expect(rule.indexOf("┼")).toBe(header.indexOf("│"));
-        expect(rule.length).toBe(header.length);
-      }
-      expect(cells(rows.at(-1) ?? "", output)).toEqual([
-        "Total",
-        "",
-        "10",
+      const total = block(output, "Total");
+      expect(total).toContain("Total · 10 open PRs");
+      expect(tableRows(total, "Review state", 5).map((row) => row[1])).toEqual([
         "10",
         "0",
         "0",
         "0",
         "0",
-        "0",
       ]);
-      for (const row of rows.slice(1, -1))
-        expect(cells(row, output).slice(2)).toEqual(["1", "1", "0", "0", "0", "0", "0"]);
-      for (const line of output.split("\n")) expect(line.length).toBeLessThanOrEqual(width);
+      for (const line of output.split("\n")) expect(textWidth(line)).toBeLessThanOrEqual(width);
       expect(stripColor(renderStatus(report, { width, color: true }))).toBe(output);
     }
-    const narrow = renderStatus(report, { width: 60 });
-    expect(narrow).toContain("  Open: 1");
-    expect(narrow).toContain("  Conflicts: 0");
+    const narrow = renderStatus(report, { width: 40 });
+    expect(narrow).toMatch(/^Author\s+Open PRs$/m);
+    expect(narrow).toMatch(/^Review state · alice\s+PRs$/m);
+    expect(narrow.replaceAll("\n", "")).toContain("Conflicts 0");
     expect(narrow).not.toContain(" │ ");
+    for (const line of narrow.split("\n")) expect(textWidth(line)).toBeLessThanOrEqual(40);
     const longRepo = `acme/${"long-project-".repeat(5)}`;
     const long = renderStatus(fixture([pr(1, { repo: longRepo })], [coverage(longRepo)]), {
       width: 80,
     });
-    expect(long).toContain("  Open: 1");
+    expect(long).toMatch(/^alice\s+1\s+Needs review\s+1$/m);
+    expect(long.replaceAll("\n", "")).toContain(longRepo);
     expect(long).not.toContain(" │ ");
   });
 
@@ -316,11 +374,16 @@ describe("renderStatus authors", () => {
     report.totals.open.count = 91;
     for (const view of ["authors", "projects"] as const) {
       const output = renderStatus(report, { view, width: 240 });
-      const total = cells(
-        output.split("\n").find((line) => line.startsWith("Total ")) ?? "",
-        output,
-      );
-      expect(total.slice(-7)).toEqual(["91", "0", "0", "0", "0", "0", "0"]);
+      const total = block(output, "Total");
+      expect(total).toContain("Total · 91 open PRs");
+      expect(tableRows(total, "Review state", 5).map((row) => row[1])).toEqual([
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+      ]);
+      expect(total).toContain("Conflicts 0");
     }
   });
 
@@ -346,28 +409,35 @@ describe("renderStatus authors", () => {
       [coverage("acme/app", false), coverage("acme/api")],
     );
     const output = renderStatus(report);
-    expect(output).toContain("Coverage: INCOMPLETE");
+    expect(output).toContain("Coverage INCOMPLETE");
     expect(output).toContain("PAGE_LIMIT: Inventory stopped at the page cap.");
-    expect(output).toContain("Totals: Open ? (at least 2 known)");
-    const rows = body(output).split("\n");
-    expect(cells(rows.find((line) => line.startsWith("app ")) ?? "", output)).toEqual([
-      "app",
-      "alice",
-      "?",
-      "?",
-      "?",
-      "?",
-      "?",
-      "?",
-      "?",
+    expect(block(output, "Total")).toContain("Total · ? open PRs");
+    expect(output).toContain("Open: ? (at least 2 known)");
+    const app = block(output, "acme/app");
+    expect(tableRows(app, "Author", 2)).toEqual([
+      ["alice", "?"],
+      ["bob", "?"],
     ]);
-    expect(
-      rows.some(
-        (line) =>
-          JSON.stringify(cells(line, output)) ===
-          JSON.stringify(["", "bob", "1", "1", "0", "0", "0", "0", "0"]),
-      ),
-    ).toBe(true);
+    for (const author of ["alice", "bob"])
+      expect(tableRows(app, `Review state · ${author}`, 5).map((row) => row[1])).toEqual([
+        "?",
+        "?",
+        "?",
+        "?",
+        "?",
+      ]);
+    const api = block(output, "acme/api");
+    expect(tableRows(api, "Author", 2)).toEqual([
+      ["alice", "0"],
+      ["bob", "1"],
+    ]);
+    expect(tableRows(api, "Review state · bob", 5).map((row) => row[1])).toEqual([
+      "1",
+      "0",
+      "0",
+      "0",
+      "0",
+    ]);
     expect(output).toContain("Open: ? (at least 0 known)");
     expect(output).toContain("Open: ? (at least 1 known)");
   });
@@ -385,33 +455,37 @@ describe("renderStatus authors", () => {
 });
 
 describe("renderStatus projects and PRs", () => {
-  test("projects show one row per repository with author counts, all review buckets and flags", () => {
+  test("projects pair author open counts with aggregate reviews without inventing a breakdown", () => {
     const report = fixture();
     report.projects[0].authors[0].count = { count: 27, prIds: [], unknownIds: [] };
     const output = renderStatus(report, { view: "projects", width: 240 });
-    expect(output).toContain("alice (open)");
-    expect(output).toContain("bob (open)");
-    expect(output).not.toContain("Authors (open)");
-    const table = output.split("Projects\n")[1].split("Review=required;")[0];
-    expect(
-      table.split("\n").filter((line) => line.startsWith("api ") || line.startsWith("app ")),
-    ).toHaveLength(2);
-    expect(cells(table.split("\n").find((line) => line.startsWith("api ")) ?? "", output)).toEqual([
-      "api",
-      "27",
-      "1",
-      "1",
-      "0",
-      "0",
-      "1",
-      "0",
-      "0",
-      "0",
+    expect(body(output).match(/^acme\/(?:api|app) ·/gm)).toHaveLength(2);
+    const api = block(output, "acme/api");
+    expect(api).toContain("acme/api · 1 open PR");
+    expect(tableRows(api, "Author", 2)).toEqual([
+      ["alice", "27"],
+      ["bob", "1"],
     ]);
-    expect(
-      cells(table.split("\n").find((line) => line.startsWith("Total ")) ?? "", output),
-    ).toEqual(["Total", "", "", "6", "1", "1", "2", "1", "1", "?"]);
-    expect(output).not.toContain("count details");
+    expect(tableRows(api, "Review state", 5)).toEqual([
+      ["Needs review", "0"],
+      ["Approved", "1"],
+      ["Changes requested", "0"],
+      ["Not required", "0"],
+      ["Unknown", "0"],
+    ]);
+    expect(api).toContain("Flags: Drafts 0 · Conflicts 0 · Unassigned 0 · Merge unknown 0");
+    expect(api).not.toContain("Review state · alice");
+    const total = block(output, "Total");
+    expect(total).toContain("Total · 6 open PRs");
+    expect(tableRows(total, "Review state", 5).map((row) => row[1])).toEqual([
+      "1",
+      "2",
+      "1",
+      "1",
+      "1",
+    ]);
+    expect(total).not.toContain("Author");
+    expect(output).toContain("Unknown count details");
     expect(output).toContain("Merge unknown 1");
   });
 
@@ -427,19 +501,40 @@ describe("renderStatus projects and PRs", () => {
     report.projects[1].authors[1].count.count = null;
     for (const width of [80, 120]) {
       const output = renderStatus(report, { view: "projects", width });
-      const header = output.split("\n").find((line) => line.startsWith("Project ")) ?? "";
-      const gap = width === 80 ? 1 : 2;
-      const first = header.indexOf("a (open)");
-      const second = header.indexOf("b (open)");
-      expect(first).toBe(7 + gap);
-      const api = output.split("\n").find((line) => line.startsWith("api ")) ?? "";
-      const app = output.split("\n").find((line) => line.startsWith("app ")) ?? "";
-      expect(api.slice(first, second - gap)).toBe("     123");
-      expect(app.slice(first, second - gap)).toBe("       7");
-      expect(app.slice(second, header.indexOf("Open") - gap)).toBe("       ?");
+      const api = block(output, "acme/api");
+      const app = block(output, "acme/app");
+      expect(tableRows(api, "Author", 2)).toEqual([
+        ["a", "123"],
+        ["b", "0"],
+      ]);
+      expect(tableRows(app, "Author", 2)).toEqual([
+        ["a", "7"],
+        ["b", "?"],
+      ]);
+      const header = api.split("\n").find((line) => line.startsWith("Author ")) ?? "";
+      const rightEdge = header.indexOf("Open PRs") + "Open PRs".length;
+      const numericStart = header.indexOf("Open PRs");
+      expect(
+        api
+          .split("\n")
+          .find((line) => line.startsWith("a "))
+          ?.slice(numericStart, rightEdge),
+      ).toBe("     123");
+      expect(
+        app
+          .split("\n")
+          .find((line) => line.startsWith("a "))
+          ?.slice(numericStart, rightEdge),
+      ).toBe("       7");
+      expect(
+        app
+          .split("\n")
+          .find((line) => line.startsWith("b "))
+          ?.slice(numericStart, rightEdge),
+      ).toBe("       ?");
       const colored = renderStatus(report, { view: "projects", width, color: true });
       expect(stripColor(colored)).toBe(output);
-      expect(colored).toContain(`${esc}[38;5;179m       ?${esc}[0m`);
+      expect(colored).toContain(`${esc}[1m       ?${esc}[0m`);
     }
   });
 
@@ -447,35 +542,139 @@ describe("renderStatus projects and PRs", () => {
     const report = fixture([]);
     report.rows[0].author = "7";
     const output = renderStatus(report);
-    const rows = body(output).split("\n");
-    const start = rows[0].indexOf("Author");
-    expect(rows[2].slice(start, start + 6)).toBe("7     ");
+    const api = block(output, "acme/api");
+    expect(tableRows(api, "Author", 2)).toEqual([
+      ["7", "0"],
+      ["bob", "0"],
+    ]);
+    expect(
+      api
+        .split("\n")
+        .find((line) => line.startsWith("7 "))
+        ?.slice(0, 6),
+    ).toBe("7     ");
   });
 
   test("projects preserve zero rows and zero portfolio totals without inventing author totals", () => {
     const output = renderStatus(fixture([]), { view: "projects" });
-    const total = cells(output.split("\n").find((line) => line.startsWith("Total ")) ?? "", output);
-    expect(total).toEqual(["Total", "", "", "0", "0", "0", "0", "0", "0", "0"]);
-    for (const repo of ["api", "app"]) {
-      expect(
-        cells(output.split("\n").find((line) => line.startsWith(`${repo} `)) ?? "", output),
-      ).toEqual([repo, "0", "0", "0", "0", "0", "0", "0", "0", "0"]);
+    const total = block(output, "Total");
+    expect(total).toContain("Total · 0 open PRs");
+    expect(total).not.toContain("Author");
+    expect(tableRows(total, "Review state", 5).map((row) => row[1])).toEqual([
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+    ]);
+    for (const repo of ["acme/api", "acme/app"]) {
+      const section = block(output, repo);
+      expect(section).toContain(`${repo} · 0 open PRs`);
+      expect(tableRows(section, "Author", 2)).toEqual([
+        ["alice", "0"],
+        ["bob", "0"],
+      ]);
+      expect(tableRows(section, "Review state", 5).map((row) => row[1])).toEqual([
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+      ]);
+      expect(section).toContain("Flags: Drafts 0 · Conflicts 0 · Unassigned 0 · Merge unknown 0");
     }
   });
 
   test("projects preserve unknown author counts and portfolio lower bounds for incomplete captures", () => {
     const report = fixture([pr(1)], [coverage("acme/app", false), coverage("acme/api")]);
     const output = renderStatus(report, { view: "projects", width: 240 });
-    expect(cells(output.split("\n").find((line) => line.startsWith("app ")) ?? "", output)).toEqual(
-      ["app", "?", "?", "?", "?", "?", "?", "?", "?", "?"],
-    );
-    expect(
-      cells(output.split("\n").find((line) => line.startsWith("Total ")) ?? "", output).slice(-7),
-    ).toEqual(["?", "?", "?", "?", "?", "?", "?"]);
+    const app = block(output, "acme/app");
+    expect(app).toContain("acme/app · ? open PRs");
+    expect(tableRows(app, "Author", 2)).toEqual([
+      ["alice", "?"],
+      ["bob", "?"],
+    ]);
+    for (const section of [app, block(output, "Total")]) {
+      expect(tableRows(section, "Review state", 5).map((row) => row[1])).toEqual([
+        "?",
+        "?",
+        "?",
+        "?",
+        "?",
+      ]);
+      expect(section.replaceAll("\n", "")).toContain("Conflicts ?");
+    }
     expect(output).toContain("acme/app / alice Open: ? (at least 1 known)");
     expect(output).toContain("acme/app / bob Open: ? (at least 0 known)");
     expect(output).toContain("PAGE_LIMIT: Inventory stopped at the page cap.");
     expect(output).toContain("acme/api: complete");
+  });
+
+  test("deduplicates only fully known identical totals, including flags, and retains distinct unknown evidence", () => {
+    const report = fixture([pr(1)], [coverage("acme/app")]);
+    expect(renderStatus(report, { view: "projects" })).not.toMatch(/^Total ·/m);
+    const oneAuthor = buildStatusReport([pr(1)], [coverage("acme/app")], {
+      repos: ["acme/app"],
+      authors: ["alice"],
+      startedAt: start,
+      generatedAt: end,
+    });
+    expect(renderStatus(oneAuthor)).not.toMatch(/^Total ·/m);
+    report.totals.drafts.count = 9;
+    expect(block(renderStatus(report, { view: "projects" }), "Total")).toContain("Drafts 9");
+    report.totals.drafts.count = 0;
+    report.projects[0].counts.conflicts = { count: null, prIds: [], unknownIds: ["acme/app#1"] };
+    report.totals.conflicts = { count: null, prIds: ["acme/app#2"], unknownIds: ["acme/app#1"] };
+    const output = renderStatus(report, { view: "projects" });
+    expect(block(output, "acme/app").replaceAll("\n", "")).toContain(
+      "Conflicts ? (at least 0 known; 1 unknown PRs)",
+    );
+    expect(block(output, "Total").replaceAll("\n", "")).toContain(
+      "Conflicts ? (at least 1 known; 1 unknown PRs)",
+    );
+    expect(output).toContain("Unknown count details");
+    expect(output).not.toContain("INCOMPLETE");
+  });
+
+  test("Unicode and taller author tables preserve visible numeric alignment before ANSI", () => {
+    const report = fixture([], [coverage("acme/app")]);
+    const names = ["界", "e\u0301", "👩🏽‍💻", "four", "five", "six", "seven", "eight"];
+    report.scope.authors = names;
+    report.projects[0].authors = names.map((author, index) => ({
+      author,
+      count: {
+        count: index === 2 ? null : index === 0 ? 123 : index === 1 ? 7 : 0,
+        prIds: [],
+        unknownIds: [],
+      },
+    }));
+    const plain = renderStatus(report, { view: "projects", width: 80 });
+    const colored = renderStatus(report, { view: "projects", width: 80, color: true });
+    expect(colored.length).toBeGreaterThan(plain.length);
+    expect(stripColor(colored)).toBe(plain);
+    const lines = block(plain, "acme/app").split("\n");
+    const header = lines.find((line) => line.startsWith("Author ")) ?? "";
+    const edge = textWidth(header.slice(0, header.indexOf("Open PRs") + 8));
+    for (const [index, name] of names.entries()) {
+      const line = lines.find((line) => line.startsWith(`${name} `)) ?? "";
+      const prefix = line.match(/^.+?\s+(\d+|\?)(?=\s|$)/);
+      expect(prefix?.[1]).toBe(index === 2 ? "?" : index === 0 ? "123" : index === 1 ? "7" : "0");
+      expect(textWidth(prefix?.[0] ?? "")).toBe(edge);
+    }
+    const wide = lines.find((line) => line.startsWith("界 ")) ?? "";
+    expect(textWidth(wide.slice(0, wide.indexOf("Needs review")))).toBe(
+      header.indexOf("Review state"),
+    );
+    expect(wide.indexOf("Needs review")).not.toBe(header.indexOf("Review state"));
+    for (const width of [8, 20, 40]) {
+      const narrow = renderStatus(report, { view: "projects", width });
+      expect(stripColor(renderStatus(report, { view: "projects", width, color: true }))).toBe(
+        narrow,
+      );
+      for (const line of narrow.split("\n")) expect(textWidth(line)).toBeLessThanOrEqual(width);
+      expect(narrow.replaceAll("\n", "")).toContain("👩🏽‍💻");
+      expect(narrow).toContain("?");
+    }
   });
 
   test("ledger preserves full evidence below state fields and offers real graph commands", () => {
@@ -565,23 +764,27 @@ describe("presentation and safety", () => {
     });
   }
 
-  test("semantic color wraps padded cells, with muted zeros and conflict/changes/unknown highlights", () => {
+  test("bold and dim wrap padded cells without changing alignment or inventing colors", () => {
     const report = fixture([
       pr(1, { reviewState: "changes-requested", mergeability: "CONFLICTING" }),
     ]);
     const output = renderStatus(report, { color: true, width: 240 });
-    expect(output).toContain(`${esc}[38;5;244m   0${esc}[0m`);
-    expect(output).toContain(`${esc}[38;5;203m        1${esc}[0m`);
-    expect(output).toContain(`${esc}[38;5;214m      1${esc}[0m`);
-    expect(renderStatus(fixture(), { color: true })).toContain(`${esc}[38;5;179m`);
-    const lines = body(stripColor(output))
-      .split("\n")
-      .filter((line) => line.includes(" │ "));
-    expect(lines).toHaveLength(6);
-    for (const line of lines) {
-      expect(line.indexOf("│")).toBe(lines[0].indexOf("│"));
-      expect(line.length).toBe(lines[0].length);
-    }
+    const plain = renderStatus(report, { width: 240 });
+    expect(output).toContain(`${esc}[2m  0${esc}[0m`);
+    expect(output).toContain(`${esc}[1m  1${esc}[0m`);
+    expect(output).toContain(`Conflicts ${esc}[1m1${esc}[0m`);
+    expect(renderStatus(fixture(), { color: true })).toContain(`${esc}[1m?${esc}[0m`);
+    const codes = [...output.matchAll(new RegExp(`${esc}\\[([0-9;]*)m`, "g"))].map(
+      (match) => match[1],
+    );
+    expect(new Set(codes)).toEqual(new Set(["0", "1", "2"]));
+    expect(output.length).toBeGreaterThan(plain.length);
+    expect(stripColor(output)).toBe(plain);
+    const lines = block(plain, "acme/app").split("\n");
+    const index = lines.findIndex((line) => line.includes("Review state · alice"));
+    const edge = lines[index].lastIndexOf("PRs") + 3;
+    for (const line of lines.slice(index + 1, index + 6))
+      expect(textWidth(line.trimEnd())).toBe(edge);
   });
 
   test("narrow blocks preserve all columns, flags, long repository names and Unicode evidence", () => {
@@ -591,13 +794,15 @@ describe("presentation and safety", () => {
       [coverage(repo)],
     );
     const output = renderStatus(report, { width: 40 });
-    expect(output).toContain("  Open: 1");
-    expect(output).toContain("  None: 0");
-    expect(output).toContain("  Unknown: 0");
-    expect(output).toContain("  Conflicts: 0");
+    expect(output).toMatch(/^alice\s+1$/m);
+    expect(output).toMatch(/^Not required\s+0$/m);
+    expect(output).toMatch(/^Unknown\s+0$/m);
+    expect(output.replaceAll("\n", "")).toContain("Conflicts 0");
     expect(output.replaceAll("\n", "")).toContain(repo);
-    expect(output.replaceAll("\n", "")).toContain("Drafts 0 · Unassigned 0");
-    for (const line of output.split("\n")) expect(line.length).toBeLessThanOrEqual(40);
+    expect(output.replaceAll("\n", "")).toContain(
+      "Drafts 0 · Conflicts 0 · Unassigned 0 · Merge unknown 0",
+    );
+    for (const line of output.split("\n")) expect(textWidth(line)).toBeLessThanOrEqual(40);
     const ledger = renderStatus(report, { view: "prs", width: 40 });
     expect(ledger.replaceAll("\n", "")).toContain(safeStatusText(report.pullRequests[0].title));
     expect(ledger.replaceAll("\n", "")).toContain(
@@ -652,10 +857,13 @@ describe("presentation and safety", () => {
       message: `${esc}]0;title\x07safe\nmessage`,
     });
     for (const view of views) {
-      const output = renderStatus(report, { view, format: "markdown" });
-      expect(output).not.toContain(esc);
-      expect(output).toContain("ERROR: safe message");
-      expect(output).not.toContain("issue-graph 6 ");
+      for (const format of ["table", "markdown"] as const) {
+        const output = renderStatus(report, { view, format });
+        expect(output).not.toContain(esc);
+        expect(output).toContain("ERROR: safe message");
+        expect(output).not.toContain("issue-graph 6 ");
+        expect(output).not.toContain("\n|bad");
+      }
     }
     expect(renderStatus(report, { view: "prs" })).toContain(
       "Graph: Unavailable: invalid PR identity",

@@ -1,0 +1,225 @@
+.ig-demo {
+  --ig-demo-bg: var(--ds-background-100);
+  --ig-demo-fg: var(--ds-gray-1000);
+  --ig-demo-muted: var(--ds-gray-900);
+  --ig-demo-border: var(--ds-gray-300);
+  --ig-demo-pill-bg: var(--ds-background-100);
+  width: 100%;
+  min-width: 0;
+  max-width: 600px;
+  margin-inline: auto;
+  color: var(--ig-demo-fg);
+  text-align: left;
+}
+
+.dark-theme .ig-demo,
+.dark .ig-demo {
+  --ig-demo-pill-bg: var(--ds-background-200);
+}
+
+.ig-demo-tabs {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  padding: 4px;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  scroll-behavior: auto;
+}
+
+.ig-demo-tab-indicator {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--ig-demo-border);
+  border-radius: 6px;
+  background: var(--ig-demo-pill-bg);
+  box-shadow: 0 1px 2px #0000000d;
+  pointer-events: none;
+  transition:
+    transform 400ms cubic-bezier(0.32, 0.72, 0, 1),
+    width 400ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.ig-demo-tab {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ig-demo-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ig-demo-tab:first-of-type {
+  margin-inline-start: auto;
+}
+
+.ig-demo-tab:last-of-type {
+  margin-inline-end: auto;
+}
+
+.ig-demo-tab:hover {
+  color: var(--ig-demo-fg);
+}
+
+.ig-demo-tab[aria-selected="true"] {
+  border-color: var(--ig-demo-border);
+  background: var(--ig-demo-pill-bg);
+  color: var(--ig-demo-fg);
+  box-shadow: 0 1px 2px #0000000d;
+}
+
+.ig-demo-tabs[data-indicator-ready="true"] .ig-demo-tab[aria-selected="true"] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ig-demo-tab-indicator {
+    transition: none;
+  }
+}
+
+.ig-demo .ig-demo-tab:focus-visible,
+.ig-demo-panel:focus-visible {
+  outline: 2px solid var(--ig-demo-fg);
+  outline-offset: -3px;
+}
+
+.ig-demo-summary {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 16px;
+  color: var(--ig-demo-muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+}
+
+.ig-demo-frame {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ig-demo-border);
+  border-radius: 12px;
+  background: var(--ig-demo-bg);
+  font-family: var(--font-geist-mono, var(--font-mono, monospace));
+  box-shadow: 0 8px 32px #00000008;
+}
+
+.ig-demo-bar {
+  position: relative;
+  display: flex;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-demo-border) 60%, transparent);
+}
+
+.ig-demo-dots {
+  position: absolute;
+  left: 20px;
+  display: flex;
+  gap: 8px;
+}
+
+.ig-demo-dots span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ig-demo-muted) 40%, transparent);
+}
+
+.ig-demo-title {
+  color: var(--ig-demo-muted);
+  font-size: 12px;
+  font-weight: 450;
+  letter-spacing: -0.02em;
+}
+
+.ig-demo-panel {
+  min-width: 0;
+  padding: 18px 22px;
+  font-size: 13px;
+  line-height: 21px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ig-demo-border) transparent;
+  scroll-behavior: auto;
+}
+
+.ig-demo-panel[hidden] {
+  display: none;
+}
+
+.ig-demo-panel pre,
+.ig-demo-panel code {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-ligatures: none;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.ig-demo-panel[data-example="status"] {
+  overflow-x: auto;
+}
+
+.ig-demo-panel .ig-demo-verbatim,
+.ig-demo-panel .ig-demo-verbatim code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ig-demo-command {
+  margin-bottom: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .ig-demo-frame {
+    border-radius: 10px;
+  }
+
+  .ig-demo-dots {
+    left: 14px;
+    gap: 6px;
+  }
+
+  .ig-demo-dots span {
+    width: 9px;
+    height: 9px;
+  }
+
+  .ig-demo-panel {
+    padding: 14px;
+    font-size: 12px;
+  }
+}

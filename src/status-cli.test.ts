@@ -105,7 +105,10 @@ describe("status output contract", () => {
   test("human TTY uses a table, progress/banner stay on stderr, NO_COLOR preserves content", async () => {
     const colored = await capture(args, true);
     const plain = await capture(args, true, true);
-    const normalized = (value: string) => value.replaceAll(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, "TIME");
+    const normalized = (value: string) =>
+      value
+        .replaceAll(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, "TIME")
+        .replace(/Captured [^\n]+ UTC · Query (?:<)?[\d.]+s/, "Captured TIME · Query DURATION");
     const esc = String.fromCharCode(27);
     const strip = new RegExp(`${esc}\\[[0-9;]*m`, "g");
     expect(normalized(colored.stdout.replace(strip, ""))).toBe(normalized(plain.stdout));
@@ -114,7 +117,11 @@ describe("status output contract", () => {
     expect(plain.stderr).toContain("read-only inventory");
     expect(plain.stderr).toContain("0 PRs scanned, 1 pages");
     expect(plain.stdout).not.toContain("read-only inventory");
-    expect(plain.stdout).toContain("Open");
+    expect(plain.stdout).toContain("Open PRs");
+    expect(plain.stdout).toContain("Review state");
+    expect(plain.stdout).toMatch(
+      /Captured [A-Z][a-z]+ \d{1,2}, \d{4} at \d{2}:\d{2} UTC · Query (?:<)?[\d.]+s/,
+    );
   });
 
   test("Markdown can be requested in a pipe without ANSI and preserves zero rows", async () => {

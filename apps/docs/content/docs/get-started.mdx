@@ -1,91 +1,97 @@
 ---
 title: Get started
-description: Install from an authorized source checkout, authenticate GitHub, and inspect your first public pull request.
-lastModified: 2026-09-19
+description: Install issue-graph, sign in with GitHub CLI, and trace your first issue.
+lastModified: 2026-09-23
 ---
 
-## What is available today
+## Prerequisites
 
-The supported installation is from source. `vercel-labs/issue-graph` is **INTERNAL** on GitHub, so cloning requires repository access. Public access to a demo repository does not grant access to the tool's source. If you cannot access the source repository, wait for a functional public release; there is no working public npm CLI installation to substitute today.
+- Node.js 20 or later
+- [GitHub CLI](https://cli.github.com) on your `PATH`
+- read access to the repositories you want to query
 
-You need:
+## Install from npm
 
-- Node.js 20 or later to run the compiled CLI. For the source workspace and its development tools, use Node.js 20.19.x or 22.12+; Node.js 24 is recommended.
-- [pnpm](https://pnpm.io) to install dependencies and build the source checkout.
-- [GitHub CLI](https://cli.github.com) (`gh`) on your `PATH`.
-- GitHub authentication with access to the repositories you query.
+```bash
+npm install --global issue-graph@latest
+issue-graph --help
+```
 
-## Authenticate and install from source
+To try the [npm package](https://www.npmjs.com/package/issue-graph) without a global installation:
 
-Authenticate before cloning the internal repository:
+```bash
+npx issue-graph@latest --help
+```
+
+You can replace `issue-graph` with `npx issue-graph@latest` in any CLI example.
+
+## Authenticate GitHub
 
 ```bash
 gh auth login
 gh auth status
+```
+
+issue-graph uses your GitHub CLI credentials. For private repositories, your account needs access and any SSO authorization required by the organization.
+
+## Trace an issue
+
+Start with [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113):
+
+```bash
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+```
+
+You can also pass its URL:
+
+```bash
+issue-graph https://github.com/vercel-labs/agent-browser/issues/1113 --depth 1 --max-nodes 12 --no-snapshot
+```
+
+The command prints a Markdown report. This example, captured on 2026-09-22, found a merged fix and two open follow-ups:
+
+| Issue or PR | Captured state | Description |
+| --- | --- | --- |
+| [Issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) | CLOSED | Original orphaned Chrome report |
+| [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) | MERGED | Fix linked to #1113 |
+| [Issue #1148](https://github.com/vercel-labs/agent-browser/issues/1148) | CLOSED | Regression after the fix |
+| [Issue #1371](https://github.com/vercel-labs/agent-browser/issues/1371) | OPEN | Chrome Helper using high CPU |
+| [Issue #1607](https://github.com/vercel-labs/agent-browser/issues/1607) | OPEN | GUI Chrome launch problem on macOS |
+
+Each run queries GitHub, so your results may differ. The flags limit this run to depth 1 and 12 fetched nodes, and disable saving a new snapshot. Check the report's missing references and limits before acting. See [Graph](/docs/graph) for the capture details and crawl limits.
+
+## Save an explorer
+
+Add `--json` and `--html` to save the results:
+
+```bash
+issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
+```
+
+Open `graph.html` in your browser. Export flags write files even with `--no-snapshot`; choose new filenames if you want to keep earlier results.
+
+## Update
+
+```bash
+npm install --global issue-graph@latest
+```
+
+Use `issue-graph --help` to check the commands supported by your installed release.
+
+## Troubleshooting
+
+If the command is missing, check your npm global installation and `PATH`, or use npx. For GitHub access errors, run `gh auth status` and check repository permissions and SSO authorization.
+
+## Optional source development
+
+Contributors with repository access can build from source using pnpm and Node.js 20.19.x or 22.12+. Node.js 24 is recommended.
+
+```bash
 gh repo clone vercel-labs/issue-graph
 cd issue-graph
 pnpm install --frozen-lockfile
 pnpm build
-pnpm link --global
-issue-graph --help
+node dist/bin.js --help
 ```
 
-`pnpm link --global` exposes the checkout's `issue-graph` executable. Ensure pnpm's global binary directory is on your `PATH`; use `pnpm bin --global` to locate it. pnpm manages development dependencies and scripts; the built CLI runs on Node.js.
-
-The CLI uses the credentials available to `gh`. Private repositories and cross-repository references still require permission, including any organization SSO authorization. Do not paste tokens into command examples or commit them to configuration.
-
-## Get your first real result
-
-Inspect the neighborhood of [portless PR #427](https://github.com/vercel-labs/portless/pull/427):
-
-```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot
-```
-
-The equivalent URL form is:
-
-```bash
-issue-graph https://github.com/vercel-labs/portless/pull/427 --depth 1 --no-snapshot
-```
-
-Graph mode prints Markdown, even in a pipe. The report includes fetched nodes, relationships, and derived cleanup candidates. Actual results change with GitHub evidence; this guide does not promise particular counts or findings.
-
-Before acting, inspect failed or unfetched nodes, the node-cap section, and hubs not expanded. `--depth 1` bounds the neighborhood; `--no-snapshot` avoids saving a new history file. Neither makes the graph exhaustive.
-
-## Save an explorer when you want a file
-
-```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot --json graph.json --html graph.html
-```
-
-Open `graph.html` in your browser. These are explicit local writes even with `--no-snapshot`. Inspect their contents before sharing them, especially after querying private repositories.
-
-## Registry installation after a functional release
-
-Publication is pending. The existing public unscoped `issue-graph@0.1.0` is ctate's “Coming soon” placeholder and has no `bin`; it is not this working CLI. Do not use it as an installation check.
-
-Only after a functional unscoped release is confirmed, the intended commands are:
-
-```bash
-pnpm dlx issue-graph --help
-pnpm add --global issue-graph
-```
-
-After that release, a registry installation would be updated with `pnpm add --global issue-graph@latest`. The source checkout is now `issue-graph@0.2.0`, the selected release candidate. Publication is still pending, so this version is not yet an installation promise.
-
-All workflow examples use the installed `issue-graph` command. Installing a skill is separate from installing that executable.
-
-## Update a source installation
-
-From your source checkout, after preserving any local changes:
-
-```bash
-git pull --ff-only
-pnpm install --frozen-lockfile
-pnpm build
-pnpm link --global
-```
-
-If the command is unavailable, check your `PATH` and source build. For GitHub access errors, check `gh auth status` and repository permissions. An inaccessible reference does not mean the work is closed or absent.
-
-Continue with [Graph](/docs/graph), [Status](/docs/status), or [Agents](/docs/agents).
+Continue with [Graph](/docs/graph), [Status and history](/docs/status), or [Agents and skills](/docs/agents).

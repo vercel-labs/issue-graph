@@ -3,7 +3,7 @@ import { markdownPath } from "./docs-paths";
 import { canonicalUrl, isPreview, siteName } from "./site";
 
 export function pageMetadata(pathname: string, title: string, description: string): Metadata {
-  const fullTitle = `${title} | ${siteName}`;
+  const fullTitle = `${siteName} | ${title}`;
   const image = pathname === "/" ? "/og" : `/og${pathname}`;
   return {
     title: { absolute: fullTitle },

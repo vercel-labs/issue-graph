@@ -8,6 +8,7 @@ export const config = defineConfig({
   logo: <span className="font-medium tracking-tight">{siteName}</span>,
   logoHref: "/",
   navbarVariant: "oss",
+  navbarBrand: "labs",
   navbarActiveProduct: siteName,
   navbarGithub: { enabled: true },
   github: {
@@ -19,7 +20,7 @@ export const config = defineConfig({
   content: [{ id: "docs", label: "Documentation", dir: "content/docs", route: "/docs" }],
   nav: [
     { label: "Docs", href: "/docs" },
-    { label: "For agents", href: "/docs/agents" },
+    { label: "npm", href: "https://www.npmjs.com/package/issue-graph", external: true },
   ],
   ai: { enabled: false },
   feedback: { enabled: false },

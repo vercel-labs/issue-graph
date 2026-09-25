@@ -31,7 +31,7 @@ function run(args: string[]) {
 describe("issue-graph identity", () => {
   test("package metadata exposes only the canonical command and repository", () => {
     expect(pkg.name).toBe("issue-graph");
-    expect(pkg.version).toBe("0.2.0");
+    expect(pkg.version).toMatch(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
     expect(pkg.private).not.toBe(true);
     expect(pkg.publishConfig.access).toBe("public");
     expect(pkg.bin).toEqual({ "issue-graph": "./dist/bin.js" });

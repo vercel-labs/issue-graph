@@ -1,15 +1,11 @@
+import { CodeBlock } from "@vercel/geistdocs/components/code-block";
 import Link from "next/link";
-import { CopyCommand } from "@/components/copy-command";
 import { GraphProof } from "@/components/graph-proof";
+import { InstallSelector } from "@/components/install-selector";
+import { renderTerminalCommand } from "@/components/terminal-output";
 import { landingDescription, landingTitle, workflows } from "@/lib/landing-content";
 import { pageMetadata } from "@/lib/page-metadata";
-import {
-  packageReleasePending,
-  plannedInstallCommand,
-  siteDescription,
-  siteName,
-  siteUrl,
-} from "@/lib/site";
+import { plannedInstallCommand, siteDescription, siteName, siteUrl } from "@/lib/site";
 import "@/components/landing.css";
 
 export const metadata = pageMetadata("/", landingTitle, siteDescription);
@@ -29,20 +25,17 @@ export default function Home() {
         {JSON.stringify(structuredData).replace(/</g, "\\u003c")}
       </script>
       <section className="ig-hero" aria-labelledby="hero-title">
-        <div className="ig-eyebrow ig-hero-eyebrow">
-          <span className="ig-status-dot" /> A Vercel Labs CLI for humans and agents
-        </div>
         <h1 id="hero-title">
-          Find related work.
+          Find related work
           <br />
-          <span>Before you start.</span>
+          before you start
         </h1>
         <p className="ig-hero-description">{landingDescription}</p>
         <div className="ig-hero-action">
-          <Link className="ig-primary-link" href="/docs/get-started">
-            Trace your first issue <span aria-hidden="true">↗</span>
-          </Link>
-          <span className="ig-hero-note">Read-only on GitHub. No model required.</span>
+          <InstallSelector />
+          <span className="ig-hero-note">
+            Read-only GitHub access. Works with your GitHub CLI login.
+          </span>
         </div>
       </section>
 
@@ -52,15 +45,10 @@ export default function Home() {
 
       <section className="ig-workflows" aria-labelledby="workflow-title">
         <div className="ig-section-intro">
-          <span className="ig-eyebrow">Less tab-hopping. More context.</span>
-          <h2 id="workflow-title">
-            Start with the work,
-            <br />
-            not another search.
-          </h2>
+          <h2 id="workflow-title">Inspect a task or an entire backlog</h2>
           <p>
-            From a single issue to an entire backlog. Use the same evidence in your terminal, your
-            editor, or your agent.
+            Trace references, check PR status, or plan your next review. Each command supports
+            structured output for scripts and agents.
           </p>
         </div>
         <div className="ig-workflow-grid">
@@ -69,7 +57,9 @@ export default function Home() {
               <span className="ig-workflow-number">{workflow.number}</span>
               <h3>{workflow.title}</h3>
               <p>{workflow.description}</p>
-              <code className="ig-workflow-command">{workflow.command}</code>
+              <CodeBlock title="Terminal" className="ig-workflow-command">
+                <code>{renderTerminalCommand(workflow.command)}</code>
+              </CodeBlock>
               <Link href={workflow.href}>
                 {workflow.link} <span aria-hidden="true">↗</span>
               </Link>
@@ -80,15 +70,10 @@ export default function Home() {
 
       <section className="ig-agent-section" aria-labelledby="agent-title">
         <div className="ig-agent-copy">
-          <span className="ig-eyebrow">The same tool. Your workflow.</span>
-          <h2 id="agent-title">
-            Give your agent
-            <br />
-            the missing context.
-          </h2>
+          <h2 id="agent-title">Use issue-graph with your coding agent</h2>
           <p>
-            Let the CLI gather the references. Let your agent reason about the work. Keep the
-            decision to close, merge, or ship with you.
+            Install the skill to let your agent trace related work, check PR status, and review a
+            backlog before making changes.
           </p>
           <Link href="/docs/agents" className="ig-text-link">
             Read the agent workflow <span aria-hidden="true">↗</span>
@@ -96,27 +81,23 @@ export default function Home() {
         </div>
         <div className="ig-agent-contract">
           <div>
-            <span className="ig-contract-label">Gather</span>
-            <p>
-              Typed relationships, status, and coverage. Deterministic, with no model in the core.
-            </p>
+            <span className="ig-contract-label">Collect</span>
+            <p>The CLI reads GitHub references and review states, and reports missing data.</p>
           </div>
           <div>
-            <span className="ig-contract-label">Understand</span>
+            <span className="ig-contract-label">Inspect</span>
             <p>
-              JSON for tools. Readable output for people. An optional clustering task for your
-              agent.
+              Your agent reads the JSON results and follows links to the relevant issues and PRs.
             </p>
           </div>
           <div>
             <span className="ig-contract-label">Decide</span>
             <p>
-              References are evidence, not verdicts. Review the code before closing or merging
-              anything.
+              Review the suggested actions and check the code before closing issues or merging PRs.
             </p>
           </div>
           <div className="ig-agent-links">
-            <Link href="/skill.md">skill.md</Link>
+            <Link href="/docs/agents.md">Agent setup</Link>
             <Link href="/llms.txt">llms.txt</Link>
             <Link href="/docs/library">Library API</Link>
           </div>
@@ -125,30 +106,14 @@ export default function Home() {
 
       <section className="ig-install-section" aria-labelledby="install-title">
         <div>
-          <span className="ig-eyebrow">One useful first run</span>
-          <h2 id="install-title">
-            Bring the context
-            <br />
-            back to your terminal.
-          </h2>
+          <h2 id="install-title">Get started</h2>
         </div>
         <div className="ig-install-details">
-          <span className="ig-release-label">
-            {packageReleasePending ? "npm release in preparation" : "Run with Node.js 20+"}
-          </span>
-          <CopyCommand
-            command={plannedInstallCommand}
-            label={
-              packageReleasePending
-                ? "Copy the planned npm command, available after release"
-                : "Copy npm command"
-            }
-          />
-          <p>
-            {packageReleasePending
-              ? "This command is for the upcoming functional npm release. Today, source installation requires repository access. The quickstart explains both paths."
-              : "Authenticate with GitHub CLI, then point issue-graph at a public repository or one you can access."}
-          </p>
+          <span className="ig-release-label">Requires Node.js 20+</span>
+          <CodeBlock title="Terminal">
+            <code>{renderTerminalCommand(plannedInstallCommand)}</code>
+          </CodeBlock>
+          <p>Sign in with GitHub CLI, then run issue-graph against a repository you can access.</p>
           <Link className="ig-text-link" href="/docs/get-started">
             Read the installation guide <span aria-hidden="true">↗</span>
           </Link>

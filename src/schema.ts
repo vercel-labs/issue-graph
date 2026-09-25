@@ -19,7 +19,10 @@ export const ISSUE_GRAPH_SCHEMA = {
         "~/.issue-graph snapshots unless --no-snapshot is set",
         "explicit --json and --html output paths",
       ],
-      formats: ["markdown"],
+      formats: ["text", "markdown"],
+      defaultFormat: { tty: "text", pipe: "markdown" },
+      jsonFlag: "--json PATH writes a graph file; legacy --format json keeps Markdown stdout",
+      textFormat: "Monochrome human output; styling only on TTY without NO_COLOR, CI, or TERM=dumb",
       description: "Crawl and render the reference graph around explicit seeds.",
     },
     reconcile: {
@@ -34,7 +37,9 @@ export const ISSUE_GRAPH_SCHEMA = {
       githubMutations: false,
       localWrites: [],
       outputSchemaVersion: 1,
-      formats: ["json", "markdown"],
+      formats: ["json", "markdown", "text"],
+      defaultFormat: { tty: "text", pipe: "json" },
+      textFormat: "Monochrome human output; styling only on TTY without NO_COLOR, CI, or TERM=dumb",
       description:
         "Turn a live repository reconciliation into a deterministic execution, investigation, and blocked queue.",
     },
