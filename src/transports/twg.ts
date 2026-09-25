@@ -76,25 +76,29 @@ export function twgJiraClient(options: TwgJiraClientOptions = {}): JiraReader {
   return {
     async getIssue(issueKey, site) {
       if (site?.startsWith("-")) throw new TwgCliError("Jira site cannot start with '-'");
-      const args = [
-        ...(site ? ["--site", site] : []),
-        "--output",
-        "json",
-        "--output-summary=none",
-        "jira",
-        "workitem",
-        "get",
-        issueKey,
-        "--full",
-      ];
+      const globalArgs = [...(site ? ["--site", site] : []), "--output", "json"];
+      const commandArgs = ["jira", "workitem", "get", issueKey, "--full"];
+      const invoke = async (args: string[]): Promise<TwgRunResult> => {
+        try {
+          return await run(args);
+        } catch (error) {
+          if (error instanceof TwgCliError) throw error;
+          throw new TwgCliError(
+            `twg jira workitem get failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      };
       let result: TwgRunResult;
       try {
-        result = await run(args);
+        result = await invoke([...globalArgs, "--output-summary=none", ...commandArgs]);
       } catch (error) {
-        if (error instanceof TwgCliError) throw error;
-        throw new TwgCliError(
-          `twg jira workitem get failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        const unsupportedSummary =
+          error instanceof TwgCliError &&
+          /(?:invalid[^\n]*output-summary|output-summary[^\n]*invalid|expected:\s*stats,\s*auto,\s*inline)/i.test(
+            error.message,
+          );
+        if (!unsupportedSummary) throw error;
+        result = await invoke([...globalArgs, ...commandArgs]);
       }
       try {
         return JSON.parse(result.stdout);

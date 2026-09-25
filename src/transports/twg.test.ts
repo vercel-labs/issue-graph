@@ -39,6 +39,25 @@ describe("twgJiraClient", () => {
     expect(args).not.toContain("--site");
   });
 
+  test("retries without output-summary when an older TWG build rejects none", async () => {
+    const calls: string[][] = [];
+    const client = twgJiraClient({
+      runner: async (args) => {
+        calls.push(args);
+        if (calls.length === 1)
+          throw new TwgCliError(
+            "option '--output-summary [level]' argument 'none' is invalid. Expected: stats, auto, inline.",
+            1,
+          );
+        return { stdout: JSON.stringify({ data: { key: "PROJ-1" } }), stderr: "" };
+      },
+    });
+    expect(await client.getIssue("PROJ-1", "demo")).toEqual({ data: { key: "PROJ-1" } });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain("--output-summary=none");
+    expect(calls[1]).not.toContain("--output-summary=none");
+  });
+
   test("rejects invalid JSON and preserves typed command failures", async () => {
     const invalid = twgJiraClient({ runner: async () => ({ stdout: "warning", stderr: "" }) });
     await expect(invalid.getIssue("PROJ-1")).rejects.toThrow("invalid JSON");
