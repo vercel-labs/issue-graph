@@ -76,11 +76,15 @@ export async function crawlGraph<TNode extends CrawlNode>(
     let layerDepth = Number.POSITIVE_INFINITY;
     for (const depth of pending.values()) layerDepth = Math.min(layerDepth, depth);
     const layer: Array<{ key: NodeKey; depth: number }> = [];
+    const layerKeys = new Set<NodeKey>();
     for (const [key, depth] of pending) {
       if (depth !== layerDepth) continue;
       pending.delete(key);
+      if (nodes.has(key)) continue;
       layer.push({ key, depth });
+      layerKeys.add(key);
     }
+    if (!layer.length) continue;
 
     const available = Math.max(0, opts.maxNodes - nodes.size);
     const admitted = layer.slice(0, available);
@@ -112,7 +116,7 @@ export async function crawlGraph<TNode extends CrawlNode>(
       }
 
       for (const edge of node.edges) {
-        if (nodes.has(edge.to)) continue;
+        if (nodes.has(edge.to) || layerKeys.has(edge.to)) continue;
         const depth = targetDepth(opts, current.key, edge, current.depth);
         if (depth === null) continue;
         const knownDepth = pending.get(edge.to);

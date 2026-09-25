@@ -137,6 +137,33 @@ describe("crawlGraph", () => {
     expect(nodes.get("jira:PROJ-4")?.depth).toBe(3);
   });
 
+  test("fetches a same-layer sibling exactly once at its shortest depth", async () => {
+    const graph: Record<NodeKey, NodeKey[]> = {
+      "jira:PROJ-1": ["jira:PROJ-2", "jira:PROJ-3"],
+      "jira:PROJ-2": ["jira:PROJ-3"],
+      "jira:PROJ-3": [],
+    };
+    const calls: Array<[NodeKey, number]> = [];
+    const fetch: GraphFetchNode<FixtureNode> = async (key, depth) => {
+      calls.push([key, depth]);
+      return {
+        key,
+        depth,
+        edges: (graph[key] ?? []).map((to) => ({ to })),
+        source: "jira",
+        label: `node ${key}`,
+      };
+    };
+    const { nodes } = await crawlGraph(
+      [{ key: "jira:PROJ-1" }],
+      { maxDepth: 2, maxNodes: 10, hubThreshold: 12, concurrency: 2 },
+      fetch,
+    );
+
+    expect(calls.filter(([key]) => key === "jira:PROJ-3")).toEqual([["jira:PROJ-3", 1]]);
+    expect(nodes.get("jira:PROJ-3")?.depth).toBe(1);
+  });
+
   test("rejects invalid edge depths instead of silently corrupting BFS order", async () => {
     const fetch = fakeGraphFetch({ "jira:PROJ-1": ["jira:PROJ-2"] });
     await expect(
