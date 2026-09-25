@@ -297,16 +297,27 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .labs{display:inline-flex;color:var(--fg);border-radius:4px}.labs:hover{text-decoration:none;opacity:.8}
 .labs:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .labs-mark{height:16px;width:auto;display:block}
-.project{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--muted);max-width:100%;min-width:0}
-.project span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.project:hover{color:var(--fg);text-decoration:none}
+.project-row{position:relative;display:flex;align-items:center;gap:4px;min-width:0}
+.project{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;height:26px;padding:0 6px;margin-left:-6px;border:0;border-radius:6px;background:none;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.pbtn{cursor:pointer;transition:background 150ms,color 150ms}.pbtn:hover,.pbtn[aria-expanded="true"]{background:var(--bg2);color:var(--fg)}
+.pbtn:focus-visible,.project-gh:focus-visible,.ropt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.pname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pmuted,.plus{color:var(--muted);font-family:var(--sans)}.plus{white-space:nowrap}
+.pchev{width:12px;height:12px;flex-shrink:0;transition:transform 200ms cubic-bezier(.2,.8,.2,1)}
+.pbtn[aria-expanded="true"] .pchev{transform:rotate(180deg)}
+.project-gh{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--muted);font-size:12px;flex-shrink:0}
+.project-gh:hover{background:var(--bg2);color:var(--fg);text-decoration:none}
+.repo-menu{position:absolute;top:30px;left:-6px;z-index:20;width:calc(100% + 12px);max-height:320px;overflow-y:auto;padding:4px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);transform-origin:top left;animation:menu-in 160ms cubic-bezier(.2,.8,.2,1)}
+@keyframes menu-in{from{opacity:0;transform:translateY(-4px) scale(.98)}}
+.ropt{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:6px;align-items:center;width:100%;height:32px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--fg);font-family:var(--sans);font-size:13px;text-align:left;cursor:pointer}
+.ropt:hover,.ropt:focus{background:var(--bg2);outline:none}
+.ropt b{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.rlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rlabel .mono{font-size:12px}
+.rcheck{font-size:12px;color:var(--fg)}
+.rsep{height:1px;background:var(--border);margin:4px 0}
+.rhead{font-size:12px;color:var(--muted);padding:4px 8px 2px}
+@media (prefers-reduced-motion:reduce){.repo-menu,.pchev{animation:none;transition:none}}
 .gh-mark{width:14px;height:14px;flex-shrink:0;display:block}
-.repos{display:flex;flex-wrap:wrap;gap:6px}
-.repo{height:26px;padding:0 10px;border:1px solid var(--border2);border-radius:9999px;background:var(--bg);color:var(--fg2);font-family:var(--sans);font-size:12px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:background 150ms,color 150ms}
-.repo b{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
-.repo:hover{background:var(--bg2);color:var(--fg)}
-.repo.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}.repo.on b{color:var(--bg);opacity:.7}
-.repo:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .pv-slot{display:flex;flex-direction:column;gap:6px}
 .pv-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .pv-head .gh-mark{width:12px;height:12px}
@@ -624,6 +635,42 @@ function kcls(n){
   return n.kind==='PullRequest'?'k-pr':'k-iss';
 }
 const statGrid=rows=>'<div class="stats">'+rows.map(t=>'<div class="stat '+(t[1]===0?'zero':t[2])+'"><div class="stat-n">'+t[1]+'</div><div class="stat-l">'+t[0]+'</div></div>').join('')+'</div>';
+const CHEV='<svg class="pchev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// One control for "which repository am I looking at": the project name opens the filter.
+function repoLabel(){
+  if(!REPO)return esc(DATA.repo);
+  if(REPO===DATA.repo)return esc(DATA.repo)+' <span class="pmuted">only</span>';
+  if(REPO==='*')return 'Linked repos <span class="pmuted">only</span>';
+  return esc(REPO);
+}
+function projectRow(){
+  const gh='<a class="project-gh" href="'+esc(repoUrl(REPO&&REPO!=='*'?REPO:DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a>';
+  const linked=REPOS.filter(r=>r[0]!==DATA.repo);
+  if(!linked.length)return '<div class="project-row"><span class="project">'+PV.logo+'<span class="pname">'+esc(DATA.repo)+'</span></span>'+gh+'</div>';
+  const primary=REPOS.find(r=>r[0]===DATA.repo)?.[1]||0,total=Object.keys(ALL).length;
+  const opt=(v,label,n)=>'<button class="ropt'+(REPO===v?' on':'')+'" role="option" aria-selected="'+(REPO===v)+'" data-repo="'+esc(v??'')+'">'+
+    '<span class="rcheck" aria-hidden="true">'+(REPO===v?'✓':'')+'</span><span class="rlabel">'+label+'</span><b>'+n+'</b></button>';
+  return '<div class="project-row"><button class="project pbtn" id="repo-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="repo-menu">'+
+      PV.logo+'<span class="pname">'+repoLabel()+'</span>'+(REPO?'':'<span class="plus">+'+linked.length+' linked</span>')+CHEV+'</button>'+gh+
+    '<div class="repo-menu" id="repo-menu" role="listbox" aria-label="Filter by repository" hidden>'+
+      opt(null,'All',total)+opt(DATA.repo,esc(DATA.repo.split('/')[1])+' only',primary)+opt('*','Linked repos only',total-primary)+
+      '<div class="rsep" role="separator"></div><div class="rhead">Linked repositories</div>'+
+      linked.map(r=>opt(r[0],'<span class="mono">'+esc(r[0])+'</span>',r[1])).join('')+'</div></div>';
+}
+function wireRepoMenu(){
+  const btn=document.getElementById('repo-btn'),menu=document.getElementById('repo-menu');if(!btn)return;
+  const opts=()=>[...menu.querySelectorAll('.ropt')];
+  const close=focusBtn=>{menu.hidden=true;btn.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',outside,true);if(focusBtn)btn.focus()};
+  const outside=e=>{if(!menu.contains(e.target)&&!btn.contains(e.target))close(false)};
+  btn.onclick=()=>{if(!menu.hidden)return close(false);
+    menu.hidden=false;btn.setAttribute('aria-expanded','true');
+    (menu.querySelector('.ropt.on')||opts()[0]).focus();document.addEventListener('pointerdown',outside,true)};
+  menu.onkeydown=e=>{const o=opts(),i=o.indexOf(document.activeElement);
+    if(e.key==='Escape'){e.preventDefault();close(true)}
+    else if(e.key==='ArrowDown'){e.preventDefault();o[Math.min(o.length-1,i+1)].focus()}
+    else if(e.key==='ArrowUp'){e.preventDefault();o[Math.max(0,i-1)].focus()}};
+  for(const o of opts())o.onclick=()=>{document.removeEventListener('pointerdown',outside,true);setRepo(o.dataset.repo||null)};
+}
 function sidebar(){
   const s=statsOf(),all=Object.values(N);
   const mix=[['k-iss','Open issues',all.filter(n=>n.state==='OPEN'&&n.kind!=='PullRequest').length],
@@ -654,12 +701,7 @@ function sidebar(){
     : '';
   const total=mix.reduce((a,m)=>a+m[2],0)||1;
   return '<div class="side"><div class="side-top">'+
-    '<div class="brand"><div class="brand-row"><a class="labs" href="https://vercel.com/labs" target="_blank" rel="noopener" aria-label="Vercel Labs">'+LABS_SVG+'</a><span class="brand-sep" aria-hidden="true">/</span><span class="brand-name">issue-graph</span></div><a class="project" href="'+esc(repoUrl(DATA.repo))+'" target="_blank" rel="noopener" title="Open '+esc(DATA.repo)+' on '+esc(PV.name)+'">'+PV.logo+'<span>'+esc(DATA.repo)+'</span></a></div>'+
-    (REPOS.length>1?'<div class="repos" role="group" aria-label="Filter by repository">'+
-      [[null,'All repos',Object.keys(ALL).length],[DATA.repo,DATA.repo.split('/')[1],REPOS.find(r=>r[0]===DATA.repo)?.[1]||0],
-        ['*',(REPOS.length-1)+' other repo'+(REPOS.length>2?'s':''),REPOS.filter(r=>r[0]!==DATA.repo).reduce((a,r)=>a+r[1],0)]].map(r=>
-        '<button class="repo'+(REPO===r[0]?' on':'')+'" data-repo="'+esc(r[0]||'')+'" aria-pressed="'+(REPO===r[0])+'"'+
-          (r[0]==='*'?' title="'+esc(REPOS.filter(x=>x[0]!==DATA.repo).map(x=>x[0]).join(', '))+'"':'')+'>'+esc(r[1])+' <b>'+r[2]+'</b></button>').join('')+'</div>':'')+
+    '<div class="brand"><div class="brand-row"><a class="labs" href="https://vercel.com/labs" target="_blank" rel="noopener" aria-label="Vercel Labs">'+LABS_SVG+'</a><span class="brand-sep" aria-hidden="true">/</span><span class="brand-name">issue-graph</span></div>'+projectRow()+'</div>'+
     '<div class="mix"><div class="mix-bar" role="img" aria-label="'+esc(mix.map(m=>m[2]+' '+m[1].toLowerCase()).join(', '))+'">'+
       mix.map(m=>'<span class="'+m[0]+'" style="flex-grow:'+(m[2]/total)+'"></span>').join('')+'</div>'+
       '<div class="mix-legend">'+mix.map(m=>'<span><i class="dot '+m[0]+'"></i>'+m[1]+' <b>'+m[2]+'</b></span>').join('')+'</div></div>'+
@@ -1215,7 +1257,7 @@ function wire(){
     const it=app.querySelector('.item[data-key="'+CSS.escape(r.dataset.key)+'"]');if(it)it.scrollIntoView({block:'nearest'});}});
 }
 function wireSidebar(){
-  for(const b of app.querySelectorAll('.repo'))b.onclick=()=>setRepo(b.dataset.repo||null);
+  wireRepoMenu();
   const cb=document.getElementById('cleanup-btn');if(cb)cb.onclick=cleanupView;
   document.getElementById('explore-view').onclick=()=>exploreView();
   document.getElementById('impact-view').onclick=()=>impactView();
