@@ -50,11 +50,13 @@ describe("renderHtml", () => {
     const html = renderHtml(nodes, ["o/r#1"], "o/r");
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain("<title>issue-graph · o/r</title>");
-    expect(html).toContain('class="logo">◆</span> issue-graph');
+    expect(html).toContain('class="brand-name">issue-graph</span>');
     expect(html).toContain('id="data"');
     expect(html).toContain("o/r#2");
     expect(html).toContain('id="impact-view"');
-    expect(html).toContain("Click a node to simulate its blast radius");
+    expect(html).toContain("Pick one to see its ripple");
+    expect(html).toContain('id="rank-view"');
+    expect(html).toContain("function exploreView(gi)");
     // no raw </script> break-out from data
     expect(html.split('<script id="data"')[1].split("</script>")[0]).not.toContain("</script");
   });
@@ -92,8 +94,8 @@ describe("renderHtml", () => {
     const html = renderHtml(nodes, ["o/r#1"], "o/r");
     expect(html).toContain("function blastRadius(k)");
     expect(html).toContain("function neighbors(k)");
-    expect(html).toContain("issues resolved");
+    expect(html).toContain("Issues it resolves");
     expect(html).toContain("PRs to reconcile");
-    expect(html).toContain("projection, not proof");
+    expect(html).toContain("A projection from visible links, not proof.");
   });
 });

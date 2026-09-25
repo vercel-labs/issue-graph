@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseArgs, UsageError } from "./cli.js";
+import { nextSteps, parseArgs, UsageError } from "./cli.js";
 
 describe("parseArgs", () => {
   test("parses a seed with repo and depth", () => {
@@ -75,5 +75,25 @@ describe("parseArgs", () => {
   test("rejects unsafe crawl limits", () => {
     expect(() => parseArgs(["1", "--repo", "o/r", "--max-nodes", "1001"])).toThrow(UsageError);
     expect(() => parseArgs(["1", "--repo", "o/r", "--concurrency", "0"])).toThrow(UsageError);
+  });
+});
+
+describe("onboarding", () => {
+  test("--open parses and is rejected by plan", () => {
+    expect(parseArgs(["1", "--repo", "o/r", "--open"]).open).toBe(true);
+    expect(() => parseArgs(["plan", "--repo", "o/r", "--open"])).toThrow(/--open/);
+  });
+
+  test("next steps list only the views this run did not use", () => {
+    const bare = nextSteps(parseArgs(["--label", "bug", "--repo", "o/r"]), "o", "r");
+    expect(bare).toContain("issue-graph --label bug --repo o/r --open");
+    expect(bare).toContain("--cluster-run claude --open");
+    expect(bare).toContain("--prioritize");
+    const all = nextSteps(
+      parseArgs(["1", "--repo", "o/r", "--open", "--cluster-run", "claude", "--prioritize"]),
+      "o",
+      "r",
+    );
+    expect(all).toBe("");
   });
 });

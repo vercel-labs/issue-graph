@@ -1,8 +1,17 @@
+import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { classify, fillMentionedBy } from "./classify.js";
-import { clusterPayload, clusterPrompt, runAgent } from "./cluster.js";
+import {
+  clusterJsonPrompt,
+  clusterPayload,
+  clusterPrompt,
+  parseClustersReply,
+  renderClusters,
+  runAgent,
+} from "./cluster.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
 import { type ClustersConfig, renderHtml } from "./html.js";
@@ -60,6 +69,7 @@ const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
   --json PATH         write the machine-readable graph
   --html PATH         graph only: write a self-contained HTML explorer
   --clusters PATH     group the explorer by agent-named clusters
+  --open              write the explorer (to a temp file unless --html) and open it
   --format F          reconcile/plan output: auto, json, or markdown (default auto)
   --no-snapshot       do not persist this run to ~/.issue-graph/
   -h, --help          show this`;
@@ -79,6 +89,7 @@ interface Args {
   concurrency: number;
   cluster: boolean;
   clusterRun: string;
+  open: boolean;
   noSnapshot: boolean;
   prioritize: boolean;
   format: "auto" | "json" | "markdown";
@@ -106,6 +117,7 @@ export function parseArgs(argv: string[]): Args {
     concurrency: 4,
     cluster: false,
     clusterRun: "",
+    open: false,
     noSnapshot: false,
     prioritize: false,
     format: "auto",
@@ -136,6 +148,7 @@ export function parseArgs(argv: string[]): Args {
       a.cluster = true;
       a.clusterRun = argv[++i];
     } else if (arg === "--no-snapshot") a.noSnapshot = true;
+    else if (arg === "--open") a.open = true;
     // An unrecognized flag used to fall through to the seed, so a typo became
     // "Cannot parse seed: --hlep" — and `--help` crashed the same way.
     else if (arg.startsWith("-")) throw new UsageError(`unknown flag: ${arg}\n\n${USAGE}`);
@@ -147,8 +160,8 @@ export function parseArgs(argv: string[]): Args {
   if (!Number.isInteger(a.concurrency) || a.concurrency < 1 || a.concurrency > 32) {
     throw new UsageError("--concurrency must be an integer from 1 to 32");
   }
-  if (a.command === "plan" && a.htmlOut) {
-    throw new UsageError("plan does not support --html");
+  if (a.command === "plan" && (a.htmlOut || a.open)) {
+    throw new UsageError("plan does not support --html or --open");
   }
   return a;
 }
@@ -173,6 +186,26 @@ async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
     return numbers.map((number) => ({ owner, repo, number }));
   }
   return [parseSeed(a.seed, a.repo)];
+}
+
+/** Suggest the views this run did not use, as commands to copy. */
+export function nextSteps(a: Args, owner: string, repo: string): string {
+  const seed = a.label
+    ? `--label ${a.label} --repo ${owner}/${repo}`
+    : a.seedsCsv
+      ? `--seeds ${a.seedsCsv} --repo ${owner}/${repo}`
+      : `${a.seed} --repo ${owner}/${repo}`;
+  const lines: string[] = [];
+  if (!a.htmlOut && !a.open)
+    lines.push(
+      `- Open the dashboard (Swarm, Impact, Rank, Cleanup): \`issue-graph ${seed} --open\``,
+    );
+  if (!a.cluster)
+    lines.push(
+      `- Group by root cause (sends titles and edges to that agent): \`issue-graph ${seed} --cluster-run claude --open\``,
+    );
+  if (!a.prioritize) lines.push(`- Rank what to fix first: \`issue-graph ${seed} --prioritize\``);
+  return lines.length ? `\n## Next steps\n\n${lines.join("\n")}\n` : "";
 }
 
 async function writeOutput(file: string, content: string): Promise<void> {
@@ -310,9 +343,27 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     md += "\n## Snapshot\n\n- first snapshot for this seed; re-run later to see changes\n";
   }
 
+  md += nextSteps(args, primary.owner, primary.repo);
   console.log(md);
 
-  if (args.cluster) {
+  const repoName = `${primary.owner}/${primary.repo}`;
+  const wantsHtml = Boolean(args.htmlOut || args.open);
+  let agentClusters: ClustersConfig | undefined;
+  if (args.clusterRun && wantsHtml) {
+    process.stderr.write(`\nclustering via ${args.clusterRun}...\n`);
+    try {
+      const parsed = parseClustersReply(
+        runAgent(args.clusterRun, clusterJsonPrompt(repoName, clusterPayload(nodes, seedKeys))),
+      );
+      agentClusters = parsed;
+      console.log(`\n## Root-cause clusters (${args.clusterRun})\n\n${renderClusters(parsed)}\n`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(
+        `\n## Root-cause clusters\n\n(agent '${args.clusterRun}' failed: ${msg}; the explorer falls back to connected components.)\n`,
+      );
+    }
+  } else if (args.cluster) {
     const prompt = clusterPrompt(
       `${primary.owner}/${primary.repo}`,
       clusterPayload(nodes, seedKeys),
@@ -359,14 +410,32 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     );
     process.stderr.write(`wrote ${args.jsonOut}\n`);
   }
-  if (args.htmlOut) {
+  if (wantsHtml) {
     const clusters = args.clustersFile
       ? (JSON.parse(readFileSync(args.clustersFile, "utf8")) as ClustersConfig)
-      : undefined;
-    await writeOutput(
-      args.htmlOut,
-      renderHtml(nodes, seedKeys, `${primary.owner}/${primary.repo}`, clusters),
-    );
-    process.stderr.write(`wrote ${args.htmlOut}\n`);
+      : agentClusters;
+    const out =
+      args.htmlOut ||
+      join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
+    await writeOutput(out, renderHtml(nodes, seedKeys, repoName, clusters));
+    process.stderr.write(`wrote ${out}\n`);
+    if (args.open) openInBrowser(out);
+  }
+}
+
+/** Best-effort: hand the file to the OS opener; the path is already printed. */
+function openInBrowser(file: string): void {
+  const [cmd, argv] =
+    process.platform === "darwin"
+      ? ["open", [file]]
+      : process.platform === "win32"
+        ? ["cmd", ["/c", "start", "", file]]
+        : ["xdg-open", [file]];
+  try {
+    spawn(cmd, argv, { detached: true, stdio: "ignore" })
+      .on("error", () => {})
+      .unref();
+  } catch {
+    // no opener available; the printed path still works
   }
 }
