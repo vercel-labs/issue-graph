@@ -57,6 +57,9 @@ describe("renderHtml", () => {
     expect(html).toContain("Pick one to see its ripple");
     expect(html).toContain('id="rank-view"');
     expect(html).toContain("function exploreView(gi)");
+    expect(html).toContain('"provider":{"id":"github"');
+    expect(html).toContain('"repo":"o/r"');
+    expect(html).toContain("function setRepo(r)");
     // no raw </script> break-out from data
     expect(html.split('<script id="data"')[1].split("</script>")[0]).not.toContain("</script");
   });
