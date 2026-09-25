@@ -151,12 +151,12 @@ console.log(JSON.stringify({ data: { repository } }));
 const fakeTwg = `#!/usr/bin/env node
 const assert = require("node:assert/strict");
 const args = process.argv.slice(2);
-assert.deepEqual(args.slice(0, 8), [
-  "--site", "package-smoke", "--output", "json", "--output-summary", "none", "jira", "workitem",
+assert.deepEqual(args.slice(0, 7), [
+  "--site", "package-smoke", "--output", "json", "--output-summary=none", "jira", "workitem",
 ]);
-assert.deepEqual(args.slice(8, 10), ["get", args[9]]);
-assert.equal(args[10], "--full");
-const key = args[9];
+assert.deepEqual(args.slice(7, 9), ["get", args[8]]);
+assert.equal(args[9], "--full");
+const key = args[8];
 assert.ok(key === "PKG-1" || key === "PKG-2");
 const links = key === "PKG-1" ? [{
   type: { name: "Relates", outward: "relates to" },
