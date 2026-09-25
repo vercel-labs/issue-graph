@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { renderHtml } from "./html.js";
+import { dashboardModel, renderDashboard, renderHtml } from "./html.js";
 import type { GraphNode, NodeKey, PullRequestMeta } from "./types.js";
 
 const meta = (files: string[]): PullRequestMeta => ({
@@ -99,5 +99,23 @@ describe("renderHtml", () => {
     expect(html).toContain("Issues it resolves");
     expect(html).toContain("PRs to reconcile");
     expect(html).toContain("A projection from visible links, not proof.");
+  });
+});
+
+describe("renderDashboard", () => {
+  test("embeds every project and opens the first", () => {
+    const a = dashboardModel(asMap([node("o/a#1")]), ["o/a#1"], "o/a");
+    const b = dashboardModel(asMap([node("o/b#2")]), ["o/b#2"], "o/b");
+    const html = renderDashboard([a, b]);
+    const data = JSON.parse(
+      html.split('<script id="data" type="application/json">')[1].split("</script>")[0],
+    );
+    expect(data.projects.map((p: { repo: string }) => p.repo)).toEqual(["o/a", "o/b"]);
+    expect(html).toContain("<title>issue-graph · o/a</title>");
+    expect(html).toContain("function setProject(repo)");
+  });
+
+  test("refuses an empty project list", () => {
+    expect(() => renderDashboard([])).toThrow(/at least one model/);
   });
 });

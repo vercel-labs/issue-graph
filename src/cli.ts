@@ -14,7 +14,7 @@ import {
 } from "./cluster.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
-import { type ClustersConfig, renderHtml } from "./html.js";
+import { type ClustersConfig, dashboardModel, type Model, renderDashboard } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
@@ -28,12 +28,14 @@ import {
   diffReconcileSnapshots,
   diffSnapshots,
   listSnapshots,
+  readDashboardModels,
   readReconcileSnapshot,
   readSnapshot,
   reconcileSnapshotDir,
   snapshotDir,
   toReconcileSnapshot,
   toSnapshot,
+  writeDashboardModel,
   writeReconcileSnapshot,
   writeSnapshot,
 } from "./snapshot.js";
@@ -48,6 +50,7 @@ const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
        issue-graph reconcile --repo owner/repo [options]
        issue-graph plan --repo owner/repo [options]
        issue-graph status --repo owner/repo --author login[,login] [options]
+       issue-graph dashboard [--open] [--html PATH]
        issue-graph schema
        issue-graph skills [list]
        issue-graph skills get core [--full] [--json]
@@ -81,7 +84,7 @@ const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
   -h, --help          show this`;
 
 interface Args {
-  command: "graph" | "reconcile" | "plan" | "schema";
+  command: "graph" | "reconcile" | "plan" | "schema" | "dashboard";
   seed: string;
   repo: string;
   depth: number;
@@ -106,7 +109,9 @@ export class UsageError extends Error {}
 
 export function parseArgs(argv: string[]): Args {
   const command =
-    argv[0] === "reconcile" || argv[0] === "plan" || argv[0] === "schema" ? argv[0] : "graph";
+    argv[0] === "reconcile" || argv[0] === "plan" || argv[0] === "schema" || argv[0] === "dashboard"
+      ? argv[0]
+      : "graph";
   const start = command === "graph" ? 0 : 1;
   const a: Args = {
     command,
@@ -214,6 +219,8 @@ export function nextSteps(a: Args, owner: string, repo: string): string {
       `- Group by root cause (sends titles and edges to that agent): \`issue-graph ${seed} --cluster-run claude --open\``,
     );
   if (!a.prioritize) lines.push(`- Rank what to fix first: \`issue-graph ${seed} --prioritize\``);
+  if ((a.htmlOut || a.open) && !a.noSnapshot)
+    lines.push("- See every saved run in one dashboard: `issue-graph dashboard --open`");
   return lines.length ? `\n## Next steps\n\n${lines.join("\n")}\n` : "";
 }
 
@@ -249,6 +256,19 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
   if (args.help) {
     console.log(USAGE);
+    return;
+  }
+  if (args.command === "dashboard") {
+    const models = readDashboardModels<Model>();
+    if (!models.length) {
+      throw new UsageError(
+        "no saved runs yet: run a graph with --open or --html first (without --no-snapshot)",
+      );
+    }
+    const out = args.htmlOut || join(tmpdir(), `issue-graph-dashboard-${Date.now()}.html`);
+    await writeOutput(out, renderDashboard(models));
+    process.stderr.write(`wrote ${out} (${models.map((m) => m.repo).join(", ")})\n`);
+    if (args.open) openInBrowser(out);
     return;
   }
   if (args.command === "schema") {
@@ -453,8 +473,13 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     const out =
       args.htmlOut ||
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
-    await writeOutput(out, renderHtml(nodes, seedKeys, repoName, clusters));
+    const model = dashboardModel(nodes, seedKeys, repoName, clusters);
+    await writeOutput(out, renderDashboard([model]));
     process.stderr.write(`wrote ${out}\n`);
+    // keep the latest run per repository so `issue-graph dashboard` can switch between them
+    if (!args.noSnapshot) {
+      process.stderr.write(`dashboard run saved: ${writeDashboardModel(repoName, model)}\n`);
+    }
     if (args.open) openInBrowser(out);
   }
 }

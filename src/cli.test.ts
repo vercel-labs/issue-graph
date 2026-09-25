@@ -12,6 +12,8 @@ vi.mock("./snapshot.js", async (original) => ({
   listSnapshots: vi.fn(() => []),
   writeSnapshot: vi.fn(),
   writeReconcileSnapshot: vi.fn(),
+  writeDashboardModel: vi.fn(() => "/tmp/model.json"),
+  readDashboardModels: vi.fn(() => []),
 }));
 
 describe("parseArgs", () => {
@@ -101,6 +103,7 @@ describe("onboarding", () => {
   test("--open parses and is rejected by plan", () => {
     expect(parseArgs(["1", "--repo", "o/r", "--open"]).open).toBe(true);
     expect(() => parseArgs(["plan", "--repo", "o/r", "--open"])).toThrow(/--open/);
+    expect(parseArgs(["dashboard", "--open"]).command).toBe("dashboard");
   });
 
   test("next steps list only the views this run did not use", () => {
@@ -109,11 +112,22 @@ describe("onboarding", () => {
     expect(bare).toContain("--cluster-run claude --open");
     expect(bare).toContain("--prioritize");
     const all = nextSteps(
-      parseArgs(["1", "--repo", "o/r", "--open", "--cluster-run", "claude", "--prioritize"]),
+      parseArgs([
+        "1",
+        "--repo",
+        "o/r",
+        "--open",
+        "--cluster-run",
+        "claude",
+        "--prioritize",
+        "--no-snapshot",
+      ]),
       "o",
       "r",
     );
     expect(all).toBe("");
+    const saved = nextSteps(parseArgs(["1", "--repo", "o/r", "--open", "--prioritize"]), "o", "r");
+    expect(saved).toContain("issue-graph dashboard --open");
   });
 });
 

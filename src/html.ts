@@ -34,7 +34,7 @@ function normalizeClusters(c?: ClustersConfig): {
 }
 
 /** A group in the left tree: a connected component, or an agent-named cluster. */
-interface Group {
+export interface Group {
   label: string;
   subtitle: string;
   members: NodeKey[];
@@ -56,7 +56,7 @@ export interface ProviderDescriptor {
   signals: Array<{ id: string; label: string; tone: "warn" | "danger" }>;
 }
 
-interface Model {
+export interface Model {
   provider: ProviderDescriptor;
   repo: string;
   seeds: NodeKey[];
@@ -66,7 +66,7 @@ interface Model {
   nodes: Record<NodeKey, ClientNode>;
 }
 
-interface ClientNode {
+export interface ClientNode {
   repo: string;
   key: NodeKey;
   num: number;
@@ -236,16 +236,32 @@ function buildModel(
 }
 
 /** Render the graph as a self-contained, Geist-styled master–detail explorer. */
+/** The explorer's data for one run, also what `dashboard` saves and reloads. */
+export function dashboardModel(
+  nodes: Map<NodeKey, GraphNode>,
+  seedKeys: NodeKey[],
+  repo: string,
+  clustersConfig?: ClustersConfig,
+): Model {
+  const { clusters, cleanup } = normalizeClusters(clustersConfig);
+  return buildModel(nodes, seedKeys, repo, clusters, cleanup);
+}
+
 export function renderHtml(
   nodes: Map<NodeKey, GraphNode>,
   seedKeys: NodeKey[],
   repo: string,
   clustersConfig?: ClustersConfig,
 ): string {
-  const { clusters, cleanup } = normalizeClusters(clustersConfig);
-  const model = buildModel(nodes, seedKeys, repo, clusters, cleanup);
+  return renderDashboard([dashboardModel(nodes, seedKeys, repo, clustersConfig)]);
+}
+
+/** One explorer over several runs; the first model opens unless the URL names another. */
+export function renderDashboard(models: Model[]): string {
+  if (!models.length) throw new Error("renderDashboard needs at least one model");
+  const repo = models[0].repo;
   // JSON is safe inside <script> once "<" is escaped (prevents </script> break-out).
-  const data = JSON.stringify(model).replace(/</g, "\\u003c");
+  const data = JSON.stringify({ projects: models }).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -303,6 +319,19 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .project-gh{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--muted);font-size:12px;flex-shrink:0}
 .project-gh:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .project-gh:hover{background:var(--bg2);color:var(--fg);text-decoration:none}
+.pbtn{height:26px;padding:0 6px;margin-left:-6px;border:0;border-radius:6px;background:none;cursor:pointer;transition:background 150ms,color 150ms}
+.pbtn:hover,.pbtn[aria-expanded="true"]{background:var(--bg2);color:var(--fg)}
+.pbtn:focus-visible,.ropt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.pchev{width:12px;height:12px;flex-shrink:0;transition:transform 200ms cubic-bezier(.2,.8,.2,1)}
+.pbtn[aria-expanded="true"] .pchev{transform:rotate(180deg)}
+.repo-menu{position:absolute;top:30px;left:-6px;z-index:20;width:calc(100% + 12px);max-height:320px;overflow-y:auto;padding:4px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);transform-origin:top left;animation:menu-in 160ms cubic-bezier(.2,.8,.2,1)}
+@keyframes menu-in{from{opacity:0;transform:translateY(-4px) scale(.98)}}
+.ropt{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:6px;align-items:center;width:100%;height:32px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--fg);font-family:var(--sans);font-size:13px;text-align:left;cursor:pointer}
+.ropt:hover,.ropt:focus{background:var(--bg2);outline:none}
+.ropt b{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.rname{display:inline-flex;align-items:center;gap:6px;min-width:0;overflow:hidden}.rname .mono{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rname .gh-mark{width:13px;height:13px}
+.rcheck{font-size:12px;color:var(--fg)}
+@media (prefers-reduced-motion:reduce){.repo-menu,.pchev{animation:none;transition:none}}
 .gh-mark{width:14px;height:14px;flex-shrink:0;display:block}
 .pv-slot{display:flex;flex-direction:column;gap:6px}
 .pv-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
@@ -578,9 +607,12 @@ const LABS_SVG =
 
 const APP = `
 const LABS_SVG=${JSON.stringify(LABS_SVG)};
-const DATA=JSON.parse(document.getElementById('data').textContent);
-const N=DATA.nodes;
-const PV=DATA.provider;
+const PROJECTS=JSON.parse(document.getElementById('data').textContent).projects;
+const wanted=(()=>{try{return new URLSearchParams(location.search).get('project')}catch{return null}})();
+let DATA=PROJECTS.find(p=>p.repo===wanted)||PROJECTS[0];
+let N=DATA.nodes;
+let PV=DATA.provider;
+document.title='issue-graph · '+DATA.repo;
 const repoUrl=r=>PV.repoUrl.replace('{repo}',r);
 const app=document.getElementById('app');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -609,7 +641,40 @@ function kcls(n){
   return n.kind==='PullRequest'?'k-pr':'k-iss';
 }
 const statGrid=rows=>'<div class="stats">'+rows.map(t=>'<div class="stat '+(t[1]===0?'zero':t[2])+'"><div class="stat-n">'+t[1]+'</div><div class="stat-l">'+t[0]+'</div></div>').join('')+'</div>';
+function setProject(repo){
+  const next=PROJECTS.find(p=>p.repo===repo);if(!next||next===DATA)return;
+  DATA=next;N=DATA.nodes;PV=DATA.provider;impactSel=null;loadDone();
+  try{const u=new URL(location.href);u.searchParams.set('project',repo);history.replaceState(null,'',u)}catch{}
+  document.title='issue-graph · '+repo;
+  app.querySelector('.side').outerHTML=sidebar();wireSidebar();
+  lastHash=null;route();
+}
+const CHEV='<svg class="pchev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function projectMenu(){
+  const opt=p=>'<button class="ropt'+(p===DATA?' on':'')+'" role="option" aria-selected="'+(p===DATA)+'" data-repo="'+esc(p.repo)+'">'+
+    '<span class="rcheck" aria-hidden="true">'+(p===DATA?'✓':'')+'</span><span class="rname">'+p.provider.logo+'<span class="mono">'+esc(p.repo)+'</span></span>'+
+    '<b>'+Object.keys(p.nodes).length+'</b></button>';
+  return '<button class="project pbtn" id="repo-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="repo-menu">'+
+    PV.logo+'<span class="pname">'+esc(DATA.repo)+'</span>'+CHEV+'</button>'+
+    '<div class="repo-menu" id="repo-menu" role="listbox" aria-label="Projects" hidden>'+PROJECTS.map(opt).join('')+'</div>';
+}
+function wireProjectMenu(){
+  const btn=document.getElementById('repo-btn'),menu=document.getElementById('repo-menu');if(!btn)return;
+  const opts=()=>[...menu.querySelectorAll('.ropt')];
+  const outside=e=>{if(!menu.contains(e.target)&&!btn.contains(e.target))close(false)};
+  const close=focusBtn=>{menu.hidden=true;btn.setAttribute('aria-expanded','false');document.removeEventListener('pointerdown',outside,true);if(focusBtn)btn.focus()};
+  btn.onclick=()=>{if(!menu.hidden)return close(false);
+    menu.hidden=false;btn.setAttribute('aria-expanded','true');
+    (menu.querySelector('.ropt.on')||opts()[0]).focus();document.addEventListener('pointerdown',outside,true)};
+  menu.onkeydown=e=>{const o=opts(),i=o.indexOf(document.activeElement);
+    if(e.key==='Escape'){e.preventDefault();close(true)}
+    else if(e.key==='ArrowDown'){e.preventDefault();o[Math.min(o.length-1,i+1)].focus()}
+    else if(e.key==='ArrowUp'){e.preventDefault();o[Math.max(0,i-1)].focus()}};
+  for(const o of opts())o.onclick=()=>{close(false);setProject(o.dataset.repo)};
+}
 function projectRow(){
+  if(PROJECTS.length>1)return '<div class="project-row">'+projectMenu()+
+    '<a class="project-gh" href="'+esc(repoUrl(DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a></div>';
   return '<div class="project-row"><span class="project">'+PV.logo+'<span class="pname">'+esc(DATA.repo)+'</span></span>'+
     '<a class="project-gh" href="'+esc(repoUrl(DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a></div>';
 }
@@ -724,8 +789,10 @@ function inspector(k){
 }
 
 // Cleanup progress is per-viewer scratch; nothing is posted to GitHub.
-const CL_KEY='issue-graph:cleanup:'+DATA.repo;
-const DONE=new Set((()=>{try{return JSON.parse(localStorage.getItem(CL_KEY)||'[]')}catch{return []}})());
+let CL_KEY='',DONE=new Set();
+function loadDone(){CL_KEY='issue-graph:cleanup:'+DATA.repo;
+  DONE=new Set((()=>{try{return JSON.parse(localStorage.getItem(CL_KEY)||'[]')}catch{return []}})());}
+loadDone();
 const saveDone=()=>{try{localStorage.setItem(CL_KEY,JSON.stringify([...DONE]))}catch{}};
 const clId=(c,i)=>(c.key||'')+'|'+i;
 const CL_ACTIONS=[['retest','Retest',/retest/i],['pick','Pick one',/pick one/i],['duplicate','Duplicate',/duplicate/i],
@@ -1008,39 +1075,65 @@ function swMetric(k){
   if(SW.x==='blast')return blastRadius(k).total;
   return neighbors(k).size;
 }
-function swLayout(W){
-  const R=4,GAP=5,D=2*R+GAP,LBL=190,PAD=12;
+function swLayoutAt(W,avail,R){
+  const GAP=Math.max(1.5,R*.5),D=2*R+GAP,LBL=190,PAD=12;
   // a metric can be undefined for a node (closed items have no heat): leave it out
   const vals={};Object.keys(N).forEach(k=>{const v=swMetric(k);if(v!=null)vals[k]=v});
   const groups=swGroups().map(g=>({...g,members:g.members.filter(k=>k in vals)})).filter(g=>g.members.length);
   const max=Math.max(1,...Object.values(vals));
-  // linear and exact: a dot's x is its value, equal values stack vertically
-  const x0=LBL+PAD,x1=W-PAD-8,px=v=>x0+(v/max)*(x1-x0);
+  // exact positions, equal values stack vertically; a wide range switches to a
+  // labeled log axis so hundreds of low values do not collapse into one column
+  const log=max>30;
+  const ints=Object.values(vals).every(Number.isInteger);
+  const sc=v=>log?Math.log1p(v)/Math.log1p(max):v/max;
+  const x0=LBL+PAD,x1=W-PAD-8,px=v=>x0+sc(v)*(x1-x0);
+  // each row gets a share of the viewport; a stack that reaches it spills sideways
+  // to the nearest free slot, so dense values form a swarm instead of a tower
+  const rowH=Math.max(30,Math.floor(avail/Math.max(1,groups.length)));
+  const lanes=Math.max(0,Math.floor((rowH-20-D)/2/D));
   const pos={};let y=0;const rows=[];
   for(const g of groups){
-    const placed=[];
+    const placed=[],grid=new Map();
+    const cell=(x,o)=>Math.round(x/D)+':'+Math.round(o/D);
+    const free=(x,o)=>{const cx=Math.round(x/D),co=Math.round(o/D);
+      for(let a=cx-1;a<=cx+1;a++)for(let b=co-1;b<=co+1;b++)for(const p of grid.get(a+':'+b)||[])
+        if(Math.abs(p.x-x)<D&&Math.abs(p.o-o)<D)return false;return true;};
     const sorted=g.members.slice().sort((a,b)=>vals[a]-vals[b]||a.localeCompare(b));
     for(const k of sorted){
-      const x=px(vals[k]);let off=0;
-      for(let i=0;;i++){
-        off=i===0?0:(i%2?1:-1)*Math.ceil(i/2)*D;
-        if(!placed.some(p=>Math.abs(p.x-x)<D&&Math.abs(p.o-off)<D))break;
+      // spill sideways only within the space this value owns (for integers, under half
+      // the gap to the next one), so every dot still reads as its value; past that the
+      // row grows, because a taller row is better than a wrong position
+      const v=vals[k],base=px(v);
+      const band=ints?.45*Math.min(px(v+1)-base,v>0?base-px(v-1):px(v+1)-base):4*D;
+      const SPILL=Math.max(0,Math.floor(band/(D*.9))*2);let x=base,off=0,found=false;
+      for(let j=0;!found&&j<=SPILL;j++){
+        x=base+(j===0?0:(j%2?1:-1)*Math.ceil(j/2)*D*.9);
+        if(x<x0-D||x>x1+D)continue;
+        for(let i=0;i<=2*lanes;i++){off=i===0?0:(i%2?1:-1)*Math.ceil(i/2)*D;if(free(x,off)){found=true;break}}
       }
-      placed.push({k,x,o:off});
+      for(let i=2*lanes+1;!found;i++){x=base;off=(i%2?1:-1)*Math.ceil(i/2)*D;found=free(x,off)}
+      const pt={k,x,o:off};placed.push(pt);const c=cell(x,off);(grid.get(c)??grid.set(c,[]).get(c)).push(pt);
     }
     const spread=placed.reduce((m,p)=>Math.max(m,Math.abs(p.o)),0);
-    const h=Math.max(44,2*spread+D+20);
+    const h=Math.max(30,2*spread+D+20);
     const cy=y+h/2+6;
     placed.forEach(p=>{pos[p.k]={x:p.x,y:cy+p.o}});
     rows.push({label:g.label,n:g.members.length,top:y,h,cy});
     y+=h;
   }
-  const step=Math.max(1,Math.ceil(max/12));const ticks=[];
-  for(let t=0;t<=max;t+=step)ticks.push(t);
-  return {pos,rows,H:y+52,ticks:ticks.map(t=>({t,x:px(t)})),x0,x1,R};
+  let ticks=[];
+  if(log)ticks=[0,1,3,10,30,100,300,1000,3000].filter(t=>t<=max);
+  else{const step=Math.max(1,Math.ceil(max/12));for(let t=0;t<=max;t+=step)ticks.push(t);}
+  return {pos,rows,H:y+52,ticks:ticks.map(t=>({t,x:px(t)})),x0,x1,R,log};
 }
-function swarmSvg(W){
-  const L=swLayout(W);
+// densest views shrink the dots until the chart fits the viewport, never below a readable size
+function swLayout(W,avail){
+  let L;
+  for(const R of [4,3.5,3,2.5,2]){L=swLayoutAt(W,avail,R);if(L.H-52<=avail)break;}
+  return L;
+}
+function swarmSvg(W,avail){
+  const L=swLayout(W,avail);
   const rows=L.rows.map((r,i)=>
     (i?'<line class="grid" x1="0" x2="'+W+'" y1="'+r.top+'" y2="'+r.top+'"/>':'')+
     '<text class="row-lbl" x="0" y="'+(r.cy+4)+'">'+esc(r.label.length>26?r.label.slice(0,25)+'…':r.label)+'</text>'+
@@ -1049,14 +1142,16 @@ function swarmSvg(W){
   const axis='<line class="grid" x1="'+L.x0+'" x2="'+L.x1+'" y1="'+ay+'" y2="'+ay+'"/>'+
     L.ticks.map(t=>'<line class="grid" x1="'+t.x+'" x2="'+t.x+'" y1="'+ay+'" y2="'+(ay+4)+'"/>'+
       '<text class="tick" x="'+t.x+'" y="'+(ay+16)+'" text-anchor="middle">'+t.t+'</text>').join('')+
-    '<text class="axis-t" x="'+L.x0+'" y="'+(ay+38)+'">'+esc(meta.axis)+'</text>'+
+    '<text class="axis-t" x="'+L.x0+'" y="'+(ay+38)+'">'+esc(meta.axis)+(L.log?' (log scale)':'')+'</text>'+
     '<text class="axis-t muted-t" x="'+L.x1+'" y="'+(ay+38)+'" text-anchor="end">'+esc(meta.dir)+' →</text>';
   return {L,frame:'<g class="sw-rows">'+rows+axis+'</g>'};
 }
 function swarmRender(){
   const card=document.getElementById('swarm-card');if(!card)return;
   const W=Math.max(480,card.clientWidth-40);
-  const {L,frame}=swarmSvg(W);
+  // card padding (32) plus the axis block (52) sit outside the rows
+  const avail=Math.max(240,window.innerHeight-card.getBoundingClientRect().top-32-52-24);
+  const {L,frame}=swarmSvg(W,avail);
   let svg=card.querySelector('svg');
   if(!svg){
     const dots=Object.keys(N).map(k=>{const n=N[k];const sup=/SUPERSEDED/.test(n.verdict||'')?' c-sup':'';
@@ -1114,6 +1209,8 @@ function swarmView(by,x){
   card.onclick=e=>{const g=e.target.closest('.d');if(g){tip.hidden=true;select(g.dataset.key)}};
   setHash('swarm:'+SW.by+':'+SW.x);sel='swarm';
   requestAnimationFrame(swarmRender);
+  // the height budget depends on where the card sits, which moves once web fonts load
+  if(document.fonts)document.fonts.ready.then(()=>{if(view==='swarm')swarmRender()});
 }
 window.addEventListener('resize',()=>{if(view==='swarm')swarmRender()});
 
@@ -1198,6 +1295,7 @@ function wire(){
     const it=app.querySelector('.item[data-key="'+CSS.escape(r.dataset.key)+'"]');if(it)it.scrollIntoView({block:'nearest'});}});
 }
 function wireSidebar(){
+  wireProjectMenu();
   const cb=document.getElementById('cleanup-btn');if(cb)cb.onclick=cleanupView;
   document.getElementById('explore-view').onclick=()=>exploreView();
   document.getElementById('impact-view').onclick=()=>impactView();
