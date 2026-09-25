@@ -313,9 +313,9 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .ropt:hover,.ropt:focus{background:var(--bg2);outline:none}
 .ropt b{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
 .rlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rlabel .mono{font-size:12px}
+.rname{display:inline-flex;align-items:center;gap:6px;min-width:0}.rname .gh-mark{width:13px;height:13px}
 .rcheck{font-size:12px;color:var(--fg)}
 .rsep{height:1px;background:var(--border);margin:4px 0}
-.rhead{font-size:12px;color:var(--muted);padding:4px 8px 2px}
 @media (prefers-reduced-motion:reduce){.repo-menu,.pchev{animation:none;transition:none}}
 .gh-mark{width:14px;height:14px;flex-shrink:0;display:block}
 .pv-slot{display:flex;flex-direction:column;gap:6px}
@@ -639,10 +639,11 @@ const CHEV='<svg class="pchev" viewBox="0 0 12 12" aria-hidden="true"><path d="M
 // One control for "which repository am I looking at": the project name opens the filter.
 function repoLabel(){
   if(!REPO)return esc(DATA.repo);
-  if(REPO===DATA.repo)return esc(DATA.repo)+' <span class="pmuted">only</span>';
-  if(REPO==='*')return 'Linked repos <span class="pmuted">only</span>';
+  if(REPO==='*')return 'Linked repos';
   return esc(REPO);
 }
+// every repository reads as provider mark + owner/name, so sources stay clear once there are several providers
+const repoName=r=>'<span class="rname">'+PV.logo+'<span class="mono">'+esc(r)+'</span></span>';
 function projectRow(){
   const gh='<a class="project-gh" href="'+esc(repoUrl(REPO&&REPO!=='*'?REPO:DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a>';
   const linked=REPOS.filter(r=>r[0]!==DATA.repo);
@@ -653,9 +654,9 @@ function projectRow(){
   return '<div class="project-row"><button class="project pbtn" id="repo-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="repo-menu">'+
       PV.logo+'<span class="pname">'+repoLabel()+'</span>'+(REPO?'':'<span class="plus">+'+linked.length+' linked</span>')+CHEV+'</button>'+gh+
     '<div class="repo-menu" id="repo-menu" role="listbox" aria-label="Filter by repository" hidden>'+
-      opt(null,'All',total)+opt(DATA.repo,esc(DATA.repo.split('/')[1])+' only',primary)+opt('*','Linked repos only',total-primary)+
-      '<div class="rsep" role="separator"></div><div class="rhead">Linked repositories</div>'+
-      linked.map(r=>opt(r[0],'<span class="mono">'+esc(r[0])+'</span>',r[1])).join('')+'</div></div>';
+      opt(null,'All repositories',total)+opt('*','All linked repositories',total-primary)+
+      '<div class="rsep" role="separator"></div>'+
+      [[DATA.repo,primary]].concat(linked).map(r=>opt(r[0],repoName(r[0]),r[1])).join('')+'</div></div>';
 }
 function wireRepoMenu(){
   const btn=document.getElementById('repo-btn'),menu=document.getElementById('repo-menu');if(!btn)return;
