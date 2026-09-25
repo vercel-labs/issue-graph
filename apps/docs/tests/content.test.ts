@@ -135,6 +135,23 @@ describe("documentation content contract", () => {
     expect(pages[3]).toContain("[Capture details](https://issue-graph.dev/docs/graph)");
   });
 
+  test("ships illustrated README media with a static alternative", async () => {
+    const readme = await read("../../README.md");
+    expect(readme).toContain("https://issue-graph.dev/issue-graph-workflows.gif");
+    expect(readme).toContain("[Static version](https://issue-graph.dev/issue-graph-workflows.png)");
+    expect(readme).toContain("Illustrated workflows:");
+    expect(readme).not.toContain("Public CLI output captured on September 22, 2026.");
+    const gif = await readFile(new URL("public/issue-graph-workflows.gif", appRoot));
+    expect(gif.toString("ascii", 0, 6)).toBe("GIF89a");
+    expect(gif.readUInt16LE(6)).toBe(1080);
+    expect(gif.readUInt16LE(8)).toBe(520);
+    expect(gif.length).toBeLessThan(100_000);
+    const still = await readFile(new URL("public/issue-graph-workflows.png", appRoot));
+    expect(still.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(still.readUInt32BE(16)).toBe(1080);
+    expect(still.readUInt32BE(20)).toBe(1560);
+  });
+
   test("root guidance separates published installation from future release authorization", async () => {
     const [readme, contributing] = await Promise.all([
       read("../../README.md"),

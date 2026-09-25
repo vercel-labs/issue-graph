@@ -41,7 +41,7 @@ issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-
 
 To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. At the 2026-09-22 capture, issue #1113 was closed, [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) was merged, [regression #1148](https://github.com/vercel-labs/agent-browser/issues/1148) was closed, and follow-ups [#1371](https://github.com/vercel-labs/agent-browser/issues/1371) and [#1607](https://github.com/vercel-labs/agent-browser/issues/1607) were open. Check the open follow-ups before assuming the fix covers them.
 
-Check missing references and crawl limits in the report. Each run queries GitHub, so results can change.
+Check missing references and crawl limits in the report. Each run queries GitHub, so results can change. [Capture details](https://issue-graph.dev/docs/graph).
 
 ### Update an npm installation
 
