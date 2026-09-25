@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildJiraReport,
   fetchJiraNode,
+  type JiraEdge,
   JiraPayloadError,
   jiraDepthForEdge,
   jiraIssueKey,
@@ -140,10 +141,16 @@ describe("Jira crawl integration", () => {
     });
   });
 
-  test("recurses within the seed project and bounds cross-project references", () => {
+  test("recurses within the seed project and trusts only structured cross-project boundaries", () => {
     const depth = jiraDepthForEdge("PROJ-1");
-    expect(depth({ edge: { to: "jira:PROJ-2" }, sourceDepth: 0, maxDepth: 3 })).toBe(1);
-    expect(depth({ edge: { to: "jira:TEAM-2" }, sourceDepth: 0, maxDepth: 3 })).toBe(3);
+    const edge = (to: string, via: JiraEdge["via"]): JiraEdge => ({ to, via });
+    expect(depth({ edge: edge("jira:PROJ-2", "text"), sourceDepth: 0, maxDepth: 3 })).toBe(1);
+    expect(depth({ edge: edge("jira:TEAM-2", "issue-link"), sourceDepth: 0, maxDepth: 3 })).toBe(3);
+    expect(depth({ edge: edge("jira:TEAM-3", "remote-link"), sourceDepth: 0, maxDepth: 3 })).toBe(
+      3,
+    );
+    expect(depth({ edge: edge("jira:TEAM-4", "text"), sourceDepth: 0, maxDepth: 3 })).toBeNull();
+    expect(depth({ edge: edge("jira:UTF-8", "text"), sourceDepth: 0, maxDepth: 3 })).toBeNull();
     expect(depth({ edge: { to: "github:o/r#2" }, sourceDepth: 0, maxDepth: 3 })).toBeNull();
   });
 

@@ -49,7 +49,7 @@ Graph is the default mode. Replace `owner/repo`, label names, seed numbers, Jira
 | `--json` | Boolean JSON stdout shorthand; takes no filename |
 | `-h`, `--help` | Print Jira-specific usage without invoking TWG |
 
-The command runs `twg jira workitem get ISSUE-KEY --full` with direct JSON output. It reads Jira only, uses TWG credentials without copying tokens, and writes no snapshots. Same-project links recurse; cross-project issues are fetched at the boundary; non-Jira links are reported but not fetched. JSON has `schemaVersion: 1` and explicit coverage. Exit 1 preserves partial data when reads fail or the node cap is reached.
+The command runs `twg jira workitem get ISSUE-KEY --full` with direct JSON output. It reads Jira only, uses TWG credentials without copying tokens, and writes no snapshots. Same-project references recurse; structured cross-project links are fetched at the boundary; cross-project text matches and non-Jira links are reported but not fetched. JSON has `schemaVersion: 1` and explicit coverage. Exit 1 preserves partial data when reads fail or the node cap is reached.
 
 ## Graph selection and crawl controls
 

@@ -45,7 +45,7 @@ export const ISSUE_GRAPH_SCHEMA = {
       },
       exitCodes: { complete: 0, incompleteOrFailure: 1, usageError: 2 },
       description:
-        "Trace Jira issue links and references through TWG. Same-project links recurse; cross-project issues are one-hop boundaries; non-Jira remote links are reported but not fetched.",
+        "Trace Jira issue links and references through TWG. Same-project references recurse; structured cross-project links are one-hop boundaries; cross-project text matches and non-Jira links are reported but not fetched.",
     },
     reconcile: {
       githubMutations: false,

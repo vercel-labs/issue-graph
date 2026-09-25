@@ -379,7 +379,11 @@ export function jiraDepthForEdge(seedKey: string) {
   }) => {
     const target = jiraIssueKey(edge.to);
     if (!target) return null;
-    return jiraProject(target) === seedProject ? sourceDepth + 1 : maxDepth;
+    if (jiraProject(target) === seedProject) return sourceDepth + 1;
+    // Free-text matches can be ordinary hyphenated tokens (for example UTF-8),
+    // so only structured cross-project references are trustworthy boundaries.
+    if ("via" in edge && edge.via === "text") return null;
+    return maxDepth;
   };
 }
 

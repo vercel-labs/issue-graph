@@ -24,7 +24,7 @@ This command is read-only and writes no snapshots.
   -h, --help            show this help
 
 Auto output is Markdown in a terminal and versioned JSON in a pipe.
-Cross-project issues are fetched as one-hop boundaries. Non-Jira remote links are reported but not fetched.
+Structured cross-project links are fetched as one-hop boundaries. Cross-project text matches and non-Jira links are reported but not fetched.
 
 Examples:
   issue-graph jira PROJ-123

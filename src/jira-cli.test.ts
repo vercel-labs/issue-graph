@@ -3,7 +3,7 @@ import { runNode } from "../tests/node-process.js";
 import type { JiraReader } from "./jira.js";
 import { JiraUsageError, parseJiraArgs, runJira } from "./jira-cli.js";
 
-function payload(key: string, links: string[] = []) {
+function payload(key: string, links: string[] = [], description?: string) {
   return {
     data: {
       key,
@@ -12,6 +12,7 @@ function payload(key: string, links: string[] = []) {
         summary: `Title ${key}`,
         status: { name: "Open" },
         issuetype: { name: "Task" },
+        ...(description ? { description } : {}),
         issuelinks: links.map((target) => ({
           type: { name: "Relates", outward: "relates to" },
           outwardIssue: { key: target },
@@ -129,6 +130,25 @@ describe("Jira command output", () => {
       ["TEAM-1", 2],
     ]);
     expect(source.calls).not.toContainEqual(["TEAM-2", "demo"]);
+  });
+
+  test("reports cross-project text tokens without fetching or degrading coverage", async () => {
+    const source = reader({
+      "PROJ-1": payload("PROJ-1", [], "See TEAM-4; supports UTF-8, SHA-1, ISO-8601, and RFC-2119."),
+    });
+    const result = await capture(["PROJ-1", "--site", "demo", "--depth", "2"], source);
+    const report = JSON.parse(result.stdout);
+    expect(result.exit).toBe(0);
+    expect(report.coverageComplete).toBe(true);
+    expect(report.nodes).toHaveLength(1);
+    expect(report.nodes[0].edges.map((edge: { to: string }) => edge.to)).toEqual([
+      "jira:TEAM-4",
+      "jira:UTF-8",
+      "jira:SHA-1",
+      "jira:ISO-8601",
+      "jira:RFC-2119",
+    ]);
+    expect(source.calls).toEqual([["PROJ-1", "demo"]]);
   });
 
   test("TTY output is Markdown and keeps progress on stderr", async () => {

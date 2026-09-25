@@ -45,7 +45,8 @@ issue-graph jira PROJ-123 \
 ```
 
 - Same-project references recurse up to `--depth`.
-- Cross-project Jira issues are fetched at the depth boundary and are not expanded.
+- Structured cross-project Jira issue links and remote links are fetched at the depth boundary and are not expanded.
+- Cross-project keys found only in free text are reported but not fetched, because ordinary tokens such as `UTF-8` can match Jira key syntax.
 - GitHub and other non-Jira remote links are reported but not fetched by this command.
 - A high-degree non-seed node above `--hub-threshold` is fetched and marked as a hub, but not expanded.
 - `--max-nodes` is a hard node budget; omitted keys appear in `coverage.cappedOut`.
