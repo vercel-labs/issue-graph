@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { readFile, rm } from "node:fs/promises";
+import { isAbsolute } from "node:path";
 import type { JiraReader } from "../jira.js";
 
 export interface TwgRunResult {
@@ -34,6 +36,55 @@ function errorMessage(stdout: string, stderr: string, fallback: string): string 
     // TWG can fail before producing a JSON envelope (missing binary, auth, timeout).
   }
   return stderr.trim() || fallback;
+}
+
+function summaryOutputFiles(stdout: string): Map<string, string> {
+  const files = new Map<string, string>();
+  let inOutputFiles = false;
+  for (const line of stdout.split(/\r?\n/)) {
+    if (line === "output_files:") {
+      inOutputFiles = true;
+      continue;
+    }
+    if (!inOutputFiles) continue;
+    const match = line.match(/^ {2}([a-zA-Z0-9_]+):\s*(.+?)\s*$/);
+    if (!match) {
+      if (line.trim() && !line.startsWith("  ")) break;
+      continue;
+    }
+    let value = match[2];
+    if (value.startsWith('"')) {
+      try {
+        value = JSON.parse(value) as string;
+      } catch {
+        continue;
+      }
+    } else if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1).replaceAll("''", "'");
+    }
+    if (isAbsolute(value)) files.set(match[1], value);
+  }
+  return files;
+}
+
+async function decodeTwgOutput(stdout: string): Promise<unknown> {
+  try {
+    return JSON.parse(stdout);
+  } catch {
+    // Some customer builds expose JSON through an agent summary file instead.
+  }
+  const files = summaryOutputFiles(stdout);
+  const primary = files.get("stdout");
+  if (primary) {
+    try {
+      return JSON.parse(await readFile(primary, "utf8"));
+    } catch {
+      // Report one stable transport error below; do not expose a private payload or path.
+    } finally {
+      await Promise.allSettled([...files.values()].map((file) => rm(file, { force: true })));
+    }
+  }
+  throw new TwgCliError("twg jira workitem get returned neither raw JSON nor summary output data");
 }
 
 function defaultRunner(
@@ -98,13 +149,9 @@ export function twgJiraClient(options: TwgJiraClientOptions = {}): JiraReader {
             error.message,
           );
         if (!unsupportedSummary) throw error;
-        result = await invoke([...globalArgs, ...commandArgs]);
+        result = await invoke([...globalArgs, "--output-summary=stats", ...commandArgs]);
       }
-      try {
-        return JSON.parse(result.stdout);
-      } catch {
-        throw new TwgCliError("twg jira workitem get returned invalid JSON");
-      }
+      return await decodeTwgOutput(result.stdout);
     },
   };
 }

@@ -150,9 +150,15 @@ console.log(JSON.stringify({ data: { repository } }));
 
 const fakeTwg = `#!/usr/bin/env node
 const assert = require("node:assert/strict");
+const { writeFileSync } = require("node:fs");
+const { join } = require("node:path");
 const args = process.argv.slice(2);
+if (args.includes("--output-summary=none")) {
+  console.error("option '--output-summary [level]' argument 'none' is invalid. Expected: stats, auto, inline.");
+  process.exit(1);
+}
 assert.deepEqual(args.slice(0, 7), [
-  "--site", "package-smoke", "--output", "json", "--output-summary=none", "jira", "workitem",
+  "--site", "package-smoke", "--output", "json", "--output-summary=stats", "jira", "workitem",
 ]);
 assert.deepEqual(args.slice(7, 9), ["get", args[8]]);
 assert.equal(args[9], "--full");
@@ -162,7 +168,7 @@ const links = key === "PKG-1" ? [{
   type: { name: "Relates", outward: "relates to" },
   outwardIssue: { key: "PKG-2" },
 }] : [];
-console.log(JSON.stringify({ data: { issue: {
+const payload = { data: { issue: {
   key,
   self: "https://package-smoke.atlassian.net/rest/api/3/issue/" + key,
   fields: {
@@ -171,7 +177,12 @@ console.log(JSON.stringify({ data: { issue: {
     issuetype: { name: "Task" },
     issuelinks: links,
   },
-} } }));
+} } };
+const stdout = join(process.env.TMPDIR, "fake-twg-" + key + ".json");
+const compact = join(process.env.TMPDIR, "fake-twg-" + key + ".compact.json");
+writeFileSync(stdout, JSON.stringify(payload));
+writeFileSync(compact, JSON.stringify(payload));
+console.log("output_files:\\n  stdout: " + JSON.stringify(stdout) + "\\n  compact: " + JSON.stringify(compact) + "\\n---END---");
 `;
 
 const guard = `
@@ -536,6 +547,11 @@ try {
   assert.deepEqual(
     jira.nodes.map((node: { issueKey: string }) => node.issueKey),
     ["PKG-1", "PKG-2"],
+  );
+  assert.deepEqual(
+    readdirSync(temp).filter((name) => name.startsWith("fake-twg-")),
+    [],
+    "Jira must remove TWG summary output files",
   );
   assert.ok(!existsSync(join(home, ".issue-graph")), "Jira must not persist snapshots");
   const statusArgs = ["status", "--repo", fixtureRepo, "--author", fixtureAuthor, "--json"];
