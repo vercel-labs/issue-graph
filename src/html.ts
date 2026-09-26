@@ -1157,39 +1157,48 @@ function swLayoutAt(W,avail,R){
   // a metric can be undefined for a node (closed items have no heat): leave it out
   const vals={};Object.keys(N).forEach(k=>{const v=swMetric(k);if(v!=null)vals[k]=v});
   const groups=swGroups().map(g=>({...g,members:g.members.filter(k=>k in vals)})).filter(g=>g.members.length);
-  const max=Math.max(1,...Object.values(vals));
-  // exact positions, equal values stack vertically; a wide range switches to a
-  // labeled log axis so hundreds of low values do not collapse into one column
-  const log=max>30;
-  const ints=Object.values(vals).every(Number.isInteger);
-  const sc=v=>log?Math.log1p(v)/Math.log1p(max):v/max;
-  const x0=LBL+PAD,x1=W-PAD-8,px=v=>x0+sc(v)*(x1-x0);
-  // each row gets a share of the viewport; a stack that reaches it spills sideways
-  // to the nearest free slot, so dense values form a swarm instead of a tower
+  const all=Object.values(vals),lo=Math.min(...all),hi=Math.max(...all);
+  // the axis spans the data, not zero to max; a wide range uses a labeled log axis
+  const ints=all.every(Number.isInteger),log=hi-lo>30&&lo>=0;
+  const f=v=>log?Math.log1p(v):v,span=f(hi)-f(lo)||1;
   const rowH=Math.max(30,Math.floor(avail/Math.max(1,groups.length)));
   const lanes=Math.max(0,Math.floor((rowH-20-D)/2/D));
+  // integer values own a band; keep the ends inset by one band so edge blobs are not clipped
+  const inner=W-LBL-2*PAD-8;
+  const unit=ints&&!log?inner/Math.max(1,hi-lo+1):0;
+  const inset=ints&&!log?unit/2:3*D;
+  const x0=LBL+PAD+inset,x1=W-PAD-8-inset;
+  const px=v=>hi===lo?(x0+x1)/2:x0+(f(v)-f(lo))/span*(x1-x0);
+  const bandOf=v=>ints?.45*(log?Math.min(px(v+1)-px(v),v>lo?px(v)-px(v-1):px(v+1)-px(v)):unit):4*D;
   const pos={};let y=0;const rows=[];
   for(const g of groups){
-    const placed=[],grid=new Map();
-    const cell=(x,o)=>Math.round(x/D)+':'+Math.round(o/D);
-    const free=(x,o)=>{const cx=Math.round(x/D),co=Math.round(o/D);
-      for(let a=cx-1;a<=cx+1;a++)for(let b=co-1;b<=co+1;b++)for(const p of grid.get(a+':'+b)||[])
-        if(Math.abs(p.x-x)<D&&Math.abs(p.o-o)<D)return false;return true;};
-    const sorted=g.members.slice().sort((a,b)=>vals[a]-vals[b]||a.localeCompare(b));
-    for(const k of sorted){
-      // spill sideways only within the space this value owns (for integers, under half
-      // the gap to the next one), so every dot still reads as its value; past that the
-      // row grows, because a taller row is better than a wrong position
-      const v=vals[k],base=px(v);
-      const band=ints?.45*Math.min(px(v+1)-base,v>0?base-px(v-1):px(v+1)-base):4*D;
-      const SPILL=Math.max(0,Math.floor(band/(D*.9))*2);let x=base,off=0,found=false;
-      for(let j=0;!found&&j<=SPILL;j++){
-        x=base+(j===0?0:(j%2?1:-1)*Math.ceil(j/2)*D*.9);
-        if(x<x0-D||x>x1+D)continue;
-        for(let i=0;i<=2*lanes;i++){off=i===0?0:(i%2?1:-1)*Math.ceil(i/2)*D;if(free(x,off)){found=true;break}}
+    const placed=[];
+    if(ints){
+      // one compact hex blob per value, as round as the row allows and never wider than its band
+      const by=new Map();for(const k of g.members){const v=vals[k];(by.get(v)??by.set(v,[]).get(v)).push(k)}
+      for(const [v,ks] of by){ks.sort((a,b)=>kcls(N[a]).localeCompare(kcls(N[b]))||a.localeCompare(b));
+        const maxCols=Math.max(1,Math.floor(2*bandOf(v)/D)+1),n=ks.length;
+        // prefer a round blob over a flat line: at least ~0.6·sqrt(n) rows even if the row grows
+        const nr=Math.max(Math.ceil(Math.sqrt(n)*.6),Math.min(2*lanes+1,Math.max(1,Math.round(Math.sqrt(n*.8)))),Math.ceil(n/maxCols));
+        const nc=Math.ceil(n/nr),cells=[];
+        for(let r=0;r<nr;r++)for(let c=0;c<nc;c++){const o=(r-(nr-1)/2)*D*.87,dx=(c-(nc-1)/2)*D+(r%2?D/2:0);cells.push({dx,o})}
+        cells.sort((p,q)=>(p.dx*p.dx+p.o*p.o)-(q.dx*q.dx+q.o*q.o));
+        ks.forEach((k,i)=>placed.push({k,x:px(v)+cells[i].dx,o:cells[i].o}));
       }
-      for(let i=2*lanes+1;!found;i++){x=base;off=(i%2?1:-1)*Math.ceil(i/2)*D;found=free(x,off)}
-      const pt={k,x,o:off};placed.push(pt);const c=cell(x,off);(grid.get(c)??grid.set(c,[]).get(c)).push(pt);
+    }else{
+      // continuous values: exact x, stacks spill a few slots sideways, then the row grows
+      const grid=new Map();
+      const cell=(x,o)=>Math.round(x/D)+':'+Math.round(o/D);
+      const free=(x,o)=>{const cx=Math.round(x/D),co=Math.round(o/D);
+        for(let a=cx-1;a<=cx+1;a++)for(let b=co-1;b<=co+1;b++)for(const p of grid.get(a+':'+b)||[])
+          if(Math.abs(p.x-x)<D&&Math.abs(p.o-o)<D)return false;return true;};
+      for(const k of g.members.slice().sort((a,b)=>vals[a]-vals[b]||a.localeCompare(b))){
+        const base=px(vals[k]),SPILL=8;let x=base,off=0,found=false;
+        for(let j=0;!found&&j<=SPILL;j++){x=base+(j===0?0:(j%2?1:-1)*Math.ceil(j/2)*D*.9);
+          for(let i=0;i<=2*lanes;i++){off=i===0?0:(i%2?1:-1)*Math.ceil(i/2)*D;if(free(x,off)){found=true;break}}}
+        for(let i=2*lanes+1;!found;i++){x=base;off=(i%2?1:-1)*Math.ceil(i/2)*D;found=free(x,off)}
+        const pt={k,x,o:off};placed.push(pt);const c=cell(x,off);(grid.get(c)??grid.set(c,[]).get(c)).push(pt);
+      }
     }
     const spread=placed.reduce((m,p)=>Math.max(m,Math.abs(p.o)),0);
     const h=Math.max(30,2*spread+D+20);
@@ -1199,14 +1208,18 @@ function swLayoutAt(W,avail,R){
     y+=h;
   }
   let ticks=[];
-  if(log)ticks=[0,1,3,10,30,100,300,1000,3000].filter(t=>t<=max);
-  else{const step=Math.max(1,Math.ceil(max/12));for(let t=0;t<=max;t+=step)ticks.push(t);}
-  return {pos,rows,H:y+52,ticks:ticks.map(t=>({t,x:px(t)})),x0,x1,R,log};
+  if(log)ticks=[0,1,3,10,30,100,300,1000,3000].filter(t=>t>=lo&&t<=hi);
+  else{const step=Math.max(1,Math.ceil((hi-lo)/12));for(let t=Math.ceil(lo);t<=hi;t+=step)ticks.push(t);}
+  // label the ends of the data too, so the axis says where it starts and stops
+  const nice=v=>Math.round(v*10)/10;
+  for(const e of [lo,hi])if(!ticks.some(t=>Math.abs(px(t)-px(e))<28))ticks.push(nice(e));
+  ticks.sort((p,q)=>p-q);
+  return {pos,rows,H:y+52,ticks:ticks.map(t=>({t,x:px(t)})),x0,x1,R,log,lblEnd:LBL+PAD};
 }
 // densest views shrink the dots until the chart fits the viewport, never below a readable size
 function swLayout(W,avail){
   let L;
-  for(const R of [4,3.5,3,2.5,2]){L=swLayoutAt(W,avail,R);if(L.H-52<=avail)break;}
+  for(const R of [4.5,4,3.5,3,2.5]){L=swLayoutAt(W,avail,R);if(L.H-52<=avail)break;}
   return L;
 }
 function swarmSvg(W,avail){
@@ -1214,7 +1227,7 @@ function swarmSvg(W,avail){
   const rows=L.rows.map((r,i)=>
     (i?'<line class="grid" x1="0" x2="'+W+'" y1="'+r.top+'" y2="'+r.top+'"/>':'')+
     '<text class="row-lbl" x="0" y="'+(r.cy+4)+'">'+esc(r.label.length>26?r.label.slice(0,25)+'…':r.label)+'</text>'+
-    '<text class="row-n" x="'+(L.x0-16)+'" y="'+(r.cy+4)+'" text-anchor="end">'+r.n+'</text>').join('');
+    '<text class="row-n" x="'+(L.lblEnd-16)+'" y="'+(r.cy+4)+'" text-anchor="end">'+r.n+'</text>').join('');
   const ay=L.H-48,meta=SW_META[SW.x];
   const axis='<line class="grid" x1="'+L.x0+'" x2="'+L.x1+'" y1="'+ay+'" y2="'+ay+'"/>'+
     L.ticks.map(t=>'<line class="grid" x1="'+t.x+'" x2="'+t.x+'" y1="'+ay+'" y2="'+(ay+4)+'"/>'+
