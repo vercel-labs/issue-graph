@@ -1172,9 +1172,11 @@ function swLayoutAt(W,avail,R){
   const bandOf=v=>ints?.45*(log?Math.min(px(v+1)-px(v),v>lo?px(v)-px(v-1):px(v+1)-px(v)):unit):4*D;
   const pos={};let y=0;const rows=[];
   for(const g of groups){
-    const placed=[];
+    // every dot gets an ideal spot (its slot in its value's blob, or its exact x), then the
+    // nearest free spot to it: one occupancy grid per row keeps the same minimum distance
+    // between all dots, so neighbouring values push each other apart instead of overlapping
+    const targets=[];
     if(ints){
-      // one compact hex blob per value, as round as the row allows and never wider than its band
       const by=new Map();for(const k of g.members){const v=vals[k];(by.get(v)??by.set(v,[]).get(v)).push(k)}
       for(const [v,ks] of by){ks.sort((a,b)=>kcls(N[a]).localeCompare(kcls(N[b]))||a.localeCompare(b));
         const maxCols=Math.max(1,Math.floor(2*bandOf(v)/D)+1),n=ks.length;
@@ -1183,22 +1185,25 @@ function swLayoutAt(W,avail,R){
         const nc=Math.ceil(n/nr),cells=[];
         for(let r=0;r<nr;r++)for(let c=0;c<nc;c++){const o=(r-(nr-1)/2)*D*.87,dx=(c-(nc-1)/2)*D+(r%2?D/2:0);cells.push({dx,o})}
         cells.sort((p,q)=>(p.dx*p.dx+p.o*p.o)-(q.dx*q.dx+q.o*q.o));
-        ks.forEach((k,i)=>placed.push({k,x:px(v)+cells[i].dx,o:cells[i].o}));
-      }
-    }else{
-      // continuous values: exact x, stacks spill a few slots sideways, then the row grows
-      const grid=new Map();
-      const cell=(x,o)=>Math.round(x/D)+':'+Math.round(o/D);
-      const free=(x,o)=>{const cx=Math.round(x/D),co=Math.round(o/D);
-        for(let a=cx-1;a<=cx+1;a++)for(let b=co-1;b<=co+1;b++)for(const p of grid.get(a+':'+b)||[])
-          if(Math.abs(p.x-x)<D&&Math.abs(p.o-o)<D)return false;return true;};
-      for(const k of g.members.slice().sort((a,b)=>vals[a]-vals[b]||a.localeCompare(b))){
-        const base=px(vals[k]),SPILL=8;let x=base,off=0,found=false;
-        for(let j=0;!found&&j<=SPILL;j++){x=base+(j===0?0:(j%2?1:-1)*Math.ceil(j/2)*D*.9);
-          for(let i=0;i<=2*lanes;i++){off=i===0?0:(i%2?1:-1)*Math.ceil(i/2)*D;if(free(x,off)){found=true;break}}}
-        for(let i=2*lanes+1;!found;i++){x=base;off=(i%2?1:-1)*Math.ceil(i/2)*D;found=free(x,off)}
-        const pt={k,x,o:off};placed.push(pt);const c=cell(x,off);(grid.get(c)??grid.set(c,[]).get(c)).push(pt);
-      }
+        ks.forEach((k,i)=>targets.push({k,x:px(v)+cells[i].dx,o:cells[i].o,v}));}
+    }else for(const k of g.members)targets.push({k,x:px(vals[k]),o:0,v:vals[k]});
+    // dense centres first, so blob cores keep their shape and stragglers move around them
+    targets.sort((p,q)=>Math.abs(p.o)-Math.abs(q.o)||p.v-q.v||p.k.localeCompare(q.k));
+    const placed=[],grid=new Map(),C=D;
+    const key=(x,o)=>Math.floor(x/C)+':'+Math.floor(o/C);
+    const free=(x,o)=>{const cx=Math.floor(x/C),co=Math.floor(o/C);
+      for(let a=cx-1;a<=cx+1;a++)for(let b=co-1;b<=co+1;b++)for(const p of grid.get(a+':'+b)||[])
+        if((p.x-x)**2+(p.o-o)**2<D*D*.98)return false;return true;};
+    const hx=D/2,hy=D*.87/2;
+    // candidate offsets depend only on the lattice, so sort them by distance once per layout
+    const offs=[];for(let i=-60;i<=60;i++)for(let j=-60;j<=60;j++)offs.push([i*hx,j*hy]);
+    offs.sort((p,q)=>(p[0]*p[0]+p[1]*p[1])-(q[0]*q[0]+q[1]*q[1]));
+    for(const t of targets){
+      let best=null;
+      for(const [dx,dy] of offs){const x=t.x+dx,o=t.o+dy;if(x>=x0-inset&&x<=x1+inset&&free(x,o)){best={x,o};break}}
+      // a row denser than the precomputed lattice falls back to stacking at its own x
+      for(let i=61;!best;i++)for(const sg of [1,-1])if(!best&&free(t.x,t.o+sg*i*hy))best={x:t.x,o:t.o+sg*i*hy};
+      const pt={k:t.k,x:best.x,o:best.o};placed.push(pt);const kk=key(pt.x,pt.o);(grid.get(kk)??grid.set(kk,[]).get(kk)).push(pt);
     }
     const spread=placed.reduce((m,p)=>Math.max(m,Math.abs(p.o)),0);
     const h=Math.max(30,2*spread+D+20);
@@ -1217,7 +1222,14 @@ function swLayoutAt(W,avail,R){
   return {pos,rows,H:y+52,ticks:ticks.map(t=>({t,x:px(t)})),x0,x1,R,log,lblEnd:LBL+PAD};
 }
 // densest views shrink the dots until the chart fits the viewport, never below a readable size
+// layouts are pure given these inputs, so toggling back to a view reuses its layout
+const SW_CACHE=new Map();
 function swLayout(W,avail){
+  const ck=[DATA.repo,SW.by,SW.x,Math.round(W),Math.round(avail),RK.join(',')].join('|');
+  if(SW_CACHE.has(ck))return SW_CACHE.get(ck);
+  const L=swLayoutFit(W,avail);SW_CACHE.set(ck,L);return L;
+}
+function swLayoutFit(W,avail){
   let L;
   for(const R of [3,2.5,2]){L=swLayoutAt(W,avail,R);if(L.H-52<=avail)break;}
   return L;
