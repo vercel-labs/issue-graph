@@ -1153,7 +1153,7 @@ function swMetric(k){
   return neighbors(k).size;
 }
 function swLayoutAt(W,avail,R){
-  const GAP=Math.max(2,R*.8),D=2*R+GAP,LBL=190,PAD=12;
+  const GAP=Math.max(3,R*2),D=2*R+GAP,LBL=190,PAD=12;
   // a metric can be undefined for a node (closed items have no heat): leave it out
   const vals={};Object.keys(N).forEach(k=>{const v=swMetric(k);if(v!=null)vals[k]=v});
   const groups=swGroups().map(g=>({...g,members:g.members.filter(k=>k in vals)})).filter(g=>g.members.length);
@@ -1219,7 +1219,7 @@ function swLayoutAt(W,avail,R){
 // densest views shrink the dots until the chart fits the viewport, never below a readable size
 function swLayout(W,avail){
   let L;
-  for(const R of [4.5,4,3.5,3,2.5]){L=swLayoutAt(W,avail,R);if(L.H-52<=avail)break;}
+  for(const R of [3,2.5,2]){L=swLayoutAt(W,avail,R);if(L.H-52<=avail)break;}
   return L;
 }
 function swarmSvg(W,avail){
