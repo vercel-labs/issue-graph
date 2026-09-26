@@ -1153,7 +1153,7 @@ function swMetric(k){
   return neighbors(k).size;
 }
 function swLayoutAt(W,avail,R){
-  const GAP=Math.max(1.5,R*.5),D=2*R+GAP,LBL=190,PAD=12;
+  const GAP=Math.max(2,R*.8),D=2*R+GAP,LBL=190,PAD=12;
   // a metric can be undefined for a node (closed items have no heat): leave it out
   const vals={};Object.keys(N).forEach(k=>{const v=swMetric(k);if(v!=null)vals[k]=v});
   const groups=swGroups().map(g=>({...g,members:g.members.filter(k=>k in vals)})).filter(g=>g.members.length);
