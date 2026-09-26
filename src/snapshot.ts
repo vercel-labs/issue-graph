@@ -177,3 +177,35 @@ export function diffSnapshots(prev: Snapshot, now: Snapshot): string {
   }
   return `${out.join("\n")}\n`;
 }
+
+/** Where each repository's latest explorer model is kept for `issue-graph dashboard`. */
+export function dashboardDir(): string {
+  return path.join(os.homedir(), ".issue-graph", "dashboard");
+}
+
+/** Save one run's explorer model, replacing the previous one for that repository. */
+export function writeDashboardModel(repo: string, model: unknown): string {
+  const dir = dashboardDir();
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  fs.writeFileSync(file, JSON.stringify(model), { mode: 0o600 });
+  return file;
+}
+
+/** Every saved model, most recently written first; unreadable files are skipped. */
+export function readDashboardModels<T>(): T[] {
+  const dir = dashboardDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => path.join(dir, f))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
+    .flatMap((file) => {
+      try {
+        return [JSON.parse(fs.readFileSync(file, "utf8")) as T];
+      } catch {
+        return [];
+      }
+    });
+}

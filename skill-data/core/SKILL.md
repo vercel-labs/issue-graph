@@ -45,6 +45,19 @@ Repeated `--repo` and repeated/comma-separated `--author` define status scope;
 matching is case-insensitive. Ask for scope only if it remains unresolved.
 Before starting issue work, inspect its graph for existing work and credit contributors.
 
+## Offer the next view
+
+After relaying a graph, offer the views the run did not use as a short numbered menu,
+built from the printed "Next steps" commands. Keep it concrete, for example:
+
+1. Open the dashboard: Swarm, Impact, Rank, and Cleanup (`--open`)
+2. Group these items by root cause (`--cluster-run claude --open`); say that this
+   sends titles and edges to that agent, and run it only after the user agrees
+3. Rank what to fix first (`--prioritize`), or adjust the weights in the Rank view
+
+Run the chosen command; do not run all of them. Offering clustering is fine; sending
+evidence to an agent still needs the user's consent and the boundary check below.
+
 ## Preserve counts and uncertainty
 
 - Check `coverageComplete` and per-repository `coverage` before claiming totals.
