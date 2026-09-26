@@ -35,6 +35,7 @@ fabricate results, or install/upgrade anything automatically.
 | Project totals | Same scope with `--view projects` |
 | Changes since a status capture | Same scope with `--since last` or `--since PATH` |
 | Linked work, competing fixes, overlap | `issue-graph <url\|number> --repo owner/repo` |
+| Whole open backlog, clustered and visualized | `issue-graph --all-open --repo owner/repo --max-nodes 1000 --cluster-run claude --open` |
 | Open-backlog verification queue | `issue-graph reconcile --repo owner/repo` |
 | Next backlog action | `issue-graph plan --repo owner/repo` |
 
@@ -54,6 +55,11 @@ built from the printed "Next steps" commands. Keep it concrete, for example:
 2. Group these items by root cause (`--cluster-run claude --open`); say that this
    sends titles and edges to that agent, and run it only after the user agrees
 3. Rank what to fix first (`--prioritize`), or adjust the weights in the Rank view
+4. See every saved run in one dashboard with a project switcher (`issue-graph dashboard --open`)
+
+For "cluster the open issues and open the dashboard", seed with `--all-open`; it takes
+up to `--max-nodes` items (default 80), so raise it for a large backlog and relay the
+printed note when the limit cuts the seed list.
 
 Run the chosen command; do not run all of them. Offering clustering is fine; sending
 evidence to an agent still needs the user's consent and the boundary check below.

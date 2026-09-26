@@ -52,7 +52,7 @@ Ready-for-review means non-draft, not approved or merge-ready. For a ready-for-r
    ```bash
    issue-graph <url|number> --repo owner/repo [--depth N] [--cluster] [--prioritize]
    ```
-   Multi-seed / backlog survey: `--seeds 1,2,3` or `--label <label>`. Add `--prioritize` when the ask is "what should I fix first". `issue-graph --help` lists every flag.
+   Multi-seed / backlog survey: `--seeds 1,2,3`, `--label <label>`, or `--all-open` for every open issue and PR (up to `--max-nodes`, at most 1000). Add `--prioritize` when the ask is "what should I fix first". `issue-graph --help` lists every flag.
    Done when the CLI has printed the Nodes list and the orphan checklist.
 
    Map the ask onto the invocation:
@@ -66,6 +66,8 @@ Ready-for-review means non-draft, not approved or merge-ready. For a ready-for-r
    | "clean/reconcile the whole backlog", including repos without labels | `issue-graph reconcile --repo <o/r> --format markdown` |
    | "what should happen next until the backlog is empty" | `issue-graph plan --repo <o/r> --format markdown` |
    | "cluster my backlog by root cause" | `issue-graph --seeds <n,n,n> --repo <o/r> --cluster` |
+   | "cluster all open issues and open the dashboard" | `issue-graph --all-open --repo <o/r> --max-nodes 1000 --cluster-run claude --open` |
+   | "show every repo I've run in one dashboard" | `issue-graph dashboard --open` |
    | "what changed since last time" | re-run the same seeds; the snapshot diff is automatic |
 
 2. **Surface the orphans and hazards.** Relay the orphan checklist as inspection candidates, most-actionable first:
@@ -152,6 +154,7 @@ The plan does not infer semantic dependencies from issue prose. Treat `blockedBy
 - `reconcile --repo owner/repo` inventories the open backlog without labels; `--format auto|json|markdown` controls its versioned output.
 - `plan --repo owner/repo` turns that reconciliation into execution, investigation, and blocked queues without writing snapshots.
 - `--json out.json` writes the graph with `components`, `overlaps`, and `priorities`; it is not versioned like status/reconcile/plan reports. `--no-snapshot` skips new history files, not explicit exports or reads of prior history.
+- `--open` writes the explorer (to a temp file unless `--html`) and opens it. Unless `--no-snapshot`, the run's model is saved under `~/.issue-graph/dashboard/`, one per repository; `issue-graph dashboard --open` renders every saved run with a project switcher.
 - `--html out.html` writes a self-contained explorer without a server. `--clusters clusters.json` reads agent-named groups and a cleanup list for the explorer; it does not invoke an agent. Prepare JSON separately from the clustering response as either `[{label, root_cause?, members:[{key, verdict?}]}]` or `{clusters:[…], cleanup:[{key?, text}]}`. Treat its Impact view as a projection of visible relationships, not proof of causality.
 
 ## How it reads the graph

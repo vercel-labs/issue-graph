@@ -337,3 +337,14 @@ describe("offline CLI output dispatch", () => {
     expect(output).not.toContain("\u001b[");
   });
 });
+
+describe("--all-open", () => {
+  test("parses and needs a repository", () => {
+    expect(parseArgs(["--all-open", "--repo", "o/r"]).allOpen).toBe(true);
+  });
+
+  test("next steps repeat the whole-backlog seed", () => {
+    const steps = nextSteps(parseArgs(["--all-open", "--repo", "o/r"]), "o", "r");
+    expect(steps).toContain("issue-graph --all-open --repo o/r --open");
+  });
+});
