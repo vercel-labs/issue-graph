@@ -24,3 +24,7 @@ describe("cluster JSON for the explorer", () => {
     expect(() => parseClustersReply('{"groups":[]}')).toThrow(/no clusters/);
   });
 });
+
+test("reply with a cluster missing members is rejected, so the explorer falls back", () => {
+  expect(() => parseClustersReply('{"clusters":[{"label":"A"}]}')).toThrow(/no members array/);
+});

@@ -92,6 +92,10 @@ export function parseClustersReply(reply: string): {
     cleanup?: unknown;
   };
   if (!Array.isArray(parsed.clusters)) throw new Error("agent reply has no clusters array");
+  const bad = parsed.clusters.findIndex(
+    (c) => !c || typeof c !== "object" || !Array.isArray((c as { members?: unknown }).members),
+  );
+  if (bad >= 0) throw new Error(`agent reply cluster ${bad} has no members array`);
   return {
     clusters: parsed.clusters as ClusterReply[],
     cleanup: Array.isArray(parsed.cleanup)

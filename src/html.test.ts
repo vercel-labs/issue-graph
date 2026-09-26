@@ -119,3 +119,12 @@ describe("renderDashboard", () => {
     expect(() => renderDashboard([])).toThrow(/at least one model/);
   });
 });
+
+test("a --clusters entry without members is skipped instead of crashing", () => {
+  const nodes = asMap([node("o/r#1")]);
+  const html = renderHtml(nodes, ["o/r#1"], "o/r", {
+    clusters: [{ label: "Broken" } as never, { label: "Good", members: [{ key: "o/r#1" }] }],
+  });
+  expect(html).toContain("Good");
+  expect(html).not.toContain('"label":"Broken"');
+});

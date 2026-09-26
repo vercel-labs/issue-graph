@@ -29,8 +29,11 @@ function normalizeClusters(c?: ClustersConfig): {
   cleanup: CleanupItem[];
 } {
   if (!c) return { clusters: [], cleanup: [] };
-  if (Array.isArray(c)) return { clusters: c, cleanup: [] };
-  return { clusters: c.clusters ?? [], cleanup: c.cleanup ?? [] };
+  const raw = Array.isArray(c) ? c : (c.clusters ?? []);
+  // a hand-written or agent-written file can be malformed; skip entries without members
+  const clusters = raw.filter((k) => k && Array.isArray(k.members));
+  const cleanup = Array.isArray(c) ? [] : Array.isArray(c.cleanup) ? c.cleanup : [];
+  return { clusters, cleanup };
 }
 
 /** A group in the left tree: a connected component, or an agent-named cluster. */
@@ -934,7 +937,14 @@ function fileReach(){
 let REACH=null;const reach=()=>REACH??(REACH=fileReach());
 // shared files arrive source-first; docs and lockfiles after o.significant are incidental
 const srcFiles=o=>o.shared.slice(0,o.significant);
-function overlapWith(k,x){return N[k].overlaps.find(o=>o.with===x)}
+// an issue has no files: its overlaps are those of the open PRs that close it, and the
+// one sharing the most source files with x speaks for it
+function overlapWith(k,x){
+  const own=N[k].overlaps.find(o=>o.with===x);if(own||N[k].kind==='PullRequest')return own;
+  let best;for(const e of N[k].in){if(e.via!=='closes'||N[e.from]?.state!=='OPEN')continue;
+    const o=N[e.from].overlaps.find(o=>o.with===x);if(o&&(!best||o.significant>best.significant))best=o;}
+  return best;
+}
 // strength of a link from k to x: rarity of shared files for overlaps, heat otherwise
 function strength(k,x,bucket){
   if(bucket==='overlaps'){const o=overlapWith(k,x);if(!o)return 0;const R=reach(),P=Math.max(2,R.size);
