@@ -578,6 +578,21 @@ svg .center{font-weight:600}
 .im-rip .core-t{font-family:var(--mono);font-size:11px;fill:var(--bg);font-weight:600}
 .im-rip .wave{fill:none;stroke:var(--fg);opacity:0;transform-box:fill-box;transform-origin:center;animation:wave 900ms ease-out 1}
 @keyframes wave{0%{opacity:.35;transform:scale(.3)}100%{opacity:0;transform:scale(1)}}
+.im-rip .arc{fill:none;stroke-width:3;opacity:.35;stroke-linecap:round}
+.im-rip .arc.s-resolves{stroke:var(--open-fg)}.im-rip .arc.s-prs{stroke:var(--accent)}.im-rip .arc.s-overlaps{stroke:var(--warn-fg)}.im-rip .arc.s-followups{stroke:var(--merged-fg)}.im-rip .arc.s-related{stroke:var(--closed-fg)}
+.im-rip .more-t{font-family:var(--sans);font-size:11px;fill:var(--muted)}
+.im-hot{font-size:12px;line-height:18px;color:var(--fg2);background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:12px}
+.im-aff{margin-top:12px;max-height:320px;overflow-y:auto;border-top:1px solid var(--border)}
+.im-aff-g>summary{list-style:none;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--fg2);padding:8px 0;cursor:pointer}
+.im-aff-g>summary::-webkit-details-marker{display:none}
+.im-aff-g>summary i{width:8px;height:8px;border-radius:9999px}
+.im-aff-g>summary b{margin-left:auto;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
+.im-aff-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;width:100%;padding:6px 8px;border:0;border-radius:6px;background:none;color:var(--fg);font-family:var(--sans);font-size:12px;text-align:left;cursor:pointer}
+.im-aff-row:hover{background:var(--bg2)}
+.im-aff-row .k{font-family:var(--mono);color:var(--muted)}
+.im-aff-row .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.im-aff-row .why{grid-column:2;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.im-aff-row .why code{font-size:11px;padding:0 4px}
 .im-legend{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:12px;color:var(--fg2)}
 .im-legend span{display:flex;align-items:center;gap:6px}.im-legend b{margin-left:auto;font-weight:500;font-variant-numeric:tabular-nums;color:var(--fg)}
 .im-legend i{width:8px;height:8px;border-radius:9999px;display:block}
@@ -643,7 +658,7 @@ function kcls(n){
 const statGrid=rows=>'<div class="stats">'+rows.map(t=>'<div class="stat '+(t[1]===0?'zero':t[2])+'"><div class="stat-n">'+t[1]+'</div><div class="stat-l">'+t[0]+'</div></div>').join('')+'</div>';
 function setProject(repo){
   const next=PROJECTS.find(p=>p.repo===repo);if(!next||next===DATA)return;
-  DATA=next;N=DATA.nodes;PV=DATA.provider;impactSel=null;loadDone();
+  DATA=next;N=DATA.nodes;PV=DATA.provider;impactSel=null;REACH=null;loadDone();
   try{const u=new URL(location.href);u.searchParams.set('project',repo);history.replaceState(null,'',u)}catch{}
   document.title='issue-graph · '+repo;
   app.querySelector('.side').outerHTML=sidebar();wireSidebar();
@@ -896,27 +911,86 @@ function groupLabels(){
 }
 
 const BUCKETS=[['resolves','Issues it resolves'],['prs','PRs to reconcile'],['overlaps','Overlapping PRs'],['followups','Follow-up issues'],['related','Other open links']];
+// Direct effects count 1 each; an overlap counts 2 / (PRs touching its rarest shared
+// source file), so a file only the pair touches weighs 1 and a hotspot weighs almost 0.
+function overlapWeight(k,x){const f=rarest(k,x);return f?Math.min(1,2/(reach().get(f)||2)):0}
+function impactParts(k,b){
+  const parts={};for(const [id] of BUCKETS)parts[id]=id==='overlaps'?[...b.overlaps].reduce((a,x)=>a+overlapWeight(k,x),0):b[id].size;
+  return parts;
+}
 function impactRows(){
-  return Object.keys(N).filter(k=>N[k].state==='OPEN').map(k=>({k,b:blastRadius(k)})).filter(r=>r.b.total>0)
-    .sort((x,y)=>y.b.total-x.b.total||y.b.resolves.size-x.b.resolves.size||x.k.localeCompare(y.k));
+  return Object.keys(N).filter(k=>N[k].state==='OPEN').map(k=>{const b=blastRadius(k),parts=impactParts(k,b);
+      return {k,b,parts,score:Object.values(parts).reduce((a,v)=>a+v,0)};}).filter(r=>r.b.total>0)
+    .sort((x,y)=>y.score-x.score||y.b.resolves.size-x.b.resolves.size||x.k.localeCompare(y.k));
+}
+// How many open PRs touch each file, from the overlap pairs; rare shared files are
+// the strong duplicate signal, hotspot files that most PRs touch are not.
+function fileReach(){
+  const by=new Map();
+  for(const n of Object.values(N))for(const o of n.overlaps)for(const f of srcFiles(o)){
+    const s=by.get(f)??by.set(f,new Set()).get(f);s.add(n.key);s.add(o.with);}
+  return new Map([...by].map(([f,s])=>[f,s.size]));
+}
+let REACH=null;const reach=()=>REACH??(REACH=fileReach());
+// shared files arrive source-first; docs and lockfiles after o.significant are incidental
+const srcFiles=o=>o.shared.slice(0,o.significant);
+function overlapWith(k,x){return N[k].overlaps.find(o=>o.with===x)}
+// strength of a link from k to x: rarity of shared files for overlaps, heat otherwise
+function strength(k,x,bucket){
+  if(bucket==='overlaps'){const o=overlapWith(k,x);if(!o)return 0;const R=reach(),P=Math.max(2,R.size);
+    return srcFiles(o).reduce((a,f)=>a+Math.log((P+1)/(R.get(f)||1)),0)+(o.sharedIssue?5:0);}
+  return N[x]?.heat?heatScore(N[x]):0;
+}
+function rarest(k,x){const o=overlapWith(k,x);if(!o)return null;const R=reach();
+  return srcFiles(o).slice().sort((a,b)=>(R.get(a)||0)-(R.get(b)||0))[0];}
+function affected(k){
+  const b=blastRadius(k);
+  return BUCKETS.map(([id,label])=>({id,label,items:[...b[id]].map(x=>({x,s:strength(k,x,id)})).sort((p,q)=>q.s-p.s||p.x.localeCompare(q.x))}));
 }
 function ripple(k){
-  const b=blastRadius(k),W=460,H=360,cx=W/2,cy=H/2,R1=78,R2=140;
-  const inner=[...b.resolves].map(x=>[x,'resolves']).concat([...b.prs].map(x=>[x,'prs']));
-  const outer=[...b.overlaps].map(x=>[x,'overlaps']).concat([...b.followups].map(x=>[x,'followups']),[...b.related].map(x=>[x,'related']));
-  let i=0;
+  const W=460,H=360,cx=W/2,cy=H/2,R1=78,R2=140,groups=affected(k);
+  // show as many satellites as fit legibly around each ring (label width ~34px), strongest first
+  const fit=r=>Math.max(4,Math.floor(2*Math.PI*r/34));
+  const ringOf=id=>id==='resolves'||id==='prs'?1:2;
+  const pick=(ring,r)=>{const gs=groups.filter(g=>ringOf(g.id)===ring&&g.items.length);const total=gs.reduce((a,g)=>a+g.items.length,0);
+    const cap=fit(r);if(total<=cap)return {shown:gs.flatMap(g=>g.items.map(it=>[it.x,g.id])),more:[],gs,total};
+    const shown=[],more=[];for(const g of gs){const n=Math.max(1,Math.round(cap*g.items.length/total));
+      shown.push(...g.items.slice(0,n).map(it=>[it.x,g.id]));if(g.items.length>n)more.push([g.id,g.items.length-n]);}
+    return {shown,more,gs,total};};
+  const r1=pick(1,R1),r2=pick(2,R2);let i=0;
+  // arcs: each bucket's share of its ring, so proportions read even when most items are summarized
+  const arcs=(p,r)=>{if(!p.total)return '';let a0=-Math.PI/2;return p.gs.map(g=>{const a1=a0+2*Math.PI*g.items.length/p.total;
+    const big=a1-a0>Math.PI?1:0,x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1-.0001),y1=cy+r*Math.sin(a1-.0001);
+    const d='M'+x0+' '+y0+' A'+r+' '+r+' 0 '+big+' 1 '+x1+' '+y1;a0=a1;return '<path class="arc s-'+g.id+'" d="'+d+'"/>';}).join('')};
   const ring=(list,r,phase)=>list.map((it,j)=>{const a=-Math.PI/2+phase+(j/list.length)*2*Math.PI;
-    const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a),len=Math.round(r),d=(i++)*45;
-    const lx=cx+(r+18)*Math.cos(a),ly=cy+(r+18)*Math.sin(a)+3;
+    const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a),len=Math.round(r),d=Math.min(i++,40)*28;
+    const lx=cx+(r+16)*Math.cos(a),ly=cy+(r+16)*Math.sin(a)+3;
     return '<line class="ray" x1="'+cx+'" y1="'+cy+'" x2="'+x+'" y2="'+y+'" style="--len:'+len+';animation-delay:'+d+'ms"/>'+
       '<g class="sat" data-key="'+esc(it[0])+'"><title>'+esc(short(it[0])+' '+(N[it[0]]?.title||''))+'</title>'+
-      '<circle class="s-'+it[1]+'" cx="'+x+'" cy="'+y+'" r="7" style="animation-delay:'+(d+220)+'ms"/>'+
+      '<circle class="s-'+it[1]+'" cx="'+x+'" cy="'+y+'" r="6" style="animation-delay:'+(d+220)+'ms"/>'+
       '<text x="'+lx+'" y="'+ly+'" text-anchor="'+(Math.abs(lx-cx)<8?'middle':lx<cx?'end':'start')+'">'+short(it[0])+'</text></g>';}).join('');
-  const body=ring(inner,R1,0)+ring(outer,R2,Math.PI/Math.max(outer.length,1));
-  return '<svg class="im-rip" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+b.total+' items affected by '+esc(short(k))+'">'+
-    (inner.length?'<circle class="orbit" cx="'+cx+'" cy="'+cy+'" r="'+R1+'"/>':'')+(outer.length?'<circle class="orbit" cx="'+cx+'" cy="'+cy+'" r="'+R2+'"/>':'')+
-    '<circle class="wave" cx="'+cx+'" cy="'+cy+'" r="'+R2+'"/>'+body+
-    '<circle class="core" cx="'+cx+'" cy="'+cy+'" r="22"/><text class="core-t" x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle">'+short(k)+'</text></svg>';
+  const more=[...r1.more,...r2.more].map(m=>m[1]).reduce((a,b)=>a+b,0);
+  return '<svg class="im-rip" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(r1.total+r2.total)+' items affected by '+esc(short(k))+'">'+
+    arcs(r1,R1)+arcs(r2,R2)+'<circle class="wave" cx="'+cx+'" cy="'+cy+'" r="'+R2+'"/>'+
+    ring(r1.shown,R1,0)+ring(r2.shown,R2,Math.PI/Math.max(r2.shown.length,1))+
+    '<circle class="core" cx="'+cx+'" cy="'+cy+'" r="22"/><text class="core-t" x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle">'+short(k)+'</text>'+
+    (more?'<text class="more-t" x="'+cx+'" y="'+(H-6)+'" text-anchor="middle">Showing the strongest '+(r1.shown.length+r2.shown.length)+'; +'+more+' more in the list below</text>':'')+'</svg>';
+}
+function affectedList(k){
+  const R=reach();
+  return '<div class="im-aff">'+affected(k).filter(g=>g.items.length).map(g=>
+    '<details class="im-aff-g"'+(g.items.length<=8?' open':'')+'><summary><i class="b-'+g.id+'"></i>'+g.label+'<b>'+g.items.length+'</b></summary>'+
+    g.items.map(it=>{const n=N[it.x],f=g.id==='overlaps'?rarest(k,it.x):null;
+      return '<button class="im-aff-row" data-key="'+esc(it.x)+'"><span class="k">'+short(it.x)+'</span><span class="t">'+esc(n?.title||'')+'</span>'+
+        (f?'<span class="why" title="'+esc(f)+'">shares <code>'+esc(f.split('/').pop())+'</code> · '+(R.get(f)||0)+' PRs</span>':'')+'</button>';}).join('')+
+    '</details>').join('')+'</div>';
+}
+function hotspot(k){
+  const b=blastRadius(k);if(!b.overlaps.size)return '';
+  const R=reach(),c=new Map();
+  for(const x of b.overlaps){const o=overlapWith(k,x);if(o)for(const f of srcFiles(o))c.set(f,(c.get(f)||0)+1);}
+  const top=[...c].sort((p,q)=>q[1]-p[1])[0];if(!top)return '';
+  return '<div class="im-hot">Most common shared file: <code>'+esc(top[0])+'</code>, in '+top[1]+' of '+b.overlaps.size+' overlaps ('+(R.get(top[0])||0)+' open PRs touch it). The list ranks rarer shared files first.</div>';
 }
 function impactPanel(k){
   const n=N[k],b=blastRadius(k);
@@ -924,6 +998,7 @@ function impactPanel(k){
     '<div class="sub">'+esc(n.title||'')+'</div>'+ripple(k)+
     '<div class="im-legend">'+BUCKETS.map(x=>'<span><i class="b-'+x[0]+'"></i>'+x[1]+'<b>'+b[x[0]].size+'</b></span>').join('')+
     '<span><i style="background:var(--fg)"></i>Total affected<b>'+b.total+'</b></span></div>'+
+    hotspot(k)+affectedList(k)+
     '<div class="im-actions"><button class="cl-swarm" id="im-inspect">Inspect evidence</button><button class="cl-swarm" id="im-swarm">See in Swarm</button></div>'+
     '<div class="im-hint">Inner ring: direct effects. Outer ring: work that touches it. A projection from visible links, not proof.</div></div>';
 }
@@ -932,14 +1007,15 @@ function impactView(k){
   const rows=impactRows();
   if(k!==undefined&&k!==null&&N[k])impactSel=k;
   if(!impactSel||!rows.some(r=>r.k===impactSel))impactSel=rows[0]?.k||null;
-  const max=Math.max(1,...rows.map(r=>r.b.total));
+  const max=Math.max(1,...rows.map(r=>r.score));
   const list=rows.map((r,i)=>{const n=N[r.k];
-    const lane=BUCKETS.map((x,j)=>r.b[x[0]].size?'<span class="b-'+x[0]+'" style="width:'+(r.b[x[0]].size/max*100)+'%;animation-delay:'+(Math.min(i,14)*25+j*40)+'ms"></span>':'').join('');
-    return '<button class="im-row'+(r.k===impactSel?' on':'')+'" data-k="'+esc(r.k)+'"><span class="im-rank">'+(i+1)+'</span>'+
+    const lane=BUCKETS.map((x,j)=>r.parts[x[0]]>0?'<span class="b-'+x[0]+'" style="width:'+(r.parts[x[0]]/max*100)+'%;animation-delay:'+(Math.min(i,14)*25+j*40)+'ms"></span>':'').join('');
+    const tip=r.b.total+' items touched: '+BUCKETS.filter(x=>r.b[x[0]].size).map(x=>r.b[x[0]].size+' '+x[1].toLowerCase()).join(', ');
+    return '<button class="im-row'+(r.k===impactSel?' on':'')+'" data-k="'+esc(r.k)+'" title="'+esc(tip)+'"><span class="im-rank">'+(i+1)+'</span>'+
       '<span class="im-who"><i class="dot '+kcls(n)+'"></i><span class="k">'+short(r.k)+'</span><span class="t">'+esc(n.title||'')+'</span></span>'+
-      '<span class="im-lane" aria-hidden="true">'+lane+'</span><span class="im-total">'+r.b.total+'</span></button>';}).join('');
+      '<span class="im-lane" aria-hidden="true">'+lane+'</span><span class="im-total">'+(Math.round(r.score*10)/10)+'</span></button>';}).join('');
   app.querySelector('.main').innerHTML='<div class="view-in">'+
-    '<div class="swarm-head"><div><h1>Impact</h1><div class="muted">Open items ranked by how much other work their resolution touches. Pick one to see its ripple; use ↑ and ↓ to move.</div></div></div>'+
+    '<div class="swarm-head"><div><h1>Impact</h1><div class="muted">Open items ranked by the work their resolution touches. Direct effects count 1; an overlap counts more the fewer PRs share its file. Pick one to see its ripple; use ↑ and ↓ to move.</div></div></div>'+
     (rows.length?'<div class="im"><div class="im-list" role="listbox" aria-label="Items by impact">'+list+'</div><div id="im-side">'+impactPanel(impactSel)+'</div></div>'
       :'<div class="empty">No open item has a visible downstream effect in this graph.</div>')+'</div>';
   for(const b of app.querySelectorAll('.item'))b.classList.remove('sel');
@@ -955,6 +1031,7 @@ function impactView(k){
 }
 function wireImpactPanel(){
   for(const g of app.querySelectorAll('.im-rip .sat'))g.onclick=()=>impactView(g.dataset.key);
+  for(const r of app.querySelectorAll('.im-aff-row'))r.onclick=()=>impactView(r.dataset.key);
   const i=document.getElementById('im-inspect');if(i)i.onclick=()=>select(impactSel);
   const w=document.getElementById('im-swarm');if(w)w.onclick=()=>swarmView(undefined,'blast');
 }
