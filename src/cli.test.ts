@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { parseArgs, runCli, UsageError } from "./cli.js";
+import { nextSteps, parseArgs, runCli, UsageError } from "./cli.js";
 import { listSnapshots, writeSnapshot } from "./snapshot.js";
 import { shellTransport } from "./transports/shell.js";
 
@@ -12,6 +12,8 @@ vi.mock("./snapshot.js", async (original) => ({
   listSnapshots: vi.fn(() => []),
   writeSnapshot: vi.fn(),
   writeReconcileSnapshot: vi.fn(),
+  writeDashboardModel: vi.fn(() => "/tmp/model.json"),
+  readDashboardModels: vi.fn(() => []),
 }));
 
 describe("parseArgs", () => {
@@ -94,6 +96,38 @@ describe("parseArgs", () => {
   test("rejects unsafe crawl limits", () => {
     expect(() => parseArgs(["1", "--repo", "o/r", "--max-nodes", "1001"])).toThrow(UsageError);
     expect(() => parseArgs(["1", "--repo", "o/r", "--concurrency", "0"])).toThrow(UsageError);
+  });
+});
+
+describe("onboarding", () => {
+  test("--open parses and is rejected by plan", () => {
+    expect(parseArgs(["1", "--repo", "o/r", "--open"]).open).toBe(true);
+    expect(() => parseArgs(["plan", "--repo", "o/r", "--open"])).toThrow(/--open/);
+    expect(parseArgs(["dashboard", "--open"]).command).toBe("dashboard");
+  });
+
+  test("next steps list only the views this run did not use", () => {
+    const bare = nextSteps(parseArgs(["--label", "bug", "--repo", "o/r"]), "o", "r");
+    expect(bare).toContain("issue-graph --label bug --repo o/r --open");
+    expect(bare).toContain("--cluster-run claude --open");
+    expect(bare).toContain("--prioritize");
+    const all = nextSteps(
+      parseArgs([
+        "1",
+        "--repo",
+        "o/r",
+        "--open",
+        "--cluster-run",
+        "claude",
+        "--prioritize",
+        "--no-snapshot",
+      ]),
+      "o",
+      "r",
+    );
+    expect(all).toBe("");
+    const saved = nextSteps(parseArgs(["1", "--repo", "o/r", "--open", "--prioritize"]), "o", "r");
+    expect(saved).toContain("issue-graph dashboard --open");
   });
 });
 
