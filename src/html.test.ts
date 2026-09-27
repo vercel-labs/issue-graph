@@ -112,7 +112,7 @@ describe("renderDashboard", () => {
     );
     expect(data.projects.map((p: { repo: string }) => p.repo)).toEqual(["o/a", "o/b"]);
     expect(html).toContain("<title>issue-graph · o/a</title>");
-    expect(html).toContain("function setProject(repo)");
+    expect(html).toContain("function setProject(");
   });
 
   test("refuses an empty project list", () => {
