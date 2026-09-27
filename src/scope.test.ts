@@ -37,6 +37,17 @@ describe("parseScope", () => {
   });
 });
 
+test("a repository whose name ends in a digit stays a repository", () => {
+  expect(parseScope("vercel-labs/v0")).toEqual({
+    kind: "repo",
+    provider: "github",
+    repo: "vercel-labs/v0",
+  });
+  expect(parseScope("acme/web2")).toMatchObject({ kind: "repo", repo: "acme/web2" });
+  expect(parseScope("github:acme/web2")).toMatchObject({ kind: "repo", repo: "acme/web2" });
+  expect(parseScope("acme/web2#5")).toMatchObject({ kind: "item", repo: "acme/web2", number: 5 });
+});
+
 describe("inferRepo", () => {
   test("reads https and ssh remotes, preferring origin", () => {
     expect(repoFromRemote("git@github.com:vercel-labs/emulate.git")).toBe("vercel-labs/emulate");

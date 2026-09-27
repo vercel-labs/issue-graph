@@ -31,7 +31,8 @@ export function parseScope(input: string): Scope {
     }
     rest = prefix[2];
   }
-  const item = rest.match(/^(?:([\w.-]+\/[\w.-]+))?#?(\d+)$/);
+  // a repository before the number needs its #, or owner/repo2 would read as item 2 of owner/repo
+  const item = rest.match(/^(?:([\w.-]+\/[\w.-]+)#|#)?(\d+)$/);
   if (item) return { kind: "item", provider: "github", repo: item[1], number: Number(item[2]) };
   if (REPO.test(rest)) return { kind: "repo", provider: "github", repo: rest };
   throw new ScopeError(
