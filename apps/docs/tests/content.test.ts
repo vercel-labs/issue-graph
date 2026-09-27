@@ -152,7 +152,7 @@ describe("documentation content contract", () => {
     expect(still.readUInt32BE(20)).toBe(1560);
   });
 
-  test("root guidance separates published installation from future release authorization", async () => {
+  test("root guidance documents published installation and automatic releases", async () => {
     const [readme, contributing] = await Promise.all([
       read("../../README.md"),
       read("../../CONTRIBUTING.md"),
@@ -161,12 +161,20 @@ describe("documentation content contract", () => {
       expect(page).toContain("npm install --global issue-graph@latest");
       expect(page).toContain("npm install issue-graph@latest");
       expect(page).toContain("npx issue-graph@latest --help");
-      expect(page).toContain("INTERNAL");
       expect(page).not.toMatch(/publication is (?:still )?pending|pending publication/i);
     }
     expect(contributing).not.toMatch(/expected_version=\d+\.\d+\.\d+/);
     expect(contributing).toContain('expected_version="$EXPECTED_VERSION"');
-    expect(contributing).toContain("Release environment approval");
+    expect(contributing).toContain("starts `.github/workflows/release.yml` automatically");
+    expect(contributing).toContain("Already-published versions skip the build and publication");
+    expect(contributing).toContain("Do not configure required reviewers or a wait timer");
+    expect(contributing).toContain("-F publish=false");
+    expect(contributing).toContain(
+      'gh run rerun "$RUN_ID" --repo vercel-labs/issue-graph --failed',
+    );
+    expect(contributing).toContain("without another `npm publish`");
+    expect(contributing).not.toContain("Release environment approval");
+    expect(contributing).not.toContain("INTERNAL");
   });
 
   test("uses canonical skill discovery and CLI-bundled guidance without release stories", async () => {
