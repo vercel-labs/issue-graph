@@ -9,6 +9,7 @@ import { TerminalPresentation } from "../src/components/terminal-output";
 import graph from "../src/lib/example-graph.json";
 import plan from "../src/lib/example-plan.json";
 import status from "../src/lib/example-status.json";
+import capture from "../src/lib/example-workflow.json";
 import { plainTerminalText, type TerminalDemoProps } from "../src/lib/terminal-demo";
 import {
   selectTerminalLines,
@@ -40,11 +41,7 @@ test("SSR includes three semantic examples, short display commands and linked ac
   expect(html).not.toMatch(
     /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
   );
-  const commands = [
-    "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
-    "issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects",
-    "issue-graph plan --repo vercel-labs/wterm",
-  ];
+  const commands = examples.map((example) => example.command);
   expect(html).toContain('role="tablist"');
   expect(html).toContain('aria-live="polite"');
   expect(html).toContain(examples[0].summary);
@@ -74,21 +71,17 @@ test("SSR includes three semantic examples, short display commands and linked ac
       ),
     );
   }
-  expect(html).toContain("? means unknown, not zero.");
-  expect(html).toContain("Approval does not imply merge readiness.");
-  expect(html).toContain("Validate repository-specific behavior before mutating GitHub.");
+  expect(html).toContain("Heat measures discussion, not severity.");
+  expect(html).toContain("View full dashboard screenshot");
+  expect(html).toMatch(/<img\b[^>]*alt="Captured portless Rank dashboard/);
 });
 
 test("the compact demo uses scoped monochrome hierarchy without restyling shared commands", () => {
   const html = renderToStaticMarkup(createElement(TerminalDemo, { examples }));
   expect(html).toContain('class="ig-terminal-command"');
   expect(html).toContain('ig-demo-token-merged">issue-graph</span>');
-  expect(html).toContain('ig-demo-token-reference">--repo</span>');
-  expect(html).toContain('ig-demo-token-positive">vercel-labs/agent-browser</span>');
-  expect(html).toContain('ig-demo-token-reference">Next:</span>');
-  for (const count of [26, 9, 11, 6])
-    expect(html).toContain(`ig-demo-token-strong">${count}</span>`);
-  expect(html).toContain('ig-demo-status-zero"><th scope="row">Changes requested</th><td>0</td>');
+  expect(html).toContain('ig-demo-token-reference">--heat-top</span>');
+  expect(html).toContain('ig-demo-token-positive">vercel-labs/portless</span>');
   const css = read("../src/components/terminal-output.css");
   const monochrome = css.match(/\.ig-demo \.ig-demo-token-reference,[\s\S]*?\}/)?.[0] ?? "";
   expect(monochrome).toContain(".ig-demo .ig-demo-token-positive");
@@ -127,8 +120,22 @@ test("plain formatting preserves labels and URLs while React escapes display tex
   ).toHaveLength(4);
 });
 
+const legacyGraph = plainTerminalText(
+  selectTerminalLines(graph.terminalOutput, [
+    { startLine: 1, endLine: 3 },
+    { startLine: 9, endLine: 10 },
+    { startLine: 14, endLine: 20 },
+  ]),
+);
+const legacyStatus = plainTerminalText(
+  selectTerminalLines(status.terminalOutput, [{ startLine: 1, endLine: 13 }]),
+);
+const legacyPlan = plainTerminalText(
+  selectTerminalLines(plan.terminalOutput, [{ startLine: 1, endLine: 16 }]),
+);
+
 test("graph reading view keeps identities, full titles and qualified follow-up reasons", () => {
-  const output = examples[0].output;
+  const output = legacyGraph;
   const rows = terminalPresentation(output, "graph");
   expect(rows?.[0]).toEqual({ kind: "context", text: "vercel-labs/agent-browser · #1113" });
   expect(rows?.filter((row) => row.kind === "item")).toEqual([
@@ -172,8 +179,8 @@ test("graph reading view keeps identities, full titles and qualified follow-up r
 
 test("unrecognized shapes stay verbatim and mixed repositories keep qualified references", () => {
   for (const output of [
-    examples[0].output.replace("PR 🟪 MERGED", "PR UNKNOWN"),
-    `${examples[0].output}\nUnexpected caveat: do not mutate`,
+    legacyGraph.replace("PR 🟪 MERGED", "PR UNKNOWN"),
+    `${legacyGraph}\nUnexpected caveat: do not mutate`,
   ]) {
     expect(terminalPresentation(output, "graph")).toBeNull();
     const html = renderToStaticMarkup(
@@ -189,7 +196,7 @@ test("unrecognized shapes stay verbatim and mixed repositories keep qualified re
       ),
     );
   }
-  const output = examples[0].output.replace("vercel-labs/agent-browser#1607", "other/repo#1607");
+  const output = legacyGraph.replace("vercel-labs/agent-browser#1607", "other/repo#1607");
   const rows = terminalPresentation(output, "graph");
   expect(rows?.filter((row) => row.kind === "item").map((row) => row.reference)).toEqual([
     "vercel-labs/agent-browser#1137",
@@ -202,7 +209,7 @@ test("unrecognized shapes stay verbatim and mixed repositories keep qualified re
 });
 
 test("backlog retains counts, subordinate metrics, the next action and complete caveats", () => {
-  const output = examples[2].output;
+  const output = legacyPlan;
   const rows = terminalPresentation(output, "plan");
   expect(rows).toContainEqual({
     kind: "summary",
@@ -244,7 +251,7 @@ test("backlog retains counts, subordinate metrics, the next action and complete 
 });
 
 test("status maps captured cells to separate author and aggregate review tables with UTC coverage", () => {
-  const output = examples[1].output;
+  const output = legacyStatus;
   const captured =
     output
       .split("\n")
@@ -316,29 +323,39 @@ test("status maps captured cells to separate author and aggregate review tables 
   );
 });
 
-test("catalog selects captured lines and exposes only five display fields", () => {
-  expect(examples.map(({ id }) => id)).toEqual(["graph", "status", "plan"]);
-  const fixtures = { graph, status, plan };
+test("catalog uses the 0.4.0 capture and preserves fields across HTML and Markdown", () => {
+  expect(examples.map(({ id }) => id)).toEqual(["open", "query", "dashboard"]);
   for (const entry of terminalExampleCatalog) {
-    const fixture = fixtures[entry.id];
+    const source = capture[entry.id];
     const display = toTerminalExample(entry);
-    expect(entry.output).toBe(fixture.terminalOutput);
-    expect(display.command).toBe(fixture.command);
-    expect(Object.keys(display).sort().join(",")).toBe("command,id,label,output,summary");
-    expect(display.output).toBe(
-      plainTerminalText(selectTerminalLines(fixture.terminalOutput, entry.selection.lineRanges)),
-    );
+    expect(display.command).toBe(source.command);
+    expect(display.output).toBe(source.terminalOutput);
+    expect(JSON.parse(display.output)).toEqual(JSON.parse(source.terminalOutput));
   }
-  expect(first.selection.lineRanges).toEqual([
-    { startLine: 1, endLine: 3 },
-    { startLine: 9, endLine: 10 },
-    { startLine: 14, endLine: 20 },
-  ]);
-  expect(examples[0].output.split("\n")).toHaveLength(12);
-  expect(examples[0].output).not.toContain("Nodes: 5");
-  expect(graph.nodes).toHaveLength(5);
-  expect(graph.terminalOutput).toContain("Nodes: 5");
-  expect(examples[2].output).toContain("@wterm/search");
+  const query = JSON.parse(capture.query.terminalOutput);
+  expect(query.counts).toEqual({ captured: 80, matched: 10, visible: 10, ranked: 10 });
+  expect(query.heat).toEqual({ threshold: 8.3, baselineCount: 40 });
+  const rows = terminalPresentation(capture.query.terminalOutput, "query");
+  expect(rows?.[0]).toEqual({ kind: "summary", text: "Captured: 80 · Matched: 10" });
+  expect(terminalPresentation(capture.open.terminalOutput, "open")?.[1]).toEqual({
+    kind: "summary",
+    text: "Open items captured: 80 · References not crawled: 40",
+  });
+  expect(rows?.filter((row) => row.kind === "item")).toEqual(
+    query.items.map((item: { key: string; title: string; score: number }) => ({
+      kind: "item",
+      reference: item.key,
+      title: item.title,
+      state: "OPEN",
+      details: [],
+      metrics: `Heat ${item.score}`,
+    })),
+  );
+  expect(terminalPresentation("invalid JSON", "query")).toBeNull();
+  expect(terminalPresentation("{}", "open")).toBeNull();
+  expect(capture.repositoryVisibility).toBe("PUBLIC");
+  expect(capture.cliVersion).toBe("0.4.0");
+  expect(capture.coverageNote).toContain("not a complete repository inventory");
 });
 
 test("captures remain public with sane timestamps and matching in-repo excerpt hashes", () => {
@@ -373,11 +390,6 @@ test("captures remain public with sane timestamps and matching in-repo excerpt h
 });
 
 test("summaries preserve unknown counts and never invent a missing next action", () => {
-  expect(examples.map(({ summary }) => summary)).toEqual([
-    "1 merged PR, 2 open follow-ups",
-    "3 open PRs with their review states",
-    "26 open items, a suggested next action",
-  ]);
   for (const output of ["", "Totals: Open ?"])
     expect(summarizeStatusOutput(output)).toBe("? open PRs with their review states");
   for (const output of ["", "- Open items: ?"])
@@ -395,14 +407,12 @@ test("Markdown shares examples and distinguishes the full capture from the displ
     for (const text of [example.label, example.summary, example.command, example.output])
       expect(markdown).toContain(text);
   }
-  for (const fixture of [graph, status, plan]) expect(markdown).toContain(fixture.capturedAt);
-  for (const fixture of [status, plan]) expect(markdown).toContain(fixture.coverage.note);
+  expect(markdown).toContain(capture.capturedAt);
+  expect(markdown).toContain(capture.coverageNote);
   expect(markdown).toContain("not live results");
   expect(markdown).toContain("they do not run commands or call GitHub");
-  expect(markdown).toContain("The full captured graph contains 5 fetched nodes");
-  expect(markdown).toContain("This displayed excerpt omits other captured nodes");
-  expect(markdown).toContain("19 beyond-depth references and 22 edges");
-  expect(markdown).not.toContain("All fetched nodes are shown");
+  expect(markdown).toContain("Selected JSON fields");
+  expect(markdown).toContain("Run Capture before the query examples");
 });
 
 test("terminal has no WASM, deferred output, replay timers or network execution", () => {

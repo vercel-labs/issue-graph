@@ -1,7 +1,7 @@
 ---
 title: Reconcile and plan
 description: Find backlog items to verify and get an ordered queue of reviews and investigations.
-lastModified: 2026-09-23
+lastModified: 2026-09-27
 ---
 
 ## Reconcile an open backlog
@@ -9,8 +9,8 @@ lastModified: 2026-09-23
 Reconcile finds open issues and PRs, follows their references, and suggests an action for each item. Labels are optional.
 
 ```bash
-issue-graph reconcile --repo owner/repo --format markdown
-issue-graph reconcile --repo owner/repo --format json --no-snapshot
+issue-graph reconcile owner/repo --format markdown
+issue-graph reconcile owner/repo --format json --no-save
 ```
 
 Replace `owner/repo` with a repository you can read. The default format is Markdown in a terminal and JSON in a pipe.
@@ -34,7 +34,7 @@ Reconcile reads GitHub and produces this review queue. Closing issues, merging P
 
 ## Check coverage
 
-Seed discovery paginates GitHub search up to `--max-nodes` or the 1000-result search ceiling. The default node cap is 80; you can set it from 1 to 1000. Depth, hub, concurrency, and per-node limits also apply.
+Seed discovery paginates GitHub search up to `--budget` or the 1000-result search ceiling. The default node cap is 80; you can set it from 1 to 1000. Depth, hub, concurrency, and per-node limits also apply.
 
 Inspect `limits.seedLimitReached`, `limits.cappedOut`, and `limits.fetchFailures`. Increase the budget, re-seed a missing neighborhood, or retry an access failure as needed. See [Graph](/docs/graph) for per-node limits that apply at every node cap.
 
@@ -42,13 +42,13 @@ Inspect `limits.seedLimitReached`, `limits.cappedOut`, and `limits.fetchFailures
 
 Reconcile saves reports under `~/.issue-graph/reconcile-owner-repo/`. History is keyed by repository so it can track changes when the open seed list changes or becomes empty.
 
-The comparison includes added, changed, and resolved actions, plus coverage changes. Incomplete coverage suppresses unsupported new or resolved claims. `--no-snapshot` skips saving a new report but can still read an existing baseline.
+The comparison includes added, changed, and resolved actions, plus coverage changes. Incomplete coverage suppresses unsupported new or resolved claims. `--no-save` skips saving a new report but can still read an existing baseline.
 
 ## Plan the next action
 
 ```bash
-issue-graph plan --repo owner/repo --format markdown
-issue-graph plan --repo owner/repo --format json
+issue-graph plan owner/repo --format markdown
+issue-graph plan owner/repo --format json
 ```
 
 Plan runs reconciliation and groups the results into:

@@ -36,7 +36,7 @@ gh auth status
 Trace public [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) without saving a snapshot:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
 ```
 
 To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. At the 2026-09-22 capture, issue #1113 was closed, [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) was merged, [regression #1148](https://github.com/vercel-labs/agent-browser/issues/1148) was closed, and follow-ups [#1371](https://github.com/vercel-labs/agent-browser/issues/1371) and [#1607](https://github.com/vercel-labs/agent-browser/issues/1607) were open. Check the open follow-ups before assuming the fix covers them.
@@ -51,56 +51,59 @@ npm install --global issue-graph@latest
 
 Use `issue-graph --help` to check the commands supported by your installed release.
 
+This README follows repository `main`, which can be ahead of the published package. If a documented command is missing, use a release that includes it or follow the source setup below.
+
 ## Choose a workflow
 
 | Need | Installed command |
 | --- | --- |
-| Inspect an issue or PR before starting work | `issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot` |
-| Survey labeled open issues | `issue-graph --label bug --repo owner/repo --prioritize` |
-| Count open PRs by author | `issue-graph status --repo vercel-labs/portless --author ctate,Railly` |
-| See PR evidence, assignees, and requested reviewers | `issue-graph status --repo vercel-labs/portless --author ctate --view prs` |
-| Reconcile an open backlog, with or without labels | `issue-graph reconcile --repo owner/repo --format json --no-snapshot` |
-| Select the next backlog action | `issue-graph plan --repo owner/repo --format json` |
+| Inspect an issue or PR before starting work | `issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save` |
+| Survey labeled open issues | `issue-graph rank owner/repo --label bug` |
+| Filter a saved model and open its exact dashboard view | `issue-graph query github:owner/repo --state open --view rank --open` |
+| Count open PRs by author | `issue-graph status vercel-labs/portless --author ctate,Railly` |
+| See PR evidence, assignees, and requested reviewers | `issue-graph status vercel-labs/portless --author ctate --view prs` |
+| Reconcile an open backlog, with or without labels | `issue-graph reconcile owner/repo --format json --no-save` |
+| Select the next backlog action | `issue-graph plan owner/repo --format json` |
 | Inspect the machine contract | `issue-graph schema` |
 
 Graph and plan default to compact human output in a terminal. Graph still prints Markdown in a pipe; plan prints versioned JSON. Use `--format text` for the human view outside a terminal, or `--format markdown` for Markdown. Plan also supports `--format json`. Human output wraps at up to 100 columns; monochrome bold/dim styling requires a TTY and is disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
 
-Graph `--json PATH` writes a graph file; its legacy `--format json` still prints Markdown, not JSON. Reconcile keeps terminal Markdown and piped JSON defaults and does not support `--format text`. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
+Graph `-o PATH.json` writes a graph file; its legacy `--format json` still prints Markdown, not JSON. Reconcile keeps terminal Markdown and piped JSON defaults and does not support `--format text`. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
 
 ## Explore and compare
 
 Export a graph and a local Next.js dashboard:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save -o graph.json -o graph.html
 ```
 
-Open `graph.html` directly in a browser to explore relationships, filter nodes, and review cleanup candidates.
+Open `graph.html` directly in a browser to explore relationships, filter nodes, and review cleanup candidates. Keep the sibling `_next/` directory and `font-LICENSE.txt` when moving the export.
 
-Graph and reconcile runs save local history under `~/.issue-graph/` by default. Re-running the same graph seeds shows a snapshot diff; reconciliation tracks repository-level action changes. `--no-snapshot` skips saving history but does not prevent explicitly requested JSON or HTML exports. Plan writes no snapshots.
+Graph and reconcile runs save local history under `~/.issue-graph/` by default. Re-running the same graph seeds shows a snapshot diff; reconciliation tracks repository-level action changes. `--no-save` skips saving history but does not prevent explicitly requested `-o` exports. Plan writes no snapshots.
 
 Status history is opt-in:
 
 ```bash
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --save
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --since last --save
+issue-graph status vercel-labs/portless --author ctate,Railly --save
+issue-graph status vercel-labs/portless --author ctate,Railly --since last --save
 ```
 
 Status reports unknown counts as `?` or `null`. Check coverage before using totals, and review CI and unresolved review threads separately before merging.
 
 ## Query a saved dashboard
 
-Use the dashboard's filters and scoring from the CLI, without another provider request:
+Save a dashboard model with `issue-graph open owner/repo --no-open`, then use its filters and scoring from the CLI without another provider request:
 
 ```bash
 issue-graph query github:owner/repo --kind Issue --heat-min 50 --view rank --open
 issue-graph query github:owner/repo --cluster 0 --cluster 2 --view swarm --metric heat --json
-issue-graph query --history <historyId> --open
+issue-graph query --history HISTORY_ID --open
 ```
 
-Query prints JSON in a pipe. In a terminal it shows a short summary and opens the exact view; `--no-open` keeps it in the terminal. Results include captured items, scores, capabilities, coverage, a capture ID, a history ID and `viewUrl`. The Next.js page embeds the capture and effective weights; its compiled assets are stored beside it, so an old link stays stable when defaults or saved runs change. Keep the sibling `_next/` directory when moving an exported page. `--history` replays its frozen parameters. `--capture` queries the same data with current defaults.
+Query prints JSON in a pipe. In a terminal it shows a short summary and requests opening the exact view; `--no-open` suppresses that request. Results include captured items, scores, capabilities, coverage, a capture ID, a history ID and `viewUrl`. Return `viewUrl` unchanged, including the query string and hash. The Next.js page embeds the capture and effective weights; its compiled assets are stored beside it, so an old link stays stable when defaults or saved runs change. Replace `HISTORY_ID` with the returned `historyId` to replay frozen parameters. `--capture` queries the same data with current defaults and newly supplied filters, without inheriting earlier filters.
 
-Scopes are provider-qualified: `github:owner/repo` or `linear:workspace:project:project-id`. Other providers can supply the same normalized dashboard model through `--input model.json`. This command does not collect live Linear or Jira data. Unsupported provider filters fail explicitly. Cluster indices belong to the selected capture; inspect `groups` before choosing them. Run `query --help` for all filters and view controls.
+Scopes are provider-qualified: `github:owner/repo` or `linear:workspace:project:project-id`. Other providers can supply the same normalized dashboard model through `--input model.json`; graph JSON from `-o graph.json` is a different format. This command does not collect live Linear or Jira data. Unsupported provider filters fail explicitly. Cluster indices belong to the selected capture; inspect `groups` before choosing them. See [Dashboard and saved queries](apps/docs/content/docs/dashboard.mdx) for the full workflow.
 
 Set persistent weights explicitly:
 
@@ -131,7 +134,7 @@ issue-graph skills get core --full
 
 Use `--full` for workflow references, `issue-graph skills list` for available guides, and command-specific `--help` for syntax. If the CLI or guidance is missing, report the error and ask for an authorized setup correction. See [Agents](apps/docs/content/docs/agents.mdx) for setup.
 
-Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
+Use `issue-graph cluster owner/repo` to print a root-cause clustering task for the calling agent, then `issue-graph cluster owner/repo --apply answer.json` (or `-` for stdin) to load its answer. For cron or CI, `--agent claude` or `--agent codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
 
 Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
 
@@ -141,6 +144,7 @@ Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), 
 
 - [Get started](apps/docs/content/docs/get-started.mdx): installation, authentication, and a first result
 - [Graph](apps/docs/content/docs/graph.mdx): depth, caps, snapshots, and HTML
+- [Dashboard](apps/docs/content/docs/dashboard.mdx): filters, exact links, replay, and scoring defaults
 - [Status](apps/docs/content/docs/status.mdx): counts, coverage, and history
 - [Backlog](apps/docs/content/docs/backlog.mdx): reconcile and plan
 - [Agents](apps/docs/content/docs/agents.mdx): skill setup and optional clustering

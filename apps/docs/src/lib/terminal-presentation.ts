@@ -190,6 +190,45 @@ function backlogPresentation(output: string): PresentationRow[] | null {
 }
 
 export function terminalPresentation(output: string, exampleId: string): PresentationRow[] | null {
+  if (exampleId === "open" || exampleId === "query") {
+    try {
+      const result = JSON.parse(output);
+      if (exampleId === "open") {
+        if (typeof result.repo !== "string" || typeof result.open !== "number") return null;
+        return [
+          { kind: "context", text: result.repo },
+          {
+            kind: "summary",
+            text: `Open items captured: ${result.open} · References not crawled: ${result.notCrawled}`,
+          },
+          { kind: "text", text: "Saved locally. Collection stopped at the 80-item budget." },
+          { kind: "heading", text: "Next: ask your agent to group related work" },
+          { kind: "text", text: result.next },
+        ];
+      }
+      if (!Array.isArray(result.items) || !result.counts || !result.heat) return null;
+      return [
+        {
+          kind: "summary",
+          text: `Captured: ${result.counts.captured} · Matched: ${result.counts.matched}`,
+        },
+        { kind: "heading", text: `Open issues · Heat ≥ ${result.heat.threshold}` },
+        ...result.items.map(
+          (item: { key: string; title: string; score: number }): PresentationRow => ({
+            kind: "item",
+            reference: item.key,
+            state: "OPEN",
+            title: item.title,
+            details: [],
+            metrics: `Heat ${item.score}`,
+          }),
+        ),
+        { kind: "text", text: "First two results. Heat measures discussion, not severity." },
+      ];
+    } catch {
+      return null;
+    }
+  }
   if (exampleId === "plan") return backlogPresentation(output);
   if (exampleId !== "graph") return null;
   const lines = output.split("\n");

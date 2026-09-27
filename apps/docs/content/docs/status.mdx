@@ -1,7 +1,7 @@
 ---
 title: Status and history
 description: Count pull requests by author and repository, check review states, and compare saved reports.
-lastModified: 2026-09-23
+lastModified: 2026-09-27
 ---
 
 ## Check PR status
@@ -9,17 +9,17 @@ lastModified: 2026-09-23
 Specify repositories and authors:
 
 ```bash
-issue-graph status --repo vercel-labs/portless --author ctate,Railly
-issue-graph status --repo vercel-labs/agent-browser --repo vercel-labs/portless --author ctate,Railly
+issue-graph status vercel-labs/portless --author ctate,Railly
+issue-graph status vercel-labs/agent-browser vercel-labs/portless --author ctate,Railly
 ```
 
-Both `--repo` and `--author` are required. Repeat `--repo` for more repositories. Repeat `--author` or separate authors with commas. Scope matching and deduplication are case-insensitive.
+`--author` is required. Name one or more repositories, or run inside a GitHub checkout to use its `git remote`. `--repo owner/repo` also works and can repeat. Repeat `--author` or separate authors with commas. Scope matching and deduplication are case-insensitive.
 
 ## Choose a view
 
 ```bash
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects
-issue-graph status --repo vercel-labs/portless --author ctate --view prs
+issue-graph status vercel-labs/portless --author ctate,Railly --view projects
+issue-graph status vercel-labs/portless --author ctate --view prs
 ```
 
 | View | Output |
@@ -30,11 +30,11 @@ issue-graph status --repo vercel-labs/portless --author ctate --view prs
 
 ## Choose an output format
 
-A terminal gets an aligned table with a narrow-screen fallback. A pipe gets versioned JSON. Set `--format auto|table|markdown|json` to choose explicitly.
+A terminal gets an aligned table with a narrow-screen fallback. A pipe gets versioned JSON. Set `--format auto|human|markdown|json` to choose explicitly.
 
 ```bash
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --format markdown
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --json
+issue-graph status vercel-labs/portless --author ctate,Railly --format markdown
+issue-graph status vercel-labs/portless --author ctate,Railly --json
 ```
 
 For status, `--json` writes to stdout and takes no filename. Schema version 1 includes scope, query timestamps, coverage, PR details, author and project rows, totals, and next steps. `NO_COLOR` disables styling. Progress messages go to stderr.
@@ -73,16 +73,16 @@ Caps, access failures, malformed responses, and detectable pagination drift prod
 Use `--save` to keep a local capture:
 
 ```bash
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --save
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --since last --save
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --since /path/to/previous.json --json
+issue-graph status vercel-labs/portless --author ctate,Railly --save
+issue-graph status vercel-labs/portless --author ctate,Railly --since last --save
+issue-graph status vercel-labs/portless --author ctate,Railly --since /path/to/previous.json --json
 ```
 
 Captures are immutable JSON files under `~/.issue-graph/status/<scope-hash>/`. Set `ISSUE_GRAPH_HOME` to change the storage root.
 
 `--since last` loads the latest capture for the same repository and author scope before fetching new data. Order and case can differ. `--since PATH` accepts a saved snapshot or an older status JSON export. Missing, corrupt, future, or mismatched baselines return an error.
 
-`--no-snapshot` prevents saving and conflicts with `--save`. You can combine it with `--since` to compare without saving the new capture.
+`--no-save` prevents saving and conflicts with `--save`. You can combine it with `--since` to compare without saving the new capture.
 
 ## Read changes
 

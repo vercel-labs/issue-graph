@@ -1,0 +1,105 @@
+---
+title: Dashboard and saved queries
+description: Filter captured work, open an exact dashboard view, replay decisions, and configure scoring defaults.
+lastModified: 2026-09-27
+---
+
+## Capture a repository
+
+Collect a GitHub graph and save its dashboard model:
+
+```bash
+issue-graph open vercel-labs/agent-browser --no-open
+issue-graph query github:vercel-labs/agent-browser --json --no-open
+```
+
+`open` reads GitHub within the crawl budget. `query` uses the saved model without provider requests or authentication. It does not refresh the data or fetch missing nodes. A missing saved model is an error; run `open` first or import a normalized dashboard model with `--input model.json`.
+
+`--input` expects a dashboard model, not the graph JSON produced by `graph -o graph.json`. Do not use `--no-save` on the collection command if you want to query its saved model later.
+
+Run `issue-graph dashboard` to browse the latest saved models with a project selector, or `issue-graph runs` to list them.
+
+## Choose a view
+
+| View | Use it to |
+| --- | --- |
+| Explore | Read clusters and inspect an item with its linked context |
+| Impact | Inspect relationships and affected items in the captured graph |
+| Swarm | Compare items grouped by cluster, state, kind, or all together |
+| Rank | Order open items by discussion Heat and adjust scoring weights |
+
+The compact Filters menu works across views. It supports state, item kind, clusters, Heat, search, and provider-supported solution and review filters. Context can remain visible even when it does not match a filter.
+
+The project selector's open count describes the collected inventory, when available. Query `counts.captured`, `matched`, `visible`, and `ranked` describe the saved graph and current view; they are not total repository open counts. Inspect `coverage` before interpreting them.
+
+## Prioritize with filters
+
+```bash
+issue-graph query github:vercel-labs/agent-browser --state open --kind Issue --heat-min 50 --view rank --json --no-open
+issue-graph query github:vercel-labs/agent-browser --kind PullRequest --review pending --heat-top 25 --view rank --json --no-open
+```
+
+Different filters intersect. Repeated `--cluster` values select the union of those clusters. Use `groups[].index` from the query result; indices belong to that capture.
+
+Heat uses comments, participants, reactions, inbound references, and age. It is a signal for inspection, not severity or merge readiness. `--heat-min` is inclusive. `--heat-top 10` and `--heat-top 25` use open captured items of the selected kind in the project as their baseline, before the other filters; ties can include more than the requested percentage. Heat filters exclude items without an open Heat score.
+
+`--solution with` finds issues with an observed closing link from an open or merged PR. `--solution without` means that link was not observed in the capture, not that no fix exists.
+
+## Open the exact result
+
+Every query returns `viewUrl`, `captureId`, `historyId`, effective `query.weights`, capabilities, coverage, and results. Add `--open` to request opening the exact view while retaining JSON output:
+
+```bash
+issue-graph query github:vercel-labs/agent-browser --state open --kind Issue --heat-min 50 --view rank --json --open
+```
+
+Share the returned `viewUrl` unchanged, including its query string and hash. It identifies the project, view, filters, weights, and selection. The CLI returns a local file URL, not a hosted page. `opened: true` means the OS opener was requested; it does not confirm the page loaded.
+
+The Next.js dashboard runs as a static export with embedded data. No Next server is required. When moving it, keep the HTML, sibling `_next/` directory, and `font-LICENSE.txt` together. Anyone with the export can read the full embedded capture, including filtered-out items.
+
+## Explore and replay a capture
+
+Replace `CAPTURE_ID`, `HISTORY_ID`, and `ITEM_KEY` with values from a query result. Choose cluster indices and item keys from that same capture:
+
+```bash
+issue-graph query --capture CAPTURE_ID --cluster 0 --cluster 2 --view swarm --group cluster --metric heat --json --no-open
+issue-graph query --capture CAPTURE_ID --view explore --select ITEM_KEY --json --no-open
+issue-graph query --history HISTORY_ID --json --open
+```
+
+`--capture` reuses the full immutable model with current defaults and the filters supplied in this command. It does not inherit the previous query's filters. `--history` restores frozen parameters and the saved view, even after defaults or the latest model change; it rejects scope, input, filter, and weight overrides. To change a historical view, use its `captureId` in a new query.
+
+Explore can select a contextual item outside the filter matches. Impact selection must be inside its results. Use `--focus-cluster N` to focus an Explore cluster; `--cluster N` filters membership. Swarm `--group` and `--metric` require `--view swarm`.
+
+## Keep defaults separate from exploration
+
+Inspect effective weights before changing them:
+
+```bash
+issue-graph config show --provider github --scope vercel-labs/agent-browser --json
+issue-graph query github:vercel-labs/agent-browser --weights comments=4,reactions=3 --view rank --json --no-open
+```
+
+Query overrides and dashboard sliders are exploratory. They do not change persistent defaults. Reset weights restores that document's opening weights. To persist a preference explicitly:
+
+```bash
+issue-graph config set --weights comments=3,age=1 --json
+issue-graph config set --provider github --weights reactions=4 --json
+issue-graph config set --provider github --scope vercel-labs/agent-browser --weights reactions=5 --json
+```
+
+Precedence is built-in, global, provider, project, then command. Partial updates preserve unspecified weights. The five names are `comments`, `participants`, `reactions`, `inboundRefs`, and `age`; each accepts finite values from 0 to 10. Built-in weights are 3, 2, 2, 2, and 1 respectively. The age signal is `min(12, daysOpen / 30)` before weighting; the total is rounded to one decimal.
+
+## Provider and project scope
+
+Query identity is `provider:scope`. A bare `owner/repo` selects GitHub; omitting the scope works only when exactly one saved model is available. Query does not infer its scope from the current checkout.
+
+For another provider's normalized model, use its returned `provider` and `scope` fields. Pass them separately to `config show` or `config set`; `--scope` requires `--provider`. A Linear project model can use `linear:WORKSPACE_ID:project:PROJECT_ID`, keeping projects and workspaces distinct.
+
+Read `capabilities` before choosing filters, views, or metrics. Unsupported choices fail explicitly. The shared query surface can consume normalized Linear or Jira data; it does not collect live Linear or Jira data.
+
+## Local storage
+
+`ISSUE_GRAPH_HOME` overrides the shared state root, which defaults to `~/.issue-graph/`. Weights live in `config.json`, immutable models in `captures/`, and query receipts with their static views in `history/`. Queries save these artifacts locally; they do not mutate a provider.
+
+Reloading a saved page does not refresh its data. Captures persist until removed locally. See [Permissions and privacy](/docs/security) before storing or sharing private results, and [Command reference](/docs/reference) for all query flags.

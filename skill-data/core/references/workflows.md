@@ -228,7 +228,7 @@ The plan does not infer semantic dependencies from issue prose. Treat `blockedBy
 - `plan owner/repo` turns that reconciliation into execution, investigation, and blocked queues without writing snapshots.
 - `-o out.json` writes the graph with `components`, `overlaps`, and `priorities`; it is not versioned like status/reconcile/plan reports. `--no-save` skips new history files, not explicit exports or reads of prior history.
 - `issue-graph open` writes the explorer (to a temp file unless `-o PATH.html`) and opens it in an interactive terminal. Unless `--no-save`, the run's model is saved under `~/.issue-graph/dashboard/`, one per repository; `issue-graph dashboard` renders every saved run with a project switcher and `issue-graph runs` lists or removes them.
-- `-o out.html` writes a self-contained explorer without a server. `--clusters clusters.json` reads agent-named groups and a cleanup list for the explorer; it does not invoke an agent. Prepare JSON separately from the clustering response as either `[{label, root_cause?, members:[{key, verdict?}]}]` or `{clusters:[…], cleanup:[{key?, text}]}`. Treat its Impact view as a projection of visible relationships, not proof of causality.
+- `-o out.html` writes a static Next.js explorer without a server. Keep the HTML, sibling `_next/` directory and `font-LICENSE.txt` together when moving it. `--clusters clusters.json` reads agent-named groups and a cleanup list for the explorer; it does not invoke an agent. Prepare JSON separately from the clustering response as either `[{label, root_cause?, members:[{key, verdict?}]}]` or `{clusters:[…], cleanup:[{key?, text}]}`. Treat its Impact view as a projection of visible relationships, not proof of causality.
 
 ## How it reads the graph
 

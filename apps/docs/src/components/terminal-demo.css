@@ -203,6 +203,19 @@
   overflow-wrap: anywhere;
 }
 
+.ig-demo-preview {
+  display: block;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid var(--ig-demo-border);
+  border-radius: 6px;
+}
+
+.ig-demo-preview img {
+  width: 100%;
+  height: auto;
+}
+
 @media (max-width: 640px) {
   .ig-demo-frame {
     border-radius: 10px;
