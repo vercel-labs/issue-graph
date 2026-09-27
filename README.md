@@ -69,7 +69,7 @@ Graph `--json PATH` writes a graph file; its legacy `--format json` still prints
 
 ## Explore and compare
 
-Export a graph and a self-contained HTML explorer:
+Export a graph and a local Next.js dashboard:
 
 ```bash
 issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
@@ -87,6 +87,30 @@ issue-graph status --repo vercel-labs/portless --author ctate,Railly --since las
 ```
 
 Status reports unknown counts as `?` or `null`. Check coverage before using totals, and review CI and unresolved review threads separately before merging.
+
+## Query a saved dashboard
+
+Use the dashboard's filters and scoring from the CLI, without another provider request:
+
+```bash
+issue-graph query github:owner/repo --kind Issue --heat-min 50 --view rank --open
+issue-graph query github:owner/repo --cluster 0 --cluster 2 --view swarm --metric heat --json
+issue-graph query --history <historyId> --open
+```
+
+Query prints JSON in a pipe. In a terminal it shows a short summary and opens the exact view; `--no-open` keeps it in the terminal. Results include captured items, scores, capabilities, coverage, a capture ID, a history ID and `viewUrl`. The Next.js page embeds the capture and effective weights; its compiled assets are stored beside it, so an old link stays stable when defaults or saved runs change. Keep the sibling `_next/` directory when moving an exported page. `--history` replays its frozen parameters. `--capture` queries the same data with current defaults.
+
+Scopes are provider-qualified: `github:owner/repo` or `linear:workspace:project:project-id`. Other providers can supply the same normalized dashboard model through `--input model.json`. This command does not collect live Linear or Jira data. Unsupported provider filters fail explicitly. Cluster indices belong to the selected capture; inspect `groups` before choosing them. Run `query --help` for all filters and view controls.
+
+Set persistent weights explicitly:
+
+```bash
+issue-graph config set --weights comments=3,age=1
+issue-graph config set --provider github --scope owner/repo --weights reactions=4
+issue-graph config show --provider github --scope owner/repo
+```
+
+Defaults resolve from built-in values, global defaults, provider defaults, project defaults, then command overrides. Named weights range from 0 to 10. Config lives in `~/.issue-graph/config.json`; immutable captures and query receipts live in `captures/` and `history/`. `ISSUE_GRAPH_HOME` overrides the state directory. Dashboard sliders affect only the current URL/session; Reset weights restores that document's opening weights. Only `config set` updates persistent defaults. Captures remain on this machine until you remove them.
 
 ## Agents and integrations
 
@@ -181,3 +205,9 @@ The agent-readability audit may follow production canonical URLs from a localhos
 ## License
 
 Apache-2.0
+
+### Dashboard development
+
+`apps/dashboard` is the Next.js dashboard used by `open`, `dashboard`, `cluster --apply`, and `query`. Its React host mounts the original dashboard renderer and CSS, preserving its layout, graphs, and animations. The renderer lives in `src/dashboard-view.js`; filters, ranking, graph metrics, and URL state share the CLI core. `src/html.ts` retains the programmatic HTML exporter using the same renderer. `apps/docs` remains the documentation site.
+
+Run `bun run dev:dashboard` and choose a normalized capture JSON locally. The browser does not upload it. `bun run build` includes the static Next.js export in the CLI package; end users do not need to run a Next.js server. `bun run test` prepares the same dashboard build before testing saved views.

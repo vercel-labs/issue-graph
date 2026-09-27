@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
+import { stateHome } from "./local-store.js";
 import type { ReconcileAction, ReconcileHistory, ReconcileReport } from "./reconcile.js";
 import type { GraphNode, NodeKey, Snapshot } from "./types.js";
 
@@ -15,12 +15,12 @@ export interface ReconcileSnapshot {
 /** Per-seed-set directory under ~/.issue-graph where snapshots are persisted. */
 export function snapshotDir(owner: string, repo: string, seedKeys: NodeKey[]): string {
   const id = `${owner}-${repo}-${seedKeys.map((k) => k.split("#")[1]).join("_")}`.slice(0, 80);
-  return path.join(os.homedir(), ".issue-graph", id.replace(/[^\w.-]/g, "_"));
+  return path.join(stateHome(), id.replace(/[^\w.-]/g, "_"));
 }
 
 export function reconcileSnapshotDir(owner: string, repo: string): string {
   const id = `reconcile-${owner}-${repo}`.replace(/[^\w.-]/g, "_");
-  return path.join(os.homedir(), ".issue-graph", id);
+  return path.join(stateHome(), id);
 }
 
 /** Prior snapshot filenames for a seed set, oldest first. */
@@ -180,7 +180,7 @@ export function diffSnapshots(prev: Snapshot, now: Snapshot): string {
 
 /** Where each repository's latest explorer model is kept for `issue-graph dashboard`. */
 export function dashboardDir(): string {
-  return path.join(os.homedir(), ".issue-graph", "dashboard");
+  return path.join(stateHome(), "dashboard");
 }
 
 /** Save one run's explorer model, replacing the previous one for that repository. */

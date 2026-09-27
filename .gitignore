@@ -9,3 +9,6 @@ dist
 *.tsbuildinfo
 apps/docs/test-results/
 .env*
+
+apps/dashboard/out/
+apps/dashboard/next-env.d.ts

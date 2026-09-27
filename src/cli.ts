@@ -13,19 +13,16 @@ import {
   renderClusters,
   runAgent,
 } from "./cluster.js";
+import { modelDefaults, readConfig, resolveWeights } from "./config.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
-import {
-  applyClusters,
-  type ClustersConfig,
-  dashboardModel,
-  type Model,
-  renderDashboard,
-} from "./html.js";
+import { applyClusters, type ClustersConfig, dashboardModel, type Model } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
+import { writeNextDashboard } from "./next-dashboard.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
 import { prioritize, renderPriority } from "./priority.js";
+import { runQueryCli } from "./query-cli.js";
 import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
@@ -63,6 +60,8 @@ commands
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
   rank [repo]              what to fix first, by discussion heat
+  query [provider:scope]   filter saved captures and open the exact view (--help for filters)
+  config show | set       global, provider and project defaults (--help for weights)
   cluster [repo]           the task for your agent to group open work by root cause
   cluster [repo] --apply F apply the agent's answer (a file, or - for stdin) to the dashboard
   reconcile [repo]         open-backlog verification queue
@@ -407,6 +406,7 @@ async function writeOutput(file: string, content: string): Promise<void> {
 }
 
 export async function runCli(argv = process.argv.slice(2)): Promise<void> {
+  if (["query", "config"].includes(argv[0])) return runQueryCli(argv, openInBrowser);
   if (!argv.length) {
     // a person inside a GitHub repository gets its dashboard; scripts and CI keep the usage
     if (interactive() && inferRepo()) argv = ["open"];
@@ -451,7 +451,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       );
     }
     const out = args.htmlOut || join(tmpdir(), `issue-graph-dashboard-${Date.now()}.html`);
-    await writeOutput(out, renderDashboard(models));
+    writeNextDashboard(out, models, modelDefaults(models));
     process.stderr.write(`wrote ${out} (${models.map((m) => m.label ?? m.repo).join(", ")})\n`);
     if (args.openMode === "yes" || (args.openMode === "auto" && interactive())) openInBrowser(out);
     return;
@@ -522,7 +522,11 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
           : "json"
         : args.format;
     if (args.command === "plan") {
-      const plan = buildPlanReport(report, nodes, prioritize(nodes, new Date()));
+      const plan = buildPlanReport(
+        report,
+        nodes,
+        prioritize(nodes, new Date(), resolveWeights(readConfig(), "github", report.repo)),
+      );
       console.log(
         format === "json"
           ? JSON.stringify(plan, null, 2)
@@ -547,8 +551,9 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
   let md = render(nodes, seedKeys, multi);
 
-  const priorities = prioritize(nodes, new Date());
-  if (args.prioritize) md += renderPriority(priorities);
+  const weights = resolveWeights(readConfig(), "github", `${primary.owner}/${primary.repo}`);
+  const priorities = prioritize(nodes, new Date(), weights);
+  if (args.prioritize) md += renderPriority(priorities, weights);
 
   if (cappedOut.size) {
     md += `\n## Not crawled (node cap ${args.maxNodes} reached): ${cappedOut.size}\n\n`;
@@ -611,8 +616,11 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (args.command === "graph") printGraph(md + nextSteps(args, primary.owner, primary.repo));
   else if (args.command === "rank") {
     if (args.format === "json")
-      console.log(JSON.stringify({ repo: repoName, priorities }, null, 2));
-    else printGraph(renderPriority(priorities) + nextSteps(args, primary.owner, primary.repo));
+      console.log(JSON.stringify({ repo: repoName, weights, priorities }, null, 2));
+    else
+      printGraph(
+        renderPriority(priorities, weights) + nextSteps(args, primary.owner, primary.repo),
+      );
   } else {
     // open and cluster summarize; the full report stays one command away
     const linked = nodes.size - own.length;
@@ -746,7 +754,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     } catch {
       process.stderr.write("Repository open totals unavailable; selector count will be unknown.\n");
     }
-    await writeOutput(out, renderDashboard([model]));
+    writeNextDashboard(out, [model], modelDefaults([model]));
     if (args.command !== "open" && args.command !== "cluster")
       process.stderr.write(`wrote ${out}\n`);
     // keep the latest run per repository so `issue-graph dashboard` can switch between them
@@ -801,7 +809,7 @@ async function runApply(a: Args): Promise<void> {
   writeDashboardModel(repo, next);
   const out =
     a.htmlOut || join(tmpdir(), `issue-graph-${repo.replace("/", "-")}-${Date.now()}.html`);
-  await writeOutput(out, renderDashboard([next]));
+  writeNextDashboard(out, [next], modelDefaults([next]));
   const opened = a.openMode === "yes" || (a.openMode === "auto" && interactive());
   if (opened) openInBrowser(out);
   const machine = a.format === "json" || (a.format === "auto" && !process.stdout.isTTY);
@@ -958,7 +966,7 @@ function openInBrowser(file: string): void {
     process.platform === "darwin"
       ? ["open", [file]]
       : process.platform === "win32"
-        ? ["cmd", ["/c", "start", "", file]]
+        ? ["rundll32.exe", ["url.dll,FileProtocolHandler", file]]
         : ["xdg-open", [file]];
   try {
     spawn(cmd, argv, { detached: true, stdio: "ignore" })

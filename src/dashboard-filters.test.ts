@@ -235,18 +235,20 @@ test("the shipped view functions share filters while retaining complete relation
   ]);
   const html = renderDashboard([m]);
   const script = html.slice(html.lastIndexOf("<script>") + 8, html.lastIndexOf("</script>"));
-  const setup = script.slice(0, script.indexOf("app.className="));
   const result = runInNewContext(
-    `${setup}
+    script.replace(
+      'app.className = "";',
+      `
     F={state:'open',kind:'Issue',heatMode:'min',heatMin:270};computeFilters();SW.by='all';
-    ({
+    return ({
       rank:rankRows().map(r=>r.n.key),
       swarm:swGroups().flatMap(g=>g.members),
       explore:clusterStats(DATA.groups[0]).ms,
       impact:impactRows().map(r=>r.k),
       linkedPRs:[...blastRadius('${key(1)}').prs],
       captured:Object.keys(N).length
-    })`,
+    });`,
+    ),
     {
       document: {
         getElementById: (id: string) =>
@@ -255,6 +257,7 @@ test("the shipped view functions share filters while retaining complete relation
       location: { href: "https://example.invalid/view.html", search: "" },
       URL,
       URLSearchParams,
+      AbortController,
       window: { addEventListener() {} },
       localStorage: { getItem: () => null },
     },

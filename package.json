@@ -30,7 +30,7 @@
     "start": "tsx src/bin.ts",
     "build": "tsx scripts/build.ts",
     "prepack": "pnpm build",
-    "test": "vitest run --config vitest.config.ts",
+    "test": "tsx scripts/build-dashboard.ts && vitest run --config vitest.config.ts",
     "test:package": "tsx scripts/verify-package.ts",
     "dev:docs": "pnpm --filter @issue-graph/docs dev",
     "build:docs": "pnpm --filter @issue-graph/docs build",
@@ -38,11 +38,13 @@
     "test:docs": "pnpm --filter @issue-graph/docs test",
     "test:docs:routes": "pnpm --filter @issue-graph/docs test:routes",
     "audit:docs": "pnpm --filter @issue-graph/docs audit",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check src tests vitest.config.ts scripts/build.ts scripts/verify-package.ts scripts/release.ts scripts/release-notes.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/dashboard/tsconfig.json",
+    "lint": "biome check src tests vitest.config.ts scripts/build.ts scripts/verify-package.ts scripts/release.ts scripts/release-notes.ts scripts/build-dashboard.ts apps/dashboard/src apps/dashboard/biome.json apps/dashboard/next.config.mjs",
     "lint:fix": "biome check --write src tests vitest.config.ts",
     "format": "biome format --write src tests vitest.config.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "dev:dashboard": "bun run --cwd apps/dashboard dev",
+    "build:dashboard": "tsx scripts/build-dashboard.ts"
   },
   "engines": {
     "node": ">=20"

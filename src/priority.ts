@@ -1,3 +1,4 @@
+import { scoring, type Weights } from "./scoring.js";
 import type { GraphNode, NodeKey } from "./types.js";
 
 /** One ranked row: the raw signals plus the composite score. */
@@ -31,17 +32,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * Linear and transparent on purpose: the raw signals are shown next to the
  * score so a human can override the ranking.
  */
-export function score(r: Omit<PriorityRow, "score">): number {
-  const age = Math.min(12, r.daysOpen / 30);
-  return (
-    Math.round(
-      (r.comments * 3 + r.participants * 2 + r.reactions * 2 + r.inboundRefs * 2 + age) * 10,
-    ) / 10
-  );
+export function score(r: Omit<PriorityRow, "score">, weights: Weights = scoring.defaults): number {
+  return scoring.score(r, weights);
 }
 
 /** Rank every OPEN node by discussion heat, highest score first. */
-export function prioritize(nodes: Map<NodeKey, GraphNode>, now: Date): PriorityRow[] {
+export function prioritize(
+  nodes: Map<NodeKey, GraphNode>,
+  now: Date,
+  weights: Weights = scoring.defaults,
+): PriorityRow[] {
   // distinct referencing nodes per target
   const inbound = new Map<NodeKey, number>();
   for (const n of nodes.values())
@@ -65,13 +65,13 @@ export function prioritize(nodes: Map<NodeKey, GraphNode>, now: Date): PriorityR
         : Math.max(0, Math.floor((now.getTime() - opened) / DAY_MS)),
       inboundRefs: inbound.get(n.key) ?? 0,
     };
-    rows.push({ ...partial, score: score(partial) });
+    rows.push({ ...partial, score: score(partial, weights) });
   }
   return rows.sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
 }
 
 /** Render the ranked list as a markdown section. */
-export function renderPriority(rows: PriorityRow[]): string {
+export function renderPriority(rows: PriorityRow[], weights: Weights = scoring.defaults): string {
   const out: string[] = ["\n## Triage priority (open nodes, most discussion/frustration first)\n"];
   if (!rows.length) {
     out.push("- (no open nodes)");
@@ -85,7 +85,7 @@ export function renderPriority(rows: PriorityRow[]): string {
     );
   });
   out.push(
-    "\n_score = comments×3 + participants×2 + reactions×2 + inbound×2 + min(12, daysOpen/30)_",
+    `\n_score = comments×${weights.comments} + participants×${weights.participants} + reactions×${weights.reactions} + inbound×${weights.inboundRefs} + min(12, daysOpen/30)×${weights.age}_`,
   );
   return `${out.join("\n")}\n`;
 }

@@ -35,6 +35,34 @@ importers:
         specifier: 2.9.1
         version: 2.9.1
 
+  apps/dashboard:
+    dependencies:
+      next:
+        specifier: 16.3.5
+        version: 16.3.5(patch_hash=a620718f9d934500c4f0364aa9312b2539559e0ac911cdc37c97b92e1e9b4550)(@opentelemetry/api@1.9.1)(@types/node@26.6.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
+      geist:
+        specifier: 1.7.2
+        version: 1.7.2(next@16.3.5(patch_hash=a620718f9d934500c4f0364aa9312b2539559e0ac911cdc37c97b92e1e9b4550)(@opentelemetry/api@1.9.1)(@types/node@26.6.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))
+    devDependencies:
+      "@types/node":
+        specifier: ^26.1.1
+        version: 26.6.1
+      "@types/react":
+        specifier: ^19.2.7
+        version: 19.3.0
+      "@types/react-dom":
+        specifier: ^19.2.3
+        version: 19.3.0(@types/react@19.3.0)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   apps/docs:
     dependencies:
       '@vercel/agent-readability':

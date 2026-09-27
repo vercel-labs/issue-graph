@@ -13,6 +13,8 @@
  */
 export * from "./classify.js";
 export * from "./crawl.js";
+export * from "./dashboard-filters.js";
+export * from "./dashboard-query.js";
 export * from "./dashboard-types.js";
 export * from "./github.js";
 export * from "./html.js";
@@ -23,6 +25,7 @@ export * from "./reconcile.js";
 export * from "./refs.js";
 export * from "./render.js";
 export * from "./schema.js";
+export * from "./scoring.js";
 export * from "./status.js";
 export * from "./status-history.js";
 export * from "./status-history-render.js";
