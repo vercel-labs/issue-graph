@@ -663,6 +663,7 @@ try {
     ),
   );
   const html = readFileSync(join(consumer, htmlPath), "utf8");
+  assert.match(html, /"openCount":\{"value":348,"issues":301,"pullRequests":47,"complete":true/);
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /Package smoke issue/);
   assert.match(html, /"openCount":\{"value":348,"issues":301,"pullRequests":47,"complete":true/);
