@@ -14,7 +14,7 @@ import {
   runAgent,
 } from "./cluster.js";
 import { components, crawl } from "./crawl.js";
-import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
+import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
 import {
   applyClusters,
   type ClustersConfig,
@@ -452,7 +452,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     }
     const out = args.htmlOut || join(tmpdir(), `issue-graph-dashboard-${Date.now()}.html`);
     await writeOutput(out, renderDashboard(models));
-    process.stderr.write(`wrote ${out} (${models.map((m) => m.repo).join(", ")})\n`);
+    process.stderr.write(`wrote ${out} (${models.map((m) => m.label ?? m.repo).join(", ")})\n`);
     if (args.openMode === "yes" || (args.openMode === "auto" && interactive())) openInBrowser(out);
     return;
   }
@@ -741,6 +741,11 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       args.htmlOut ||
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
     const model = dashboardModel(nodes, seedKeys, repoName, clusters, cappedOut.size);
+    try {
+      model.openCount = await repositoryOpenCount(transport, primary.owner, primary.repo);
+    } catch {
+      process.stderr.write("Repository open totals unavailable; selector count will be unknown.\n");
+    }
     await writeOutput(out, renderDashboard([model]));
     if (args.command !== "open" && args.command !== "cluster")
       process.stderr.write(`wrote ${out}\n`);

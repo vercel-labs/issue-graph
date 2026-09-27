@@ -90,7 +90,9 @@ const pageInfo = { hasNextPage: false, endCursor: null };
 const author = { login: "smoke-author" };
 const createdAt = "2026-01-01T00:00:00Z";
 let repository;
-if (fields.query.includes("issueOrPullRequest(number:$n)")) {
+if (fields.query.includes("IssueGraphRepositoryOpen")) {
+  repository = { nameWithOwner: "package-smoke/fixture", issues: { totalCount: 301 }, pullRequests: { totalCount: 47 } };
+} else if (fields.query.includes("issueOrPullRequest(number:$n)")) {
   assert.ok(fields.n === "1" || fields.n === "2");
   const pr = fields.n === "2";
   repository = {
@@ -541,6 +543,7 @@ try {
     ),
   );
   const html = readFileSync(join(consumer, htmlPath), "utf8");
+  assert.match(html, /"openCount":\{"value":348,"issues":301,"pullRequests":47,"complete":true/);
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /Package smoke issue/);
   assert.ok(
@@ -567,7 +570,7 @@ try {
     expectedChecks,
     `package verification must exercise all ${expectedChecks} commands`,
   );
-  assert.equal(calls.length, 14, "data verification must exercise all 14 owned gh fixture calls");
+  assert.equal(calls.length, 16, "data verification must exercise all 16 owned gh fixture calls");
   console.log(
     `Package smoke passed on ${runtime}: ${checks} commands; ${calls.length} fixture calls`,
   );

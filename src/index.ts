@@ -13,6 +13,7 @@
  */
 export * from "./classify.js";
 export * from "./crawl.js";
+export * from "./dashboard-types.js";
 export * from "./github.js";
 export * from "./html.js";
 export * from "./overlaps.js";
