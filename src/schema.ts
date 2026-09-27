@@ -13,6 +13,50 @@ export const ISSUE_GRAPH_SCHEMA = {
     usageError: 2,
   },
   commands: {
+    linear: {
+      remoteMutations: false,
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest project model under ~/.issue-graph/dashboard with HTML output unless --no-snapshot",
+      ],
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json", "html"],
+      authentication: "Exactly one of LINEAR_API_KEY or LINEAR_ACCESS_TOKEN",
+      transport: "@linear/sdk 96.0.0; fixed GraphQL queries",
+      required: ["issue URL, identifier, or UUID; alternatively --project UUID"],
+      projectCapture: {
+        scope: "non-archived project issues across all teams, including disconnected issues",
+        pageSize: 250,
+        limits: "--max-pages bounds inventory and connections; --max-nodes bounds detail reads",
+        boundary: "retain connections outside the project without fetching those issues",
+      },
+      workspace: "Issue URL and --workspace are checked against the connected organization",
+      maxDepth: { default: 1, minimum: 0, maximum: 8 },
+      maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+      maxPages: { default: 5, minimum: 1, maximum: 100 },
+      pageSize: 50,
+      projectOpenCount: {
+        scope: "entire selected project, independent of graph limits",
+        states: ["triage", "backlog", "unstarted", "started"],
+        archived: false,
+        pageSize: 250,
+        maxPages: 100,
+        incomplete: "lower bound; omitted when unavailable",
+      },
+      concurrency: { default: 4, minimum: 1, maximum: 32 },
+      relationships: ["relations", "inverseRelations", "parent", "children", "attachments"],
+      exclusions: ["text mentions", "fetching attachment targets"],
+      exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
+      jsonFlag: "--json emits the report on stdout; takes no path",
+      description:
+        "Read a bounded Linear neighborhood with workspace-scoped identities, native relation direction, and explicit pagination gaps.",
+      clustering: {
+        prompt: "--cluster prints a project-scoped task for the calling agent; no model is invoked",
+        input: "--clusters PATH applies a JSON clusters array to --html or --open",
+        semantics: "proposed themes, not verified common root causes",
+        validation: "rejects foreign or duplicate member keys; unassigned nodes stay visible",
+      },
+    },
     graph: {
       githubMutations: false,
       localWrites: [

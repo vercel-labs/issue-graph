@@ -23,6 +23,8 @@ import {
   renderDashboard,
 } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
+import { runLinear } from "./linear-cli.js";
+import { linearDashboardModel } from "./linear-html.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
 import { prioritize, renderPriority } from "./priority.js";
@@ -60,6 +62,7 @@ const USAGE = `usage: issue-graph [command] [scope...] [options]
 Run with no arguments inside a GitHub repository to open its backlog dashboard.
 
 commands
+  linear <issue>          read Linear issue relationships or capture --project UUID
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
   rank [repo]              what to fix first, by discussion heat
@@ -432,6 +435,35 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       stdout: (value) => process.stdout.write(value),
       stderr: (value) => process.stderr.write(value),
     });
+    return;
+  }
+  if (argv[0] === "linear") {
+    process.exitCode = await runLinear(
+      argv.slice(1),
+      async () => {
+        const { linearSdkReader } = await import("./transports/linear.js");
+        return linearSdkReader({
+          apiKey: process.env.LINEAR_API_KEY,
+          accessToken: process.env.LINEAR_ACCESS_TOKEN,
+        });
+      },
+      {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        dashboard: async (report, options) => {
+          const model = linearDashboardModel(report, options.clusters);
+          const out =
+            options.path ||
+            join(tmpdir(), `issue-graph-linear-${report.workspace.id}-${Date.now()}.html`);
+          await writeOutput(out, renderDashboard([model]));
+          process.stderr.write(`wrote ${out}\n`);
+          if (options.save)
+            process.stderr.write(`dashboard run saved: ${writeDashboardModel(model.id, model)}\n`);
+          if (options.open) openInBrowser(out);
+        },
+      },
+    );
     return;
   }
   const args = parseArgs(argv);

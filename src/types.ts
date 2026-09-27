@@ -4,6 +4,46 @@ export type Kind = "Issue" | "PullRequest" | "Unknown";
 /** Canonical node identity: `${owner}/${repo}#${number}`. */
 export type NodeKey = string;
 
+export interface CrawlEdge {
+  to: NodeKey;
+}
+
+export interface CrawlNode {
+  key: NodeKey;
+  depth: number;
+  edges: CrawlEdge[];
+  hub?: boolean;
+}
+
+export interface GraphSeed {
+  key: NodeKey;
+}
+
+export interface EdgeDepthContext {
+  sourceKey: NodeKey;
+  edge: CrawlEdge;
+  sourceDepth: number;
+  maxDepth: number;
+}
+
+export interface GraphCrawlOptions {
+  maxDepth: number;
+  maxNodes: number;
+  hubThreshold: number;
+  concurrency?: number;
+  depthForEdge?: (context: EdgeDepthContext) => number | null;
+}
+
+export type GraphFetchNode<TNode extends CrawlNode = CrawlNode> = (
+  key: NodeKey,
+  depth: number,
+) => Promise<TNode>;
+
+export interface GraphCrawlResult<TNode extends CrawlNode = CrawlNode> {
+  nodes: Map<NodeKey, TNode>;
+  cappedOut: Set<NodeKey>;
+}
+
 /** How one node came to reference another. */
 export type Via = "text" | "cross-ref" | "connected" | "closes";
 

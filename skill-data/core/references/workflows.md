@@ -179,3 +179,21 @@ The plan does not infer semantic dependencies from issue prose. Treat `blockedBy
 - Read-only means no GitHub mutations by the CLI, not no local side effects. Snapshots, explicit JSON/HTML exports, logs, and agent prompts can contain private repository metadata. `--no-save` does not block exports, shell redirection, or external-agent storage.
 - Repository access limits what can be observed. Inaccessible work is not absent work, and a public seed may lead to private references your credentials can read. Review the actual payload before sharing or sending it to an agent/provider; do not promise automatic redaction.
 - Status captures use restrictive local permissions, not encryption. Graph/reconcile snapshots and explicit exports have different filesystem behavior. Choose private destinations and retention deliberately.
+
+
+## Linear captures
+
+Use `issue-graph linear --help` before a Linear workflow. Configure exactly one of
+`LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` locally. The fixed SDK transport reads the
+connected workspace; it does not mutate Linear issues.
+
+- `issue-graph linear ENG-123 --workspace example --json` reads a bounded neighborhood.
+- `issue-graph linear --project UUID --html project.html` reads non-archived project issues
+  across teams and saves that project for `issue-graph dashboard`. Use `--no-snapshot`
+  to skip the saved model; explicit HTML output is still written.
+- `--cluster` prints a task for the current agent. `--clusters PATH --html project.html`
+  applies proposed themes without changing native relationships or statuses.
+
+Read coverage before making completeness claims: node/page limits and read failures
+can make the graph partial. Text mentions and attachment targets are not crawled.
+The HTML is a static capture; regenerate it to refresh.
