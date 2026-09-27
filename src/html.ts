@@ -60,6 +60,8 @@ export interface ProviderDescriptor {
 }
 
 export interface Model {
+  /** Referenced items the node cap left out of this run. */
+  notCrawled?: number;
   provider: ProviderDescriptor;
   repo: string;
   seeds: NodeKey[];
@@ -245,9 +247,10 @@ export function dashboardModel(
   seedKeys: NodeKey[],
   repo: string,
   clustersConfig?: ClustersConfig,
+  notCrawled = 0,
 ): Model {
   const { clusters, cleanup } = normalizeClusters(clustersConfig);
-  return buildModel(nodes, seedKeys, repo, clusters, cleanup);
+  return { ...buildModel(nodes, seedKeys, repo, clusters, cleanup), notCrawled };
 }
 
 export function renderHtml(
@@ -336,6 +339,8 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .rcheck{font-size:12px;color:var(--fg)}
 @media (prefers-reduced-motion:reduce){.repo-menu,.pchev{animation:none;transition:none}}
 .gh-mark{width:14px;height:14px;flex-shrink:0;display:block}
+.coverage{font-size:12px;color:var(--muted);margin-top:-8px}
+.coverage span{text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
 .pv-slot{display:flex;flex-direction:column;gap:6px}
 .pv-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .pv-head .gh-mark{width:12px;height:12px}
@@ -638,8 +643,10 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const short=k=>{const [r,n]=String(k).split('#');if(!n)return k;if(r===DATA.repo)return '#'+n;
   const [o,name]=r.split('/'),[po]=DATA.repo.split('/');return (o===po?name:r)+'#'+n};
 function statsOf(){
-  const all=Object.values(N),prs=all.filter(n=>n.state==='OPEN'&&n.kind==='PullRequest');
-  return {nodes:all.length,openPRs:prs.length,openIssues:all.filter(n=>n.state==='OPEN'&&n.kind==='Issue').length,
+  // headline counts cover the project's own repo; referenced items are reported as linked
+  const all=Object.values(N),own=all.filter(n=>n.repo===DATA.repo&&n.state==='OPEN');
+  const prs=all.filter(n=>n.state==='OPEN'&&n.kind==='PullRequest');
+  return {openHere:own.length,linked:all.length-own.length,openPRs:own.filter(n=>n.kind==='PullRequest').length,openIssues:own.filter(n=>n.kind==='Issue').length,
     superseded:prs.filter(n=>/SUPERSEDED/.test(n.verdict||'')).length,
     competing:prs.filter(n=>n.flags.some(f=>f.startsWith('competes'))).length,
     noClose:prs.filter(n=>n.flags.some(f=>f.includes('no closing link'))).length};
@@ -702,7 +709,7 @@ function sidebar(){
     ['k-pr','Open PRs',all.filter(n=>n.state==='OPEN'&&n.kind==='PullRequest').length],
     ['k-merged','Merged',all.filter(n=>n.state==='MERGED').length],
     ['k-closed','Closed',all.filter(n=>n.state!=='OPEN'&&n.state!=='MERGED').length]].filter(m=>m[2]);
-  const stats=[['Nodes',s.nodes,''],['Open PRs',s.openPRs,''],['Open issues',s.openIssues,'']];
+  const stats=[['Open here',s.openHere,''],['Open PRs',s.openPRs,''],['Open issues',s.openIssues,'']];
   const signals=PV.signals.map(g=>[g.label,s[g.id]??0,g.tone]);
   const chev='<svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const groups=DATA.groups.map((g,gi)=>{
@@ -731,6 +738,8 @@ function sidebar(){
       mix.map(m=>'<span class="'+m[0]+'" style="flex-grow:'+(m[2]/total)+'"></span>').join('')+'</div>'+
       '<div class="mix-legend">'+mix.map(m=>'<span><i class="dot '+m[0]+'"></i>'+m[1]+' <b>'+m[2]+'</b></span>').join('')+'</div></div>'+
     statGrid(stats)+
+    ((s.linked||DATA.notCrawled)?'<div class="coverage">'+(s.linked?'+'+s.linked+' linked item'+(s.linked===1?'':'s'):'')+
+      (DATA.notCrawled?(s.linked?' · ':'')+'<span title="Referenced items the node cap left out; raise --max-nodes to include them">'+DATA.notCrawled+' not crawled (node cap)</span>':'')+'</div>':'')+
     (signals.length?'<div class="pv-slot"><div class="pv-head">'+PV.logo+'<span>'+esc(PV.name)+' signals</span></div>'+statGrid(signals)+'</div>':'')+
     '<div class="view-toggle" role="group" aria-label="View"><button class="view-btn active" id="explore-view">Explore</button><button class="view-btn" id="impact-view">Impact</button><button class="view-btn" id="swarm-view">Swarm</button><button class="view-btn" id="rank-view">Rank</button></div>'+
     '<input class="filter" id="filter" placeholder="Filter by #, title, author" aria-label="Filter nodes"/>'+cleanupBtn+'</div>'+

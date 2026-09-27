@@ -496,7 +496,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     const out =
       args.htmlOut ||
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
-    const model = dashboardModel(nodes, seedKeys, repoName, clusters);
+    const model = dashboardModel(nodes, seedKeys, repoName, clusters, cappedOut.size);
     await writeOutput(out, renderDashboard([model]));
     process.stderr.write(`wrote ${out}\n`);
     // keep the latest run per repository so `issue-graph dashboard` can switch between them
