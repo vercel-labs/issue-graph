@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import { docsSlugs } from "../src/lib/docs-paths";
+import { exampleCommand, exampleRerunCommand } from "../src/lib/site";
 
 const contentRoot = new URL("../content/docs/", import.meta.url);
 const appRoot = new URL("../", import.meta.url);
@@ -115,8 +116,10 @@ describe("documentation content contract", () => {
       read("content/docs/graph.mdx"),
       read("../../README.md"),
     ]);
+    // The fixture records the legacy command it was captured with; docs show the current equivalent.
+    expect(example.command).toBe(exampleCommand);
     for (const page of pages) {
-      expect(page).toContain(example.command);
+      expect(page).toContain(exampleRerunCommand);
       expect(page).not.toContain("issue-graph 427");
     }
     for (const page of pages.slice(1)) {

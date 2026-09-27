@@ -6,20 +6,20 @@ lastModified: 2026-09-23
 
 ## Start from an issue or PR
 
-Pass a URL, or a number with `--repo`:
+Pass an item as `owner/repo#123`, a URL, or a number inside a GitHub checkout:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
-issue-graph https://github.com/vercel-labs/agent-browser/issues/1113 --depth 1 --max-nodes 12 --no-snapshot
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
+issue-graph graph https://github.com/vercel-labs/agent-browser/issues/1113 --depth 1 --budget 12 --no-save
 ```
 
-Graph is the default mode. It prints Markdown to stdout, including when piped.
+`graph` prints a formatted report in a terminal and Markdown when piped.
 
-For several seeds or labeled open issues:
+For several seeds, or to rank labeled open issues:
 
 ```bash
-issue-graph --seeds 64,246,281 --repo owner/repo --no-snapshot
-issue-graph --label bug --repo owner/repo --prioritize --no-snapshot
+issue-graph graph 64 246 281 --repo owner/repo --no-save
+issue-graph rank owner/repo --label bug --no-save
 ```
 
 Replace `owner/repo` and the seed numbers with your repository. Multi-seed results also show connected components.
@@ -30,14 +30,14 @@ Nodes represent issues and PRs. Edges come from body and comment mentions, timel
 
 The report flags competing PRs, shared changed files, possible superseded work, and closing claims missing a GitHub closing link. Use those signals to choose what to inspect. Check the implementations and scope before recommending a closure.
 
-`--prioritize` ranks open nodes by discussion activity: comments, participants, reactions, inbound references, and time open. The ranking is also included in JSON exports.
+`rank` orders open nodes by discussion activity: comments, participants, reactions, inbound references, and time open. Graph JSON exports also include the ranking in `priorities`.
 
 ## Control the crawl
 
 | Flag | Default | Effect |
 | --- | --- | --- |
 | `--depth N` | `2` | Same-repository recursion from depth-zero seeds |
-| `--max-nodes N` | `80` | Total node cap, from 1 to 1000 |
+| `--budget N` | `80` | Total node cap, from 1 to 1000 |
 | `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it above this reference count |
 | `--concurrency N` | `4` | Concurrent node requests, from 1 to 32 |
 
@@ -58,33 +58,34 @@ The capture reached its depth boundary with 19 references left unfetched. It omi
 Graph mode saves history under `~/.issue-graph/`, keyed by repository and seed list. Run the same seed list again to see new nodes, state changes, and new links:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12
 ```
 
-Keep the seed order consistent for history lookup. `--no-snapshot` skips saving a new capture while still allowing comparison with existing history. Changes in access or crawl limits affect what can be compared.
+Keep the seed order consistent for history lookup. `--no-save` skips saving a new capture while still allowing comparison with existing history. Changes in access or crawl limits affect what can be compared.
 
 ## Export JSON and HTML
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save -o graph.json -o graph.html
 ```
 
-`--json PATH` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Graph JSON has no `schemaVersion` field. Markdown remains on stdout.
+`-o PATH.json` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Graph JSON has no `schemaVersion` field. Markdown remains on stdout.
 
-`--html PATH` writes a self-contained explorer with filters, relationships, connected components, cleanup candidates, and an Impact view. Open it directly in your browser. The Impact view shows relationships found in the graph.
+`-o PATH.html` writes a self-contained explorer with filters, relationships, connected components, cleanup candidates, and an Impact view. Open it directly in your browser. The Impact view shows relationships found in the graph.
 
-Export flags write files even with `--no-snapshot` and can overwrite existing paths. Review private results before sharing them.
+Export paths write files even with `--no-save` and can overwrite existing paths. Review private results before sharing them.
 
 ## Add cluster labels
 
 Print a task for your agent, then load its reviewed labels into an explorer:
 
 ```bash
-issue-graph --seeds 64,246,281 --repo owner/repo --cluster --no-snapshot
-issue-graph --seeds 64,246,281 --repo owner/repo --clusters clusters.json --html graph.html --no-snapshot
+issue-graph cluster owner/repo
+issue-graph cluster owner/repo --apply clusters.json
+issue-graph graph 64 246 281 --repo owner/repo --clusters clusters.json -o graph.html --no-save
 ```
 
-`--cluster` prints the task. `--clusters PATH` reads prepared labels. The input can be an array of clusters or an object containing `clusters` and `cleanup`:
+`cluster` saves the run and prints the task; `--apply` loads your agent's answer into that run's dashboard. `--clusters PATH` reads prepared labels into any graph export. The input can be an array of clusters or an object containing `clusters` and `cleanup`:
 
 ```json
 {

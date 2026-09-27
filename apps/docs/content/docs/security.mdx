@@ -24,10 +24,10 @@ The HTTP transport targets `api.github.com`.
 
 | Command | Default storage | Controls |
 | --- | --- | --- |
-| Graph | Snapshots under `~/.issue-graph/` | `--no-snapshot` skips new snapshots; `--json PATH` and `--html PATH` still write |
-| Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-snapshot` skips new snapshots |
+| Graph, open, rank, cluster | Runs under `~/.issue-graph/` | `--no-save` skips new runs; `-o PATH` still writes |
+| Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-save` skips new snapshots |
 | Plan | None | Report on stdout |
-| Status | None | `--save` writes a capture; conflicts with `--no-snapshot` |
+| Status | None | `--save` writes a capture; conflicts with `--no-save` |
 | Schema and help | None | Output on stdout |
 
 `ISSUE_GRAPH_HOME` changes the status storage root. Graph and reconcile use `~/.issue-graph/`. Comparisons can read existing history while snapshot writes are disabled.
@@ -44,8 +44,8 @@ Review the full result before sharing it. HTML exports embed the graph and can b
 
 Graph, status, reconciliation, and planning run without a model. Clustering offers three options:
 
-- `--cluster` prints a task for your calling agent
-- `--cluster-run claude` or `--cluster-run codex` starts an installed agent process with graph metadata
+- `cluster` prints a task for your calling agent, and `cluster --apply` loads its answer
+- `cluster --agent claude` or `cluster --agent codex` starts an installed agent process with graph metadata
 - `--clusters PATH` reads prepared labels for an HTML export
 
 External agents use their own credentials, tools, permissions, retention settings, and billing. Confirm permission to send private metadata before running them. The CLI does not sandbox those processes.

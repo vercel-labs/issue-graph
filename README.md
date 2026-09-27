@@ -36,7 +36,7 @@ gh auth status
 Trace public [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) without saving a snapshot:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
 ```
 
 To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. At the 2026-09-22 capture, issue #1113 was closed, [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) was merged, [regression #1148](https://github.com/vercel-labs/agent-browser/issues/1148) was closed, and follow-ups [#1371](https://github.com/vercel-labs/agent-browser/issues/1371) and [#1607](https://github.com/vercel-labs/agent-browser/issues/1607) were open. Check the open follow-ups before assuming the fix covers them.
@@ -55,35 +55,35 @@ Use `issue-graph --help` to check the commands supported by your installed relea
 
 | Need | Installed command |
 | --- | --- |
-| Inspect an issue or PR before starting work | `issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot` |
-| Survey labeled open issues | `issue-graph --label bug --repo owner/repo --prioritize` |
-| Count open PRs by author | `issue-graph status --repo vercel-labs/portless --author ctate,Railly` |
-| See PR evidence, assignees, and requested reviewers | `issue-graph status --repo vercel-labs/portless --author ctate --view prs` |
-| Reconcile an open backlog, with or without labels | `issue-graph reconcile --repo owner/repo --format json --no-snapshot` |
-| Select the next backlog action | `issue-graph plan --repo owner/repo --format json` |
+| Inspect an issue or PR before starting work | `issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save` |
+| Survey labeled open issues | `issue-graph rank owner/repo --label bug` |
+| Count open PRs by author | `issue-graph status vercel-labs/portless --author ctate,Railly` |
+| See PR evidence, assignees, and requested reviewers | `issue-graph status vercel-labs/portless --author ctate --view prs` |
+| Reconcile an open backlog, with or without labels | `issue-graph reconcile owner/repo --format json --no-save` |
+| Select the next backlog action | `issue-graph plan owner/repo --format json` |
 | Inspect the machine contract | `issue-graph schema` |
 
 Graph and plan default to compact human output in a terminal. Graph still prints Markdown in a pipe; plan prints versioned JSON. Use `--format text` for the human view outside a terminal, or `--format markdown` for Markdown. Plan also supports `--format json`. Human output wraps at up to 100 columns; monochrome bold/dim styling requires a TTY and is disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
 
-Graph `--json PATH` writes a graph file; its legacy `--format json` still prints Markdown, not JSON. Reconcile keeps terminal Markdown and piped JSON defaults and does not support `--format text`. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
+Graph `-o PATH.json` writes a graph file; its legacy `--format json` still prints Markdown, not JSON. Reconcile keeps terminal Markdown and piped JSON defaults and does not support `--format text`. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
 
 ## Explore and compare
 
 Export a graph and a local Next.js dashboard:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save -o graph.json -o graph.html
 ```
 
 Open `graph.html` directly in a browser to explore relationships, filter nodes, and review cleanup candidates.
 
-Graph and reconcile runs save local history under `~/.issue-graph/` by default. Re-running the same graph seeds shows a snapshot diff; reconciliation tracks repository-level action changes. `--no-snapshot` skips saving history but does not prevent explicitly requested JSON or HTML exports. Plan writes no snapshots.
+Graph and reconcile runs save local history under `~/.issue-graph/` by default. Re-running the same graph seeds shows a snapshot diff; reconciliation tracks repository-level action changes. `--no-save` skips saving history but does not prevent explicitly requested `-o` exports. Plan writes no snapshots.
 
 Status history is opt-in:
 
 ```bash
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --save
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --since last --save
+issue-graph status vercel-labs/portless --author ctate,Railly --save
+issue-graph status vercel-labs/portless --author ctate,Railly --since last --save
 ```
 
 Status reports unknown counts as `?` or `null`. Check coverage before using totals, and review CI and unresolved review threads separately before merging.
@@ -131,7 +131,7 @@ issue-graph skills get core --full
 
 Use `--full` for workflow references, `issue-graph skills list` for available guides, and command-specific `--help` for syntax. If the CLI or guidance is missing, report the error and ask for an authorized setup correction. See [Agents](apps/docs/content/docs/agents.mdx) for setup.
 
-Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
+Use `issue-graph cluster owner/repo` to print a root-cause clustering task for the calling agent, then `issue-graph cluster owner/repo --apply answer.json` (or `-` for stdin) to load its answer. For cron or CI, `--agent claude` or `--agent codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
 
 Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
 

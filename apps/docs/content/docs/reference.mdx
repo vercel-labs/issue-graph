@@ -21,62 +21,63 @@ issue-graph schema
 ## Commands
 
 ```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot
-issue-graph https://github.com/vercel-labs/portless/pull/427 --no-snapshot
-issue-graph --seeds 64,246,281 --repo owner/repo --no-snapshot
-issue-graph --label bug --repo owner/repo --prioritize --no-snapshot
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --json
-issue-graph reconcile --repo owner/repo --format json --no-snapshot
-issue-graph plan --repo owner/repo --format json
+issue-graph open owner/repo
+issue-graph graph vercel-labs/portless#427 --depth 1 --no-save
+issue-graph graph https://github.com/vercel-labs/portless/pull/427 --no-save
+issue-graph graph 64 246 281 --repo owner/repo --no-save
+issue-graph rank owner/repo --label bug --no-save
+issue-graph cluster owner/repo
+issue-graph status vercel-labs/portless --author ctate,Railly --json
+issue-graph reconcile owner/repo --format json --no-save
+issue-graph plan owner/repo --format json
 issue-graph schema
 ```
 
-Graph is the default mode. Replace `owner/repo`, label names, and seed numbers with your scope. Use one seed-selection form per command.
+Each command takes a scope: nothing (the current directory's GitHub repository), `owner/repo`, or one or more items (`123`, `#123`, `owner/repo#123`, or a URL). Running `issue-graph` with no arguments inside a checkout opens the backlog dashboard. Older flags still work for one minor release and print their replacement.
 
 ## Graph selection and crawl controls
 
 | Flag | Meaning |
 | --- | --- |
-| `--repo owner/repo` | Required for bare numbers, `--seeds`, `--label`, reconcile, and plan |
-| `--seeds a,b,c` | Explicit comma-separated seeds; multi-seed output includes components |
+| `--repo owner/repo` | Repository for bare numbers when outside its checkout |
 | `--label L` | Seed from labeled open issues, within the discovery budget |
 | `--depth N` | Same-repo recursion depth, default 2; cross-repository references are fetched one hop |
-| `--max-nodes N` | Total nodes, default 80; integer from 1 to 1000 |
+| `--budget N` | Total nodes, default 80; integer from 1 to 1000 |
 | `--hub-threshold N` | Do not expand high-degree non-seed nodes above this number of references, default 12 |
 | `--concurrency N` | Node requests in flight, default 4; integer from 1 to 32 |
-| `--prioritize` | Append the discussion-heat ranking in graph Markdown |
-| `--no-snapshot` | Skip new graph/reconcile history files; explicit export flags still write |
+| `--no-save` | Skip new run and reconcile history files; `-o` paths still write |
 | `-h`, `--help` | Print usage |
 
-Reconcile and plan normally discover the open backlog from `--repo` and share the crawl controls. Search pages are 100 results, with a 1000-result ceiling. Graph per-node connections are bounded separately; see [Graph](/docs/graph).
+Reconcile and plan discover the open backlog of their repository scope and share the crawl controls. Search pages are 100 results, with a 1000-result ceiling. Graph per-node connections are bounded separately; see [Graph](/docs/graph).
 
 ## Graph exports and clustering
 
 | Flag | Meaning |
 | --- | --- |
-| `--json PATH` | Write a graph JSON file; Markdown remains on stdout |
-| `--html PATH` | Write a self-contained graph HTML explorer |
+| `-o PATH.json` | Write a graph JSON file; the report remains on stdout |
+| `-o PATH.html` | Write a self-contained graph HTML explorer |
 | `--clusters PATH` | Read cluster/cleanup labels for the HTML explorer |
-| `--cluster` | Print a clustering task for the caller's agent |
-| `--cluster-run claude` | Launch installed Claude headlessly with the clustering task |
-| `--cluster-run codex` | Launch installed Codex headlessly with the clustering task |
+| `cluster` | Print a clustering task for the caller's agent and save the run |
+| `cluster --apply PATH` | Apply the agent's answer (a file, or `-` for stdin) to the saved run |
+| `cluster --agent claude` | Launch installed Claude headlessly with the clustering task |
+| `cluster --agent codex` | Launch installed Codex headlessly with the clustering task |
 
-These options apply to graph mode. Reconcile and plan use `--format json` for structured output. Graph exports write files even with `--no-snapshot`. External agents run with their own permissions.
+`-o` can repeat. Reconcile and plan use `--format json` for structured output. Export paths write files even with `--no-save`. External agents run with their own permissions.
 
 ## Status flags
 
 | Flag | Meaning |
 | --- | --- |
-| `--repo owner/repo` | Required, repeatable repository scope |
+| `owner/repo...` | Repositories; defaults to the current checkout. `--repo owner/repo` also works and can repeat |
 | `--author login[,login]` | Required, repeatable/comma-separated author scope |
 | `--view authors|projects|prs` | Human view, default `authors` |
-| `--format auto|table|markdown|json` | Default `auto`: table in a TTY, JSON in a pipe |
-| `--json` | Boolean stdout JSON shorthand, no filename; conflicts with table/Markdown format |
+| `--format auto|human|markdown|json` | Default `auto`: table in a TTY, JSON in a pipe |
+| `--json` | Boolean stdout JSON shorthand, no filename; conflicts with human/Markdown format |
 | `--concurrency N` | Concurrent repositories, default 4; integer from 1 to 32 |
 | `--max-pages N` | Pages per connection, default 100; integer from 1 to 1000 |
 | `--save` | Opt into an immutable local capture |
 | `--since last|PATH` | Compare with the latest same-scope capture or an explicit snapshot/export |
-| `--no-snapshot` | Forbid snapshot writes; conflicts with `--save` |
+| `--no-save` | Forbid snapshot writes; conflicts with `--save` |
 | `-h`, `--help` | Print status-specific usage |
 
 Status PR pages contain 50 PRs; assignees and reviewer requests are also paginated. Scope normalization is case-insensitive. `--view` does not remove evidence fields from the JSON report. See [Status and history](/docs/status) for counts, coverage, and comparisons.
@@ -85,15 +86,15 @@ Status PR pages contain 50 PRs; assignees and reviewer requests are also paginat
 
 | Mode | stdout | Local persistence |
 | --- | --- | --- |
-| Graph | Markdown regardless of TTY; graph JSON only via `--json PATH` | Snapshots by default; explicit JSON/HTML paths write independently |
-| Reconcile | `--format auto|json|markdown`; auto is Markdown in TTY, JSON in pipe | Repository history by default unless `--no-snapshot` |
+| Graph | Formatted in a TTY, Markdown in a pipe; graph JSON only via `-o PATH.json` | Runs saved by default; `-o` paths write independently |
+| Reconcile | `--format auto|json|markdown`; auto is Markdown in TTY, JSON in pipe | Repository history by default unless `--no-save` |
 | Plan | Same format selection as reconcile | No snapshots |
 | Status | `--format auto|table|markdown|json`; auto is table in TTY, JSON in pipe | Only with `--save` |
 | Schema | JSON | None |
 
 Reconcile, plan, and status reports currently have `schemaVersion: 1`. Graph JSON currently has no report version field. It contains `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Use the schema for the mode you are consuming.
 
-Status history adds `history` on comparison and `snapshot` on save. Graph/reconcile can read earlier history even with `--no-snapshot`. Progress and file-write notices go to stderr. See [Security](/docs/security) for sensitive-data handling.
+Status history adds `history` on comparison and `snapshot` on save. Graph/reconcile can read earlier history even with `--no-save`. Progress and file-write notices go to stderr. See [Security](/docs/security) for sensitive-data handling.
 
 ## Environment
 

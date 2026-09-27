@@ -20,7 +20,7 @@ You can also try the [npm package](https://www.npmjs.com/package/issue-graph) wi
 ## Trace an issue
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
 ```
 
 The result shows linked issues and PRs, their current states, and possible follow-ups. Use an issue URL or replace the repository and number with your own.
