@@ -1,0 +1,118 @@
+---
+title: Linear
+description: Read explicit issue relationships with workspace-scoped identity and visible coverage limits.
+---
+
+Start with one Linear issue to see its blockers, related work, parent and sub-issues, and attachment links.
+
+Set exactly one of `LINEAR_API_KEY` with read access or `LINEAR_ACCESS_TOKEN` for OAuth in your environment. The command uses the pinned Linear SDK and sends queries only.
+
+```bash
+issue-graph linear https://linear.app/your-workspace/issue/ENG-123/example --depth 1 --max-nodes 20
+```
+
+An identifier or native UUID also works. Use `--workspace` to require a particular workspace:
+
+```bash
+issue-graph linear ENG-123 --workspace your-workspace --json
+```
+
+The URL's workspace and `--workspace` must agree with the authenticated organization. Identities include the organization ID and native issue ID, so identifiers in different workspaces cannot collide.
+
+## What the graph includes
+
+- Explicit issue relations in both directions, retaining their native type and direction.
+- Parent and sub-issue relationships.
+- Attachment URLs and titles, including linked GitHub pull requests.
+- Native workflow status, archive state, and update time.
+
+Attachment targets are listed without fetching them. Text mentions in descriptions and comments are outside this command's scope. A linked pull request is not evidence that an issue is resolved.
+
+The output is Markdown by default. `--json` emits the versioned report on stdout. These runs do not write local files.
+
+## Dashboard
+
+Generate an HTML explorer and save the latest run for this issue's project:
+
+```bash
+issue-graph linear ENG-123 --workspace your-workspace --html linear.html --open
+issue-graph dashboard --open
+```
+
+For a project dashboard, capture the project's full non-archived issue list and read every selected issue's connections:
+
+```bash
+issue-graph linear --project <project-uuid> --workspace your-workspace --max-nodes 1000 --max-pages 100 --html linear.html --open
+```
+
+Project mode includes disconnected issues and empty projects. It paginates the inventory, then reads both directions of relations, parents, children, and attachments with bounded concurrency. Connections outside the project remain visible without fetching those issues. Depth and hub expansion limits apply only to issue neighborhoods. `--max-pages` also bounds the project inventory; reaching either limit leaves the capture visibly incomplete. Rerun the command to refresh a saved capture.
+
+The dashboard keeps successful reads under **Snapshot details** and **Connection details**. Empty connections are valid results. Scope exclusions, such as archived issues or text mentions, do not flag individual issues. Failed, truncated, or inconsistent reads retain warnings.
+
+The dashboard switches between saved Linear projects and GitHub repositories. Each Linear entry is labeled `Workspace / Project` and keyed by workspace and project UUID. Issues from other projects are excluded from that view; boundary relationships remain visible. Issues without a project are scoped to their team. Older captures without project metadata are labeled `Unscoped capture`.
+
+The selector counts all non-archived open issues in the project, independent of graph depth and node caps. Open means triage, backlog, unstarted, or started. A separate query reads up to 100 pages of 250 IDs across all teams in the project. `≥` marks a partial count; `—` means unavailable, including captures without a project. The tooltip records when the count was read. Saved dashboards do not refresh automatically. GitHub entries count open issues plus pull requests, with the breakdown in the tooltip.
+
+Linear shows issue identifiers, native workflow states, archived issues, relationship direction, attachment links, and read coverage. Explore and Swarm support relationships and depth; GitHub-only impact and discussion ranking are not shown for Linear.
+
+`--open` creates a temporary HTML file when `--html` is omitted. HTML runs save the latest project model under `~/.issue-graph/dashboard`. Add `--no-snapshot` to write or open the HTML without saving a dashboard entry. `--json` can be combined with HTML output; file notices go to stderr.
+
+### Thematic clusters
+
+By default, groups are connected components. To group by topic instead, print a task for the calling agent, then supply its reviewed JSON:
+
+```bash
+issue-graph linear ENG-123 --cluster
+issue-graph linear ENG-123 --clusters themes.json --html linear.html --open
+```
+
+The task includes native issue descriptions and explicit relationships from this project's capture. It does not invoke another model. `--cluster` cannot be combined with `--json`. The file uses the same cluster shape as GitHub:
+
+```json
+{"clusters":[{"label":"Keyboard input","root_cause":"Proposed theme: negotiated input handling","members":[{"key":"<exact captured node key>"}]}]}
+```
+
+For Linear, `root_cause` is a grouping rationale, not a verified causal finding. Explore and Swarm label these as proposed themes. Foreign-project keys, duplicate assignments, malformed input, verdicts, and cleanup actions are rejected. Issues without an assignment remain visible under Ungrouped. Clustering changes only the local grouping; issue states, relationships and project open totals stay intact.
+
+Partial runs still generate HTML and exit `1`. Inspect the coverage notice and each issue's read details. The dashboard is a captured view, not a live connection, and opening it sends no mutations to Linear.
+
+## Limits and coverage
+
+| Option | Default | Range |
+| --- | --- | --- |
+| `--depth` | 1 | 0–8 |
+| `--max-nodes` | 80 | 1–1000 |
+| `--max-pages` | 5 | 1–100 per connection per issue |
+| `--hub-threshold` | 12 | 1–1000 |
+| `--concurrency` | 4 | 1–32 |
+
+Each connection has its own cursor and pages contain up to 50 entries. Archived issues are included; archived relations and attachments are excluded. Non-seed hubs are fetched but not expanded.
+
+`coverageComplete` describes the requested depth and relationship sources. It is false when a node cannot be read, a connection is incomplete, an issue changes while its pages are read, or a node cap or hub stops traversal. Depth boundaries are listed separately. API reads across pages are not an atomic snapshot.
+
+Exit codes are `0` for complete coverage within scope, `1` for partial coverage or a runtime failure, and `2` for invalid arguments. JSON includes per-node connection coverage and the known nodes omitted by the node cap.
+
+## Library
+
+The reader is a separate entry point, keeping SDK types out of the graph contract:
+
+```ts
+import { buildLinearGraph } from "issue-graph";
+import { linearSdkReader } from "issue-graph/transport/linear";
+
+const reader = linearSdkReader({ apiKey: process.env.LINEAR_API_KEY });
+const report = await buildLinearGraph(reader, "ENG-123", {
+  workspace: "your-workspace",
+  maxDepth: 1,
+  maxNodes: 20,
+  maxPages: 3,
+  hubThreshold: 12,
+  concurrency: 4,
+});
+```
+
+Use `buildLinearProject(reader, projectUuid, options)` for a project capture. Pass `linearDashboardModel(report)` to `renderDashboard()` to combine Linear and GitHub models in one HTML page. These functions are exported from `issue-graph`.
+
+An authenticated Linear MCP session is separate from SDK credentials. MCP captures should record their actual source and supported relationship categories in the report scope. A returned empty array is a successful read; an unrequested or unexposed category belongs in the scope notes. Never mark a failed requested read as a scope exclusion.
+
+The reader accepts a per-request timeout and bounded retry options. Credentials and raw upstream error messages are not included in the report.

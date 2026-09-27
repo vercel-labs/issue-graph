@@ -91,7 +91,7 @@ const author = { login: "smoke-author" };
 const createdAt = "2026-01-01T00:00:00Z";
 let repository;
 if (fields.query.includes("IssueGraphRepositoryOpen")) {
-  repository = { nameWithOwner: "package-smoke/fixture", issues: { totalCount: 12 }, pullRequests: { totalCount: 7 } };
+  repository = { nameWithOwner: "package-smoke/fixture", issues: { totalCount: 301 }, pullRequests: { totalCount: 47 } };
 } else if (fields.query.includes("issueOrPullRequest(number:$n)")) {
   assert.ok(fields.n === "1" || fields.n === "2");
   const pr = fields.n === "2";
@@ -161,7 +161,53 @@ process.env.PATH = bin;
 require("node:net").Socket.prototype.connect = function () {
   throw new Error("Network forbidden in package smoke consumer");
 };
-globalThis.fetch = async function () {
+globalThis.fetch = async function (url, init) {
+  if (process.env.PACKAGE_TEST_LINEAR === "1") {
+    assert.equal(url, "https://api.linear.app/graphql");
+    assert.equal(init.method, "POST");
+    assert.equal(new Headers(init.headers).get("authorization"), "package-smoke-linear");
+    const body = JSON.parse(init.body);
+    assert.ok(body.query.startsWith("query IssueGraph"));
+    assert.ok(!body.query.includes("mutation"));
+    const org = "11111111-1111-4111-8111-111111111111";
+    if (body.query.includes("IssueGraphWorkspace")) {
+      return Response.json({ data: { organization: { id: org, urlKey: "fixture", name: "Fixture" } } });
+    }
+    const id = n => "00000000-0000-4000-8000-" + String(n).padStart(12, "0");
+    const project = { id: id(process.env.PACKAGE_TEST_LINEAR_SECOND === "1" ? 901 : 900), name: "Project A", url: "https://linear.app/fixture/project/a" };
+    const team = { id: id(800), name: "Engineering", key: "ENG", organization: { id: org } };
+    if (body.query.includes("IssueGraphProjectOpen")) {
+      assert.equal(body.variables.id, project.id);
+      return Response.json({ data: { project: { id: project.id, issues: {
+        nodes: Array.from({length: 12}, (_, n) => ({ id: id(n + 1), archivedAt: null, state: { type: "started" }, project, team })),
+        pageInfo: { hasNextPage: false, endCursor: null },
+      } } } });
+    }
+    if (body.query.includes("IssueGraphProject(")) {
+      assert.equal(body.variables.id, project.id);
+      return Response.json({ data: { project: { ...project, issues: {
+        nodes: [1, 2].map(n => ({ id: id(n), updatedAt: "2026-09-25T00:00:00Z", project, team })),
+        pageInfo: { hasNextPage: false, endCursor: null },
+      } } } });
+    }
+    const number = body.variables.id === "ENG-1" || body.variables.id === id(1) ? 1 : 2;
+    const reference = n => ({
+      id: id(n), identifier: "ENG-" + n,
+      url: "https://linear.app/fixture/issue/ENG-" + n + "/example",
+      team: { organization: { id: org } },
+    });
+    const empty = { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } };
+    const partial = process.env.PACKAGE_TEST_LINEAR_PARTIAL === "1";
+    return Response.json({ data: { issue: {
+      ...reference(number), project, team, title: "Linear fixture " + number, updatedAt: "2026-09-25T00:00:00Z",
+      archivedAt: null, state: { name: "Todo", type: "unstarted" }, parent: null,
+      relations: empty, inverseRelations: empty, attachments: empty,
+      children: {
+        nodes: number === 1 ? [reference(2)] : [],
+        pageInfo: { hasNextPage: partial, endCursor: partial ? "more" : null },
+      },
+    } } });
+  }
   throw new Error("Network forbidden in package smoke consumer");
 };
 `;
@@ -172,12 +218,17 @@ const name = ${JSON.stringify(packageName)};
 const core = await import(name);
 const { httpTransport } = await import(name + "/transport/http");
 const { shellTransport } = await import(name + "/transport/shell");
+const { linearSdkReader } = await import(name + "/transport/linear");
 assert.ok(import.meta.resolve(name).endsWith("/dist/index.js"));
 assert.equal(typeof core.crawl, "function");
 assert.equal(typeof core.parseNodeResponse, "function");
 assert.equal(typeof core.collectStatus, "function");
 assert.equal(typeof httpTransport, "function");
 assert.equal(typeof shellTransport, "function");
+assert.equal(typeof linearSdkReader, "function");
+assert.equal(typeof core.buildLinearGraph, "function");
+assert.equal(typeof core.buildLinearProject, "function");
+assert.equal(typeof core.linearDashboardModel, "function");
 const expected = {
   data: { repository: { issueOrPullRequest: {
     __typename: "Issue", title: "HTTP fixture", state: "OPEN", body: "",
@@ -269,7 +320,8 @@ try {
       updateNotifier: false,
       managePackageManagerVersions: false,
       scriptShell: "/bin/sh",
-      registry: "http://127.0.0.1:9",
+      registry: "https://registry.npmjs.org",
+      engineStrict: true,
     };
     writeFileSync(
       join(dir, "pnpm-workspace.yaml"),
@@ -367,6 +419,26 @@ try {
     assert.ok(files.includes(`package/${name}`), `missing published file: ${name}`);
   console.log(`PASS published contents: ${files.length} files, no source/tests/internal docs/maps`);
 
+  for (const dir of [consumer, dlxConsumer]) {
+    const manifestPath = join(dir, "package.json");
+    const before = readFileSync(manifestPath, "utf8");
+    run(
+      [
+        pnpm,
+        "add",
+        "--workspace-root",
+        "--offline=false",
+        "--ignore-scripts",
+        "--lockfile=false",
+        tarball,
+      ],
+      dir,
+      { ...env, NODE_OPTIONS: "" },
+    );
+    rmSync(join(dir, "node_modules"), { recursive: true, force: true });
+    writeFileSync(manifestPath, before);
+  }
+
   run(
     [pnpm, "add", "--workspace-root", "--offline", "--ignore-scripts", "--lockfile=false", tarball],
     consumer,
@@ -381,10 +453,12 @@ try {
   assert.equal(manifest.exports["."].import, "./dist/index.js");
   assert.equal(manifest.exports["./transport/http"].import, "./dist/transports/http.js");
   assert.equal(manifest.exports["./transport/shell"].import, "./dist/transports/shell.js");
+  assert.equal(manifest.exports["./transport/linear"].import, "./dist/transports/linear.js");
   assert.equal(manifest.types, "./dist/index.d.ts");
   assert.equal(manifest.exports["."].types, "./dist/index.d.ts");
   assert.equal(manifest.exports["./transport/http"].types, "./dist/transports/http.d.ts");
   assert.equal(manifest.exports["./transport/shell"].types, "./dist/transports/shell.d.ts");
+  assert.equal(manifest.exports["./transport/linear"].types, "./dist/transports/linear.d.ts");
   assert.equal(
     readFileSync(join(installed, "dist/bin.js"), "utf8").split("\n")[0],
     "#!/usr/bin/env node",
@@ -396,6 +470,36 @@ try {
     run([pnpm, "exec", "issue-graph", ...args], consumer, { ...env, ...overrides }, expected);
   assert.match(invoke(["--help"]).stdout, /usage: issue-graph/);
   assert.match(invoke(["status", "--help"]).stdout, /--save/);
+  assert.match(invoke(["linear", "--help"]).stdout, /LINEAR_API_KEY/);
+  const linearEnv = {
+    PACKAGE_TEST_LINEAR: "1",
+    LINEAR_API_KEY: "package-smoke-linear",
+    LINEAR_ACCESS_TOKEN: "",
+  };
+  const linearReport = JSON.parse(
+    invoke(["linear", "ENG-1", "--workspace", "fixture", "--json"], 0, linearEnv).stdout,
+  );
+  assert.equal(linearReport.coverageComplete, true);
+  assert.equal(linearReport.openCount.value, 12);
+  assert.equal(linearReport.openCount.complete, true);
+  assert.deepEqual(
+    linearReport.nodes.map((node: { identifier: string }) => node.identifier),
+    ["ENG-1", "ENG-2"],
+  );
+  const linearPartial = JSON.parse(
+    invoke(["linear", "ENG-1", "--json", "--max-pages", "1"], 1, {
+      ...linearEnv,
+      PACKAGE_TEST_LINEAR_PARTIAL: "1",
+    }).stdout,
+  );
+  assert.equal(linearPartial.coverageComplete, false);
+  const linearProject = JSON.parse(
+    invoke(["linear", "--project", "00000000-0000-4000-8000-000000000900", "--json"], 0, linearEnv)
+      .stdout,
+  );
+  assert.equal(linearProject.scope.issues, "project");
+  assert.equal(linearProject.inventory.complete, true);
+  assert.equal(linearProject.nodes.length, 2);
   const schema = JSON.parse(invoke(["schema"]).stdout);
   assert.equal(schema.name, "issue-graph");
   assert.deepEqual(schema.exitCodes, { success: 0, runtimeFailure: 1, usageError: 2 });
@@ -467,7 +571,23 @@ try {
   );
 
   const dlx = (args: string[], expected = 0) =>
-    run([pnpm, `--package=${tarball}`, "dlx", "issue-graph", ...args], dlxConsumer, env, expected);
+    run(
+      [
+        pnpm,
+        "--config.offline=true",
+        "--config.ignore-scripts=true",
+        "--config.engine-strict=true",
+        `--config.store-dir=${join(owned, "dlx-store")}`,
+        `--config.cache-dir=${join(owned, "dlx-cache")}`,
+        `--package=${tarball}`,
+        "dlx",
+        "issue-graph",
+        ...args,
+      ],
+      dlxConsumer,
+      env,
+      expected,
+    );
   assert.match(dlx(["--help"]).stdout, /usage: issue-graph/);
   assert.deepEqual(JSON.parse(dlx(["schema"]).stdout), schema);
   assert.match(dlx(["--not-a-real-option"], 2).stderr, /unknown flag/);
@@ -545,6 +665,7 @@ try {
   const html = readFileSync(join(consumer, htmlPath), "utf8");
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /Package smoke issue/);
+  assert.match(html, /"openCount":\{"value":348,"issues":301,"pullRequests":47,"complete":true/);
   assert.ok(
     !existsSync(join(home, ".issue-graph")),
     "--no-snapshot must prevent graph persistence",
@@ -560,16 +681,87 @@ try {
     invoke([...statusArgs, "--save"], 1, { ISSUE_GRAPH_HOME: join(blocker, "status") }).stderr,
     /ENOTDIR|EEXIST|not a directory/i,
   );
+  const linearHtmlPath = join(consumer, "linear", "graph.html");
+  const linearHtml = invoke(
+    ["linear", "ENG-1", "--html", linearHtmlPath, "--no-snapshot", "--json"],
+    0,
+    linearEnv,
+  );
+  assert.equal(JSON.parse(linearHtml.stdout).source, "linear");
+  assert.ok(!existsSync(join(home, ".issue-graph")), "Linear --no-snapshot must not save a model");
+  const embedded = (path: string) =>
+    JSON.parse(
+      readFileSync(path, "utf8")
+        .split('<script id="data" type="application/json">')[1]
+        .split("</script>")[0],
+    );
+  assert.equal(embedded(linearHtmlPath).projects[0].provider.id, "linear");
+  assert.equal(embedded(linearHtmlPath).projects[0].openCount.value, 12);
+  assert.equal(embedded(linearHtmlPath).projects[0].label, "Fixture / Project A");
+  const themePath = join(consumer, "themes.json");
+  const linearKeys = Object.keys(embedded(linearHtmlPath).projects[0].nodes);
+  writeFileSync(
+    themePath,
+    JSON.stringify({
+      clusters: linearKeys.map((key, index) => ({
+        label: `Theme ${index + 1}`,
+        root_cause: "Proposed theme from captured evidence",
+        members: [{ key }],
+      })),
+    }),
+  );
+  invoke(
+    ["linear", "ENG-1", "--clusters", themePath, "--html", linearHtmlPath, "--no-snapshot"],
+    0,
+    linearEnv,
+  );
+  assert.deepEqual(
+    embedded(linearHtmlPath).projects[0].groups.map((g: { label: string }) => g.label),
+    ["Theme 1", "Theme 2"],
+  );
+  assert.equal(embedded(linearHtmlPath).projects[0].grouping, "themes");
+  assert.equal(embedded(linearHtmlPath).projects[0].openCount.value, 12);
+  assert.match(invoke(["linear", "ENG-1", "--cluster"], 0, linearEnv).stdout, /ISSUE DATA:/);
+  const savedLinear = invoke(
+    ["linear", "ENG-1", "--html", linearHtmlPath, "--max-pages", "1", "--json"],
+    1,
+    { ...linearEnv, PACKAGE_TEST_LINEAR_PARTIAL: "1" },
+  );
+  assert.equal(JSON.parse(savedLinear.stdout).coverageComplete, false);
+  assert.equal(embedded(linearHtmlPath).projects[0].coverage.complete, false);
+  const dashboardPath = join(consumer, "linear", "dashboard.html");
+  invoke(["dashboard", "--html", dashboardPath]);
+  assert.equal(
+    embedded(dashboardPath).projects[0].id,
+    "linear:11111111-1111-4111-8111-111111111111:project:00000000-0000-4000-8000-000000000900",
+  );
+  assert.equal(embedded(dashboardPath).projects[0].coverage.complete, false);
+  invoke(["linear", "ENG-1", "--html", linearHtmlPath], 0, {
+    ...linearEnv,
+    PACKAGE_TEST_LINEAR_SECOND: "1",
+  });
+  invoke(["dashboard", "--html", dashboardPath]);
+  const savedProjects = embedded(dashboardPath).projects;
+  assert.equal(savedProjects.length, 2);
+  assert.equal(new Set(savedProjects.map((p: { id: string }) => p.id)).size, 2);
+  assert.ok(savedProjects.every((p: { openCount: { value: number } }) => p.openCount.value === 12));
+  const failedLinearHtml = invoke(
+    ["linear", "ENG-1", "--html", join(blocker, "linear.html"), "--json"],
+    1,
+    linearEnv,
+  );
+  assert.equal(failedLinearHtml.stdout, "");
+  assert.match(failedLinearHtml.stderr, /ENOTDIR|EEXIST|not a directory/i);
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 44 : 45;
+  const expectedChecks = suppliedTarball ? 58 : 59;
   assert.equal(
     checks,
     expectedChecks,
     `package verification must exercise all ${expectedChecks} commands`,
   );
-  assert.equal(calls.length, 14, "data verification must exercise all 14 owned gh fixture calls");
+  assert.equal(calls.length, 16, "data verification must exercise all 16 owned gh fixture calls");
   console.log(
     `Package smoke passed on ${runtime}: ${checks} commands; ${calls.length} fixture calls`,
   );

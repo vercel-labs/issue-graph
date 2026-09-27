@@ -56,6 +56,7 @@ Use `issue-graph --help` to check the commands supported by your installed relea
 | Need | Installed command |
 | --- | --- |
 | Inspect an issue or PR before starting work | `issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot` |
+| Inspect explicit Linear relationships | `issue-graph linear ENG-123 --workspace your-workspace --depth 1 --json` |
 | Survey labeled open issues | `issue-graph --label bug --repo owner/repo --prioritize` |
 | Count open PRs by author | `issue-graph status --repo vercel-labs/portless --author ctate,Railly` |
 | See PR evidence, assignees, and requested reviewers | `issue-graph status --repo vercel-labs/portless --author ctate --view prs` |
@@ -87,6 +88,26 @@ issue-graph status --repo vercel-labs/portless --author ctate,Railly --since las
 ```
 
 Status reports unknown counts as `?` or `null`. Check coverage before using totals, and review CI and unresolved review threads separately before merging.
+
+## Linear
+
+Set `LINEAR_API_KEY` with read access, or `LINEAR_ACCESS_TOKEN` for OAuth. Use exactly one.
+
+```bash
+issue-graph linear https://linear.app/your-workspace/issue/ENG-123/example --depth 1 --max-nodes 20 --json
+```
+
+The command reads explicit relations in both directions, parents, sub-issues, and attachment URLs. It preserves native status and relation direction, checks the connected workspace, and paginates each connection. Archived issues are included; archived relations and attachments are excluded. It reports attachment targets without fetching them and does not collect text mentions.
+
+`--json` prints the report to stdout. Add `--html linear.html --open` to visualize the graph and save the latest project run for `issue-graph dashboard --open`. Each Linear project has its own entry, labeled `Workspace / Project`, and includes only that project's issues. Use `--no-snapshot` to skip saving the dashboard entry. Plain Markdown/JSON runs do not write files, and no remote mutations are sent.
+
+Selector counts cover all open items in the project, independently of graph limits. Linear counts non-archived issues in triage, backlog, unstarted, or started states. GitHub counts open issues plus pull requests. Counts include their capture time; `≥` marks an incomplete count and `—` means unavailable. Saved dashboards are offline snapshots; rerun the graph command to refresh them.
+
+Linear defaults to connected groups. Use `--cluster` to print a thematic grouping task for the calling agent, then `--clusters themes.json --html linear.html` to apply its reviewed assignments. The dashboard marks them as proposed themes, validates project membership, and preserves native relationships and open totals.
+
+Use `linear --project <project-uuid> --max-nodes 1000 --max-pages 100 --html linear.html --open` to capture a whole non-archived project, including disconnected issues and each issue's connections. Rerun it to refresh the saved dashboard. Successful reads are folded under Snapshot details; failed or truncated reads retain visible warnings. SDK credentials are separate from an authenticated MCP session.
+
+The dashboard shows native Linear states, directional relationships, and coverage alongside saved GitHub graphs. Exit `0` means complete within the declared depth and sources; `1` means partial coverage or a read failure; `2` means invalid usage. Inspect per-node coverage, node caps, hubs, and depth boundaries before relying on the result. See [Linear](apps/docs/content/docs/linear.mdx).
 
 ## Agents and integrations
 

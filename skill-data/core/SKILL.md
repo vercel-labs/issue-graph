@@ -9,7 +9,7 @@ Use the CLI to collect and classify evidence without a model. Counts, graph link
 and triage rankings guide inspection, not conclusions about correctness or readiness.
 
 Run the CLI with Node.js 20 or later. Local skill loading needs no credentials;
-operational queries use authenticated `gh` and access to the requested repositories.
+GitHub queries use authenticated `gh` and access to the requested repositories.
 Check `gh auth status` before queries; never request tokens in chat or install tools
 without authorization.
 
@@ -38,6 +38,7 @@ fabricate results, or install/upgrade anything automatically.
 | Whole open backlog, clustered and visualized | `issue-graph open owner/repo`, then the cluster handshake below |
 | What to fix first | `issue-graph rank owner/repo` |
 | Open-backlog verification queue | `issue-graph reconcile owner/repo` |
+| Linear issue or project relationships | `issue-graph linear <issue>`, or `linear --project UUID` |
 | Next backlog action | `issue-graph plan owner/repo` |
 
 For counts, skip graph discovery and do not reconstruct counts through ad hoc queries
@@ -51,8 +52,10 @@ Before starting issue work, inspect its graph for existing work and credit contr
 
 Commands take a verb and a scope: `issue-graph <verb> [scope]`. The scope is `owner/repo`
 (or `github:owner/repo`), one or more items (`123`, `#123`, `owner/repo#123`, a URL), or
-nothing, which means the GitHub repository of the current directory. Other providers
-are not supported yet; a `provider:` prefix other than `github` fails with that message.
+nothing, which means the GitHub repository of the current directory. These verbs accept
+GitHub scopes; other `provider:` prefixes are rejected. Use the dedicated `linear` command
+for Linear, with exactly one of `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` configured locally.
+Read `linear --help` for its separate flags and limits. Never request credentials in chat.
 Older flags (`--prioritize`, `--cluster-run`, `--max-nodes`, `--json PATH`, `--html`,
 `--all-open`, `--seeds`, `--no-snapshot`) still work and print their replacement; use
 the new forms.
