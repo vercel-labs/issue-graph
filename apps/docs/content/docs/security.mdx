@@ -26,13 +26,17 @@ The HTTP transport targets `api.github.com`.
 
 | Command | Default storage | Controls |
 | --- | --- | --- |
-| Graph, open, rank, cluster | Runs under `~/.issue-graph/` | `--no-save` skips new runs; `-o PATH` still writes |
+| Graph and rank | Runs under `~/.issue-graph/` | `--no-save` skips new history; `-o PATH` and `--open` still write exports |
+| Open and cluster | Runs plus an HTML export | `--no-save` skips history, but the export still writes to a temporary file or `-o PATH.html` |
+| Cluster with `--apply` | Updates the saved model and writes an HTML export | Applying an answer always saves it |
+| Dashboard | HTML export of saved models | Temporary file by default; `-o PATH.html` chooses its location |
+| Runs | None when listing | `runs rm owner/repo` deletes that saved dashboard model only |
 | Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-save` skips new snapshots |
 | Plan | None | Report on stdout |
 | Status | None | `--save` writes a capture; conflicts with `--no-save` |
 | Query | Immutable models in `captures/`, receipts and views in `history/` | New queries save automatically; `--history` replays existing artifacts |
 | Config | `config.json` | Only `config set` persists weights; query overrides and UI edits do not |
-| Schema and help | None | Output on stdout |
+| Auth, schema, skills, and help | None | Output on stdout |
 
 `ISSUE_GRAPH_HOME` changes the shared state root for graph, reconcile, status, saved dashboard models, config, captures, and query history. The default is `~/.issue-graph/`. Comparisons can read existing history while snapshot writes are disabled. Query has no `--no-save` flag; `--no-open` only suppresses the browser opener.
 
@@ -62,8 +66,8 @@ Access errors, deleted references, API failures, and crawl limits can hide work.
 
 Shared files and closing links help identify related work. Verify the code and current behavior before closing an issue. Check CI and unresolved review threads before merging a PR.
 
-## Source access and vulnerability reports
+## Vulnerability reports
 
-The npm package is public. The source repository is currently INTERNAL and requires organization access. Installing from npm works independently of that access.
+The source repository and npm package are public. Captures can still contain private repository data.
 
 Report vulnerabilities through the repository's private Security reporting form, following `SECURITY.md`. Include affected versions, reproduction steps, and impact. Keep private details out of public issues if you cannot access the form.

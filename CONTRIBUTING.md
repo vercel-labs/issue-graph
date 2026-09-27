@@ -2,12 +2,11 @@
 
 Issues and focused pull requests are welcome.
 
-Unless explicitly stated otherwise, contributions submitted for inclusion in
-this project are licensed under Apache-2.0.
+Contributions use Apache-2.0 unless stated otherwise.
 
 ## Setup
 
-To use the latest published CLI without contributing to source, run `npx issue-graph@latest --help` or install it with `npm install --global issue-graph@latest`. Library consumers can use `npm install issue-graph@latest`. The public npm package requires Node.js 20 or later and does not require or grant source access. Check the installed command's help before relying on source-only features; `@latest` does not promise unreleased capabilities.
+To use the published CLI, run `npx issue-graph@latest --help` or `npm install --global issue-graph@latest`. For library use, run `npm install issue-graph@latest`. The package requires Node.js 20+. These docs track `main`; check installed help for available commands.
 
 Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Authenticate the GitHub CLI for live API checks.
 
@@ -30,14 +29,11 @@ For packaging changes, also run `pnpm test:package`. To test an existing archive
 pnpm test:package --tarball "/absolute/path/issue-graph-${EXPECTED_VERSION}.tgz" --sha256 <sha256>
 ```
 
-Both options are required in supplied mode. Verification checks the archive's name and version against the source manifest, SHA-256 before and after consumption, installed CLI and exports, offline pnpm installation/dlx, and owned GitHub fixtures. Default mode packs once through `prepack`; supplied mode never packs or rebuilds.
+Both options are required for an existing archive. Verification checks identity, hashes, installed commands, exports, offline installation, and owned GitHub fixtures. Default mode packs once through `prepack`; supplied mode uses the archive without rebuilding.
 
-Add or update tests for behavior changes. Keep the graph core runtime-agnostic,
-and keep filesystem or subprocess dependencies out of the main package entry
-point.
+Add or update tests for behavior changes. Keep filesystem and subprocess dependencies out of the runtime-agnostic core entry point.
 
-For transport changes, also compare both implementations against a live public
-repository:
+For transport changes, compare both implementations against a live public repository:
 
 ```bash
 pnpm exec tsx scripts/verify-transports.ts <number> <owner/repo> <depth>
@@ -45,11 +41,11 @@ pnpm exec tsx scripts/verify-transports.ts <number> <owner/repo> <depth>
 
 ## Skill maintenance
 
-Keep the two skill layers separate:
+Maintain these skill files:
 
-- `skills/issue-graph/SKILL.md` is the evergreen discovery stub. Preserve its name and routing description, keep it at most 45 lines, and avoid version, release, installation, or prerequisite facts. It must load `issue-graph skills get core` before operational commands, use `--full` for references, and point to `skills list` for discovery. Missing commands/assets should report a CLI/skill mismatch, never fabricated guidance or automatic installation.
-- `skill-data/core/SKILL.md` is compact operational guidance versioned with the CLI (roughly 80–120 lines). Maintain status-first routing, explicit scope, unknown counts and coverage, snapshot defaults, GitHub read-only boundaries, and untrusted-evidence/privacy rules here.
-- `skill-data/core/references/workflows.md` holds detailed workflows, flags, limits, and safety details. Retrieve it through `issue-graph skills get core --full`; do not require agents to know source paths or copy reference files into their discovery directory.
+- `skills/issue-graph/SKILL.md` discovers the bundled guide. Keep its name and routing description, stay within 45 lines, and leave version and setup details in the docs. Load `skills get core` before commands, `--full` for references, and `skills list` for discovery. Report missing assets as a CLI/skill mismatch.
+- `skill-data/core/SKILL.md` holds release-matched operational guidance, roughly 80 to 120 lines. Preserve routing, scope, counts, coverage, storage, exact dashboard links, and safety rules.
+- `skill-data/core/references/workflows.md` holds detailed workflows and limits. Retrieve it through `issue-graph skills get core --full`.
 
 When behavior changes, update the core and relevant reference together with the CLI. Keep setup/release availability in README and docs, not in the stub.
 
@@ -63,13 +59,13 @@ For CLI/packaging changes, verify discovery and retrieval from a packed installa
 
 The Vercel project uses `apps/docs` as its Root Directory, the Next.js framework preset, Node.js 24.x, and source files outside the Root Directory enabled. The latter is required for the workspace lockfile and canonical skill route. `apps/docs/vercel.json` installs from the workspace root and builds the docs with Corepack and the pinned pnpm version.
 
-Connect the project to `vercel-labs/issue-graph` with production branch `main`. Domain assignment and production deployment require maintainer authorization. Website deployment does not publish the CLI or make the GitHub repository public.
+Connect the project to `vercel-labs/issue-graph` with production branch `main`. Domain assignment and production deployment require maintainer authorization. Website deployment and CLI publication are separate workflows.
 
 ## Release process
 
 Merging a new stable version into canonical `main` starts `.github/workflows/release.yml` automatically. Update `package.json` and the current notes between the release markers in `CHANGELOG.md`, using a `## X.Y.Z` heading. Run `pnpm --filter @issue-graph/docs sync:changelog` to update the generated docs page. Do not edit `apps/docs/content/docs/changelog.mdx` directly.
 
-Each push checks the exact commit and npm registry state. An unpublished version must be newer than `latest`. Already-published versions skip the build and publication, so ordinary merges do not create duplicate releases. Invalid identities, malformed registry data, noncanonical repositories, non-main refs, and registry/network errors fail closed. Publishing does not change repository visibility.
+Each push checks the commit and npm registry. An unpublished version must be newer than `latest`. Already-published versions skip the build and publication. Invalid identity, registry errors, and refs outside canonical `main` stop publication.
 
 The build runs lint, typecheck, and tests with Node 24 and the pinned pnpm version, then packs once through `prepack`. Node 20/22/24 consumers test that exact tarball without rebuilding. Only after all consumers pass does the publish job send the same archive to npm through OIDC, with hooks disabled and no stored npm token. It installs no project dependencies. Metadata binds the package name, version, source SHA, filename, and SHA-256 to an immutable run-specific artifact retained for 30 days.
 

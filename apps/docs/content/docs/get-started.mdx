@@ -31,10 +31,10 @@ These docs track repository `main`, which can be ahead of the published package.
 
 ```bash
 gh auth login
-gh auth status
+issue-graph auth status
 ```
 
-issue-graph uses your GitHub CLI credentials. For private repositories, your account needs access and any SSO authorization required by the organization.
+issue-graph uses your GitHub CLI credentials. `auth status` reports sign-in state without displaying tokens; use `gh auth status` for GitHub CLI diagnostics. For private repositories, your account needs access and any SSO authorization required by the organization.
 
 ## Trace an issue
 
@@ -95,7 +95,7 @@ If the command is missing, check your npm global installation and `PATH`, or use
 
 ## Optional source development
 
-Contributors with repository access can build from source using pnpm and Node.js 20.19.x or 22.12+. Node.js 24 is recommended.
+Build from source using pnpm and Node.js 20.19.x or 22.12+. Node.js 24 is recommended.
 
 ```bash
 gh repo clone vercel-labs/issue-graph

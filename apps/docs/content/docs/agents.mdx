@@ -16,7 +16,7 @@ Choose your agent and installation scope. To list the skill before installing it
 npx skills@latest add vercel-labs/issue-graph --list
 ```
 
-If you cannot access the repository, install the same skill from the public site:
+You can also install the same skill from the public site:
 
 ```bash
 npx skills@latest add https://issue-graph.dev
@@ -31,7 +31,7 @@ npm install --global issue-graph@latest
 issue-graph --help
 ```
 
-The skill provides agent instructions. The CLI runs the commands and uses your GitHub CLI login. See [Get started](/docs/get-started) to set up authentication.
+The skill provides agent instructions. The CLI uses your GitHub CLI login for live collection. Saved queries, config, and skill retrieval work offline. See [Get started](/docs/get-started) to set up authentication.
 
 ## Load the command guidance
 
@@ -85,6 +85,8 @@ Include the returned `viewUrl` unchanged as a clickable link, preserving the que
 `open` and `cluster --apply` return a `dashboard` path. Follow them with `query` on the saved scope to get a link for specific filters and selection. See [Dashboard and saved queries](/docs/dashboard).
 
 Use `query --weights` for temporary exploration. Use `config set` only when the user wants persistent defaults. Take `--provider` and `--scope` from the query result; UI changes do not write the config file. Query and config need no provider authentication.
+
+Use `query` to automate dashboard triage. The documentation site's WebMCP tools handle documentation navigation and search.
 
 ## Report findings
 
