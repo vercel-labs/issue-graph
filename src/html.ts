@@ -1808,7 +1808,7 @@ function rankView(w){
     '<input type="range" min="0" max="5" step="0.5" value="'+RK[i]+'" data-i="'+i+'" aria-label="'+sg[1]+' weight"/>'+
     '<span class="rk-w-sub">'+sg[2]+'</span></label>').join('');
   const n=rankRows().length;
-  renderMain('<div class="rk">'+
+  renderMain('<div class="rk view-in">'+
     '<div class="swarm-head"><div><h1>Rank</h1><div class="muted"><span id="rank-count">'+n+'</span> open items ordered by triage score, the same one <code>--prioritize</code> prints. Drag a weight to change what counts; the order is a place to start reading, not a verdict.</div></div>'+
     '<div class="segs"><button class="cl-swarm" id="rk-swarm">Show heat in Swarm</button><button class="cl-swarm" id="rk-reset">Reset weights</button></div></div>'+
     '<div class="rk-weights">'+sliders+'</div>'+
