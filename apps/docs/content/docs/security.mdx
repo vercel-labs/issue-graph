@@ -1,7 +1,7 @@
 ---
 title: Permissions and privacy
-description: Configure GitHub access and understand which commands save files or send data to an external agent.
-lastModified: 2026-09-23
+description: Configure GitHub or TWG access and understand command data boundaries and local writes.
+lastModified: 2026-09-26
 ---
 
 ## GitHub access
@@ -20,11 +20,18 @@ For the HTTP library transport, store your token on the server and grant only th
 
 The HTTP transport targets `api.github.com`.
 
+## Jira access through TWG
+
+`issue-graph jira` shells out to the customer-facing `twg` executable for read-only Jira work-item details. It uses TWG's existing authentication and Jira permissions; issue-graph does not read, copy, or store Atlassian tokens. Use `--site` when TWG has no configured default site.
+
+Full reads can include private summaries, descriptions, comments, assignees, issue links, and remote links. Inaccessible issues remain failed nodes and make coverage incomplete; they are not treated as absent. The command never mutates Jira and creates no snapshots, but stdout, stderr, shell redirection, and terminal logs can retain results.
+
 ## Local files
 
 | Command | Default storage | Controls |
 | --- | --- | --- |
 | Graph | Snapshots under `~/.issue-graph/` | `--no-snapshot` skips new snapshots; `--json PATH` and `--html PATH` still write |
+| Jira | None | Report on stdout; shell redirection is controlled by the caller |
 | Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-snapshot` skips new snapshots |
 | Plan | None | Report on stdout |
 | Status | None | `--save` writes a capture; conflicts with `--no-snapshot` |
@@ -36,7 +43,7 @@ Status captures use restrictive directory and file permissions. Graph, reconcile
 
 ## Share results carefully
 
-Results can include private titles, repository names, URLs, authors, assignments, relationships, commit identifiers, and changed-file paths. A public seed can lead to private references accessible to your account.
+Results can include private GitHub or Jira titles, repository and project names, descriptions, comments, URLs, authors, assignees, relationships, commit identifiers, and changed-file paths. A public seed can lead to private references accessible to your account.
 
 Review the full result before sharing it. HTML exports embed the graph and can be read by anyone with the file. Choose an appropriate storage location, retention period, and backup policy for private captures.
 
@@ -60,6 +67,6 @@ Shared files and closing links help identify related work. Verify the code and c
 
 ## Source access and vulnerability reports
 
-The npm package is public. The source repository is currently INTERNAL and requires organization access. Installing from npm works independently of that access.
+The npm package and source repository are public. Access to private GitHub repositories, Jira sites, and work items remains governed by the credentials used by `gh` or `twg`.
 
 Report vulnerabilities through the repository's private Security reporting form, following `SECURITY.md`. Include affected versions, reproduction steps, and impact. Keep private details out of public issues if you cannot access the form.

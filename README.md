@@ -8,7 +8,7 @@
 
 Find related issues, competing changes, and unresolved follow-ups before you start work.
 
-`issue-graph` traces linked GitHub issues and pull requests. Use it to find existing fixes, check PR status by author, and choose what to review next.
+`issue-graph` traces linked GitHub issues and pull requests, and can trace Jira work-item relationships through the customer-facing Atlassian Teamwork Graph CLI. Use it to find existing fixes, check PR status by author, and choose what to review next.
 
 ![issue-graph demo: related fixes and follow-ups, superseded PRs to review, and a per-author PR status ledger](https://issue-graph.dev/issue-graph-workflows.gif)
 
@@ -16,7 +16,7 @@ Illustrated workflows: Graph → Reconcile → PR status. [Static version](https
 
 ## Start here
 
-Install the [npm package](https://www.npmjs.com/package/issue-graph) with [Node.js](https://nodejs.org) 20 or later. GitHub queries use your [GitHub CLI](https://cli.github.com) login.
+Install the [npm package](https://www.npmjs.com/package/issue-graph) with [Node.js](https://nodejs.org) 20 or later. GitHub queries use your [GitHub CLI](https://cli.github.com) login. The optional Jira command uses an existing authenticated customer `twg` installation.
 
 Try the CLI without a global installation:
 
@@ -56,6 +56,7 @@ Use `issue-graph --help` to check the commands supported by your installed relea
 | Need | Installed command |
 | --- | --- |
 | Inspect an issue or PR before starting work | `issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot` |
+| Trace related Jira work through TWG | `issue-graph jira PROJ-123 --site example --depth 1` |
 | Survey labeled open issues | `issue-graph --label bug --repo owner/repo --prioritize` |
 | Count open PRs by author | `issue-graph status --repo vercel-labs/portless --author ctate,Railly` |
 | See PR evidence, assignees, and requested reviewers | `issue-graph status --repo vercel-labs/portless --author ctate --view prs` |
@@ -96,7 +97,7 @@ Install the CLI with `npm install --global issue-graph@latest`, then install the
 npx skills@latest add vercel-labs/issue-graph
 ```
 
-Choose your agent and project scope, preserving any local skill changes. If you cannot access the repository, use `npx skills@latest add https://issue-graph.dev`. The public site, `/skill.md`, and [repository skill](skills/issue-graph/SKILL.md) serve the same canonical skill. CLI installation and GitHub authentication are separate setup steps.
+Choose your agent and project scope, preserving any local skill changes. If you cannot access the repository, use `npx skills@latest add https://issue-graph.dev`. The public site, `/skill.md`, and [repository skill](skills/issue-graph/SKILL.md) serve the same canonical skill. CLI installation and source authentication are separate setup steps: GitHub workflows use `gh`, while Jira workflows use an existing customer `twg` session.
 
 Before operational commands, load and read the guidance bundled with the installed CLI:
 
@@ -109,7 +110,7 @@ Use `--full` for workflow references, `issue-graph skills list` for available gu
 
 Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
 
-Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
+Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from GitHub shell (`issue-graph/transport/shell`), GitHub HTTP (`issue-graph/transport/http`), and Jira shell (`issue-graph/transport/twg`) transports. The additive `crawlGraph` API accepts collector-defined node keys and fetchers; GitHub-specific analysis still uses `GraphNode`. See [Library](apps/docs/content/docs/library.mdx) for ESM imports, custom collectors, and credential boundaries.
 
 ## Documentation
 
@@ -117,6 +118,7 @@ Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), 
 
 - [Get started](apps/docs/content/docs/get-started.mdx): installation, authentication, and a first result
 - [Graph](apps/docs/content/docs/graph.mdx): depth, caps, snapshots, and HTML
+- [Jira through TWG](apps/docs/content/docs/jira.mdx): authentication boundary, sites, crawl limits, and coverage
 - [Status](apps/docs/content/docs/status.mdx): counts, coverage, and history
 - [Backlog](apps/docs/content/docs/backlog.mdx): reconcile and plan
 - [Agents](apps/docs/content/docs/agents.mdx): skill setup and optional clustering
@@ -127,13 +129,13 @@ Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), 
 
 ## Limits and privacy
 
-The CLI reads GitHub data and can save local snapshots or exports. Depth, node caps, hubs, permissions, and per-node API limits affect coverage. Inspect linked code and current behavior before closing an issue or merging a PR.
+The CLI reads GitHub data and, for the Jira command, Jira data through TWG. GitHub modes can save local snapshots or exports; Jira writes only to stdout/stderr. Depth, node caps, hubs, permissions, and per-node API limits affect coverage. Inspect linked code and current behavior before changing work items or merging a PR.
 
 Snapshots, exports, logs, and cluster prompts can contain private repository metadata. Anyone with an HTML export can read its embedded data. Review content and storage permissions before sharing. See [security guidance](apps/docs/content/docs/security.mdx) and [vulnerability reporting](SECURITY.md).
 
 ## Source development
 
-Source development requires access to the INTERNAL `vercel-labs/issue-graph` repository. Use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and authenticated GitHub CLI access. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
+Source development uses the public `vercel-labs/issue-graph` repository. Use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and authenticated GitHub CLI access. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
 
 From an authorized checkout, after preserving local changes, update a source installation with:
 
