@@ -9,7 +9,7 @@ this project are licensed under Apache-2.0.
 
 To use the latest published CLI without contributing to source, run `npx issue-graph@latest --help` or install it with `npm install --global issue-graph@latest`. Library consumers can use `npm install issue-graph@latest`. The public npm package requires Node.js 20 or later and does not require or grant source access. Check the installed command's help before relying on source-only features; `@latest` does not promise unreleased capabilities.
 
-Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Cloning the INTERNAL `vercel-labs/issue-graph` repository requires access and an authenticated GitHub CLI.
+Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Authenticate the GitHub CLI for live API checks.
 
 ```bash
 gh auth login
@@ -67,56 +67,46 @@ Connect the project to `vercel-labs/issue-graph` with production branch `main`. 
 
 ## Release process
 
-Keep the current version's notes between the release markers in `CHANGELOG.md`, following the `## X.Y.Z` heading format. Run `pnpm --filter @issue-graph/docs sync:changelog` to update the generated docs page; docs development and build also sync it. Do not edit `apps/docs/content/docs/changelog.mdx` directly.
+Merging a new stable version into canonical `main` starts `.github/workflows/release.yml` automatically. Update `package.json` and the current notes between the release markers in `CHANGELOG.md`, using a `## X.Y.Z` heading. Run `pnpm --filter @issue-graph/docs sync:changelog` to update the generated docs page. Do not edit `apps/docs/content/docs/changelog.mdx` directly.
 
-After npm publication and registry-byte verification succeed, the workflow creates the matching `vX.Y.Z` GitHub Release from those notes at the approved commit. Verify-only runs do not create a tag or release.
+Each push checks the exact commit and npm registry state. An unpublished version must be newer than `latest`. Already-published versions skip the build and publication, so ordinary merges do not create duplicate releases. Invalid identities, malformed registry data, noncanonical repositories, non-main refs, and registry/network errors fail closed. Publishing does not change repository visibility.
 
-The repository remains INTERNAL; public package availability does not authorize another release or change repository visibility. The current source may contain unreleased changes despite retaining the same version as a published package. Check registry state rather than inferring publication from source, documentation, or a deployment. Never attempt to republish an existing version: the workflow rejects any existing exact version, including in verify-only mode.
+The build runs lint, typecheck, and tests with Node 24 and the pinned pnpm version, then packs once through `prepack`. Node 20/22/24 consumers test that exact tarball without rebuilding. Only after all consumers pass does the publish job send the same archive to npm through OIDC, with hooks disabled and no stored npm token. It installs no project dependencies. Metadata binds the package name, version, source SHA, filename, and SHA-256 to an immutable run-specific artifact retained for 30 days.
 
-`.github/workflows/release.yml` has only `workflow_dispatch`, with required `expected_sha` and `expected_version` inputs and a boolean `publish` input defaulting to `false`. `expected_version` deliberately has no default; each dispatch must supply the exact approved version. Obtain approval for an unpublished version newer than registry latest and update the source identity through review. After the release changes merge, review the commit on canonical `main`, set `EXPECTED_SHA` to its full 40-character SHA, and set `EXPECTED_VERSION` to the matching, reviewed, approved `package.json` version. Merging the PR does not dispatch the workflow or authorize publication. The commands below do not select a version or authorize a dispatch.
+After publication, the workflow checks the registry identity, SHA-512 integrity, and downloaded SHA-256 against the retained archive. It then creates the `vX.Y.Z` tag and GitHub Release at the published commit using the changelog notes. An existing tag must resolve to that same commit. Verify-only runs create neither tags nor releases.
 
-### Verify-only dispatch
+### One-time configuration
 
-Leave `publish` false to run the real GitHub build, retain the artifact, and exercise the Node 20/22/24 consumers. The publish job is skipped, so this mode neither requests Release environment approval nor runs a job with OIDC write permission. After the workflow is committed, an authorized maintainer can request this verification without authorizing npm publication:
+- Configure npm trusted publishing for package `issue-graph`, GitHub owner `vercel-labs`, repository `issue-graph`, workflow `release.yml`, and environment `Release`. Allow direct publishing rather than staged publishing.
+- Restrict the GitHub `Release` environment to the `main` branch. Do not configure required reviewers or a wait timer: the reviewed merge is the release decision. Naming the environment in YAML does not configure these rules.
+- Keep write permissions scoped to their jobs. Only `publish` requests OIDC; only `github-release` writes repository contents.
+
+Releases are serialized without cancelling a running release. The registry is checked again immediately before publishing. There is no atomic registry compare-and-set; coordinate any out-of-band publisher.
+
+### Manual verification and recovery
+
+Manual dispatch remains available on `main`. Set `EXPECTED_SHA` to the full current main commit and `EXPECTED_VERSION` to its exact package version. Verification defaults to `publish=false` and skips the OIDC job:
 
 ```bash
 gh workflow run release.yml --repo vercel-labs/issue-graph --ref main -f expected_sha="$EXPECTED_SHA" -f expected_version="$EXPECTED_VERSION" -F publish=false
 ```
 
-### Publish dispatch
+Use `-F publish=true` to retry an unpublished version when the automatic run did not complete. A new dispatch builds and tests its own archive. A version already on npm is skipped.
 
-Publishing requires a separate explicit `publish=true` dispatch and Release environment approval. Before that dispatch, maintainers must configure and verify:
-
-- npm trusted publishing for package `issue-graph`, GitHub owner `vercel-labs`, repository `issue-graph`, workflow filename `release.yml`, and environment `Release`, with direct `npm publish` allowed, not only staged publishing.
-- The GitHub `Release` environment restricted to `main`, with required maintainer approval. Merely naming an environment in YAML does not configure its protection rules.
-- Separate authorization to publish the reviewed SHA and exact version.
-
-Only after publication is authorized:
+If npm accepted the package but registry verification or GitHub Release creation failed, rerun the failed jobs in the original run while its artifact is retained:
 
 ```bash
-gh workflow run release.yml --repo vercel-labs/issue-graph --ref main -f expected_sha="$EXPECTED_SHA" -f expected_version="$EXPECTED_VERSION" -F publish=true
+gh run rerun "$RUN_ID" --repo vercel-labs/issue-graph --failed
 ```
 
-The publish dispatch builds and tests its own retained artifact; it does not promote or reuse an artifact from the earlier verify-only run. Both modes reject noncanonical repositories, non-main refs, mismatched source identities, an existing exact registry version, and registry/network errors. Preflight requires a canonical stable `dist-tags.latest` value (`major.minor.patch`) present in registry version history, and the target must be strictly newer. Missing, malformed, prerelease, or build-metadata latest tags fail closed. Releases are serialized without cancelling a running release. Preflight is repeated immediately before publishing, but there is no atomic registry compare-and-set: coordinate out-of-band publishers to avoid a race after that final check.
+The publish job checks whether the version now exists. If it does, it verifies that the published bytes match the retained archive and continues without another `npm publish`. A mismatch stops the run. Successful build and consumer jobs keep their original artifact ID. Rerunning all jobs or starting a new workflow is not a substitute for this recovery path.
 
-The build job uses Node 24 and the pinned pnpm with a frozen lockfile, runs lint/typecheck/tests, and calls `pnpm pack` exactly once. `prepack` supplies the only build. It retains one tarball plus `release.json` and `SHA256SUMS` in an immutable, run-specific artifact for 30 days. Metadata binds name, version, source SHA, filename, and SHA-256.
+Registry verification uses only HTTPS `registry.npmjs.org` URLs without credentials, nondefault ports, query strings, or fragments. Redirects are forbidden. Each request times out after 15 seconds; metadata is capped at 1 MiB and tarballs at the retained archive size. HTTP 404/408/429/500/502/503/504 receive at most 12 attempts, with exponential delays capped at 30 seconds. This allows npm processing time without an unbounded wait. Identity, integrity, byte, URL, malformed-data, and other network errors stop immediately. Verification never repacks, republishes, or changes registry tags.
 
-Node 20/22/24 consumers download that exact artifact ID, verify its metadata and digest, and smoke-test the supplied tarball without rebuilding. Only after every consumer passes can the protected publish job download the same artifact, recheck identity and registry state, and publish that tarball with hooks disabled. It installs no project dependencies and creates no tags or GitHub releases. If a publish succeeded but a later step failed, a rerun fails closed on the existing version; inspect the registry rather than attempting replacement.
-
-Development and tests use pnpm and Node. The publishing job alone uses the npm client for OIDC, requiring npm >=11.5.1 on Node 24 and `id-token: write` only in that job. There are no npm token secrets. It deliberately omits `--provenance` for INTERNAL sources and does not force provenance off: npm trusted publishing generates provenance automatically when both source repository and package are public. Any visibility change requires separate approval.
-
-### Read-only post-publish verification
-
-After a successful publish, the workflow runs:
+To investigate without any writes to npm or GitHub, restore the original release context and artifact outputs, then run:
 
 ```bash
 node scripts/release.ts verify-published "$RUNNER_TEMP/release"
 ```
 
-This command uses the same approved release context (`EXPECTED_SHA`, `EXPECTED_VERSION`, GitHub repository/ref/SHA context, and `EXPECTED_TARBALL_SHA256` from the build output). It first verifies the retained metadata, source identity, and archive digest. It then GETs the exact registry version, checks its name/version and `dist.integrity` against SHA-512 of the retained bytes, and GETs the registry tarball to compare its SHA-256 against the approved artifact. The original archive is checked again afterwards, including on failure.
-
-Only HTTPS `registry.npmjs.org` URLs without credentials, nondefault ports, query strings, or fragments are allowed. Redirects are forbidden. Requests time out after 15 seconds; metadata is capped at 1 MiB and the downloaded tarball at the approved archive's size. Only HTTP 404/408/429/500/502/503/504 are retried for propagation, with at most five attempts and delays of 1, 2, 4, and 8 seconds. Identity, integrity, URL, byte, malformed-data, and other network failures stop immediately. No retry rebuilds, repacks, republishes, or changes registry tags.
-
-If this verification fails after publication, retain the artifact and investigate. Re-run only the read-only verification with the same approved context, not the publish workflow; the latter intentionally rejects the already-existing version.
-
-Confirm publication with a fresh install before updating installation claims. Keep `repositoryIsPublic` false while the repository is internal.
+Confirm the published package with a fresh install before updating installation claims.
