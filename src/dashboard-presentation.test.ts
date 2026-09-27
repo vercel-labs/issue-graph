@@ -8,7 +8,7 @@ function presentation<T>(expression: string, data: unknown = { groups: [] }): T 
   new Script(script);
   const helpers = script.slice(
     script.indexOf("function statusInfo("),
-    script.indexOf("const statGrid="),
+    script.indexOf("function setProject("),
   );
   return runInNewContext(`${helpers}\n${expression}`, { DATA: data });
 }
