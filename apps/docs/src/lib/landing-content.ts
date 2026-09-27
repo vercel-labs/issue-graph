@@ -1,34 +1,36 @@
 export const landingTitle = "Find related work before you start";
-export const landingLastModified = "2026-09-23";
+export const landingLastModified = "2026-09-27";
 export const landingDescription =
-  "Trace linked issues and pull requests. Find existing fixes and open follow-ups in your terminal.";
+  "Map related issues and pull requests. Prioritize your backlog, then open the exact view in your browser.";
 
 export const workflows = [
   {
     number: "01",
-    title: "Trace related work",
+    title: "Map your backlog",
     description:
-      "Start with an issue or PR to find linked fixes, competing changes, and open follow-ups.",
-    command: "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
-    href: "/docs/graph",
-    link: "Trace a graph",
+      "Capture open issues, PRs, and their references. Explore linked work or ask your agent to group it by root cause.",
+    command: "issue-graph open vercel-labs/portless --budget 80 --no-open",
+    href: "/docs/dashboard#capture-a-repository",
+    link: "Capture a backlog",
   },
   {
     number: "02",
-    title: "Check PR status",
+    title: "Choose what to inspect next",
     description:
-      "Count open PRs by author and repository. See which need review, have approval, or have conflicts.",
-    command: "issue-graph status --repo vercel-labs/portless --author Railly",
-    href: "/docs/status",
-    link: "Inspect PR status",
+      "Filter by kind, state, cluster, or Heat. Rank open work with weights you control. Heat measures discussion, not severity.",
+    command:
+      "issue-graph query github:vercel-labs/portless --kind Issue --heat-top 25 --view rank --json --no-open",
+    href: "/docs/dashboard#prioritize-with-filters",
+    link: "Filter and rank",
   },
   {
     number: "03",
-    title: "Review your backlog",
+    title: "Open the exact view",
     description:
-      "Find issues linked to merged fixes and PRs ready for review. Get a suggested next action.",
-    command: "issue-graph plan --repo vercel-labs/portless",
-    href: "/docs/backlog",
-    link: "Reconcile a backlog",
+      "Keep the CLI and dashboard on the same filters and weights. Explore in the browser or replay a saved query.",
+    command:
+      "issue-graph query github:vercel-labs/portless --kind Issue --heat-top 25 --view rank --open",
+    href: "/docs/dashboard#open-the-exact-result",
+    link: "Use the dashboard",
   },
 ] as const;

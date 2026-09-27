@@ -54,11 +54,7 @@ function staticTerminal(html: string) {
   assert.equal((terminal.match(/role="tablist"/g) ?? []).length, 1, "One terminal tablist");
   const tabs = terminal.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
   const panels = terminal.split(/(?=<div\b[^>]*role="tabpanel")/).slice(1);
-  const commands = [
-    "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
-    "issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects",
-    "issue-graph plan --repo vercel-labs/wterm",
-  ];
+  const commands = terminalExampleCatalog.map((example) => example.command);
   const escaped = (value: string) =>
     renderToStaticMarkup(createElement("span", null, value)).replace(/<\/?span>/g, "");
   assert.equal(tabs.length, 3, "Three terminal tabs");
@@ -138,6 +134,9 @@ function staticTerminal(html: string) {
       contains(status.capture);
       contains(`Coverage ${status.coverage}`);
       for (const caveat of status.caveats.split("\n")) contains(caveat);
+    } else if (example.id === "dashboard") {
+      contains(example.output);
+      assert.ok(panel.includes("View full dashboard screenshot"));
     } else {
       const rows = terminalPresentation(example.output, example.id);
       assert.ok(rows, `Captured ${example.id} is recognized`);
@@ -179,16 +178,14 @@ function staticTerminal(html: string) {
     }
   }
   assert.equal(ids.size, 6, "Unique tab and panel identifiers");
-  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate Graph takeaway");
+  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate capture takeaway");
   assert.match(terminal, /aria-live="polite"/);
-  assert.match(terminal, /\? means unknown, not zero\./);
-  assert.match(terminal, /Flags overlap review states\./);
+  assert.match(terminal, /Heat measures discussion, not severity\./);
   assert.doesNotMatch(
     terminal,
     /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
   );
-  assert.match(terminal, /Approval does not imply merge readiness\./);
-  assert.match(terminal, /Validate repository-specific behavior before mutating GitHub\./);
+
   assert.doesNotMatch(terminal, /Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
   assert.doesNotMatch(
     terminal,
@@ -309,7 +306,7 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
       assert.ok(markdown.body.includes(example.summary));
       assert.ok(markdown.body.includes(example.output));
     }
-    assert.match(markdown.body, /This displayed excerpt omits other captured nodes/);
+    assert.match(markdown.body, /Selected JSON fields from a public CLI capture/);
     assert.doesNotMatch(markdown.body, /All fetched nodes are shown/);
   }
   const after = await request(path);
