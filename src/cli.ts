@@ -299,6 +299,8 @@ export function parseArgs(argv: string[]): Args {
   if (!Number.isInteger(a.concurrency) || a.concurrency < 1 || a.concurrency > 32) {
     throw new UsageError("--concurrency must be an integer from 1 to 32");
   }
+  // reconcile's readable output is its Markdown report
+  if (a.format === "text" && a.command === "reconcile") a.format = "markdown";
   if (a.format === "text" && !["graph", "plan", "open", "rank", "cluster"].includes(a.command)) {
     throw new UsageError(`${a.command} does not support --format human`);
   }
@@ -374,7 +376,7 @@ export function nextSteps(a: Args, owner: string, repo: string): string {
     );
   if (!a.cluster)
     lines.push(
-      `- Group by root cause (asks before sending titles and links to your agent): \`issue-graph cluster ${scope}\``,
+      `- Group by root cause (sends titles and links to the agent): \`issue-graph cluster ${scope} --agent claude\``,
     );
   if (!a.prioritize) lines.push(`- Rank what to fix first: \`issue-graph rank ${scope}\``);
   if ((a.command === "open" || a.htmlOut || a.open) && !a.noSnapshot)
@@ -569,6 +571,25 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   const own = [...nodes.values()].filter(
     (n) => `${n.owner}/${n.repo}` === repoName && n.state === "OPEN",
   );
+  // open and cluster answer in JSON on request or in a pipe, like plan and reconcile
+  const summarizes = args.command === "open" || args.command === "cluster";
+  const machine =
+    summarizes && (args.format === "json" || (args.format === "auto" && !process.stdout.isTTY));
+  const say = (line: string) => {
+    if (!machine) process.stdout.write(`${line}\n`);
+  };
+  const result: Record<string, unknown> = {
+    schemaVersion: 1,
+    command: args.command,
+    repo: repoName,
+    clusters: null,
+    agent: null,
+    prompt: null,
+    error: null,
+    dashboard: null,
+    saved: false,
+    opened: false,
+  };
   if (args.command === "graph") printGraph(md + nextSteps(args, primary.owner, primary.repo));
   else if (args.command === "rank") {
     if (args.format === "json")
@@ -577,13 +598,15 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   } else {
     // open and cluster summarize; the full report stays one command away
     const linked = nodes.size - own.length;
-    process.stdout.write(
+    say(
       `${repoName} · ${own.length} open issues and PRs` +
         (linked
           ? ` (+${linked} linked${cappedOut.size ? `, ${cappedOut.size} not crawled` : ""})`
-          : "") +
-        "\n",
+          : ""),
     );
+    result.open = own.length;
+    result.linked = linked;
+    result.notCrawled = cappedOut.size;
   }
 
   const openAfter =
@@ -613,15 +636,22 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         runAgent(args.clusterRun, clusterJsonPrompt(repoName, clusterPayload(nodes, seedKeys))),
       );
       agentClusters = parsed;
-      if (args.command === "open" || args.command === "cluster")
-        process.stdout.write(`${parsed.clusters.length} root causes via ${args.clusterRun}\n`);
+      result.agent = args.clusterRun;
+      result.clusters = parsed.clusters.map((c) => ({
+        label: c.label,
+        rootCause: c.root_cause ?? null,
+        members: c.members.length,
+      }));
+      if (summarizes) say(`${parsed.clusters.length} root causes via ${args.clusterRun}`);
       else
         console.log(`\n## Root-cause clusters (${args.clusterRun})\n\n${renderClusters(parsed)}\n`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.log(
-        `\n## Root-cause clusters\n\n(agent '${args.clusterRun}' failed: ${msg}; the explorer falls back to connected components.)\n`,
-      );
+      result.error = `agent '${args.clusterRun}' failed: ${msg}`;
+      if (!machine)
+        console.log(
+          `\n## Root-cause clusters\n\n(agent '${args.clusterRun}' failed: ${msg}; the explorer falls back to connected components.)\n`,
+        );
     }
   } else if (args.cluster) {
     const prompt = clusterPrompt(
@@ -641,7 +671,8 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         );
         printGraph(`\`\`\`\n${prompt}\n\`\`\``);
       }
-    } else {
+    } else if (machine) result.prompt = prompt;
+    else {
       printGraph("\n## Cluster step (run this prompt in your agent context)\n");
       printGraph(`\`\`\`cluster-prompt\n${prompt}\n\`\`\``);
     }
@@ -687,14 +718,16 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       if (args.command !== "open" && args.command !== "cluster")
         process.stderr.write(`dashboard run saved: ${saved}\n`);
     }
+    result.dashboard = out;
+    result.saved = !args.noSnapshot;
     if (openAfter) {
       openInBrowser(out);
-      process.stdout.write(`opened ${out}\n`);
-    } else if (args.command === "open" || args.command === "cluster")
-      process.stdout.write(
-        `dashboard: ${out}${args.noSnapshot ? "" : " (also in issue-graph dashboard)"}\n`,
-      );
+      result.opened = true;
+      say(`opened ${out}`);
+    } else if (summarizes)
+      say(`dashboard: ${out}${args.noSnapshot ? "" : " (also in issue-graph dashboard)"}`);
   }
+  if (machine) console.log(JSON.stringify(result, null, 2));
 }
 
 /** A detected agent the person agreed to use, or undefined. Never asks without a terminal. */

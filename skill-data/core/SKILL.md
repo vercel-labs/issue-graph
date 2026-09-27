@@ -117,7 +117,10 @@ Report coverage with findings; use printed hub re-seed commands to explore omiss
   `NO_COLOR`, `CI`, or `TERM=dumb`.
 - `-o PATH` also writes a file: `.json` for the graph (with `components`, `overlaps`, and
   `priorities`), `.html` for the explorer.
-- `open` prints a one-line summary and the dashboard path; `graph` prints the full report.
+- `open` and `cluster` print a one-line summary and the dashboard path in a terminal, and JSON in
+  a pipe or with `--format json`: `schemaVersion`, `repo`, `open`, `linked`, `notCrawled`, `clusters`
+  (label, rootCause, members), `agent`, `prompt` (cluster without an agent), `error`, `dashboard`,
+  `saved`, `opened`. Agents read that JSON instead of parsing text. `graph` prints the full report.
   `--open` / `--no-open` override whether the explorer opens (`open` opens by default only in an
   interactive terminal, never in CI or a pipe).
 - Status defaults to a terminal table or versioned JSON in a pipe. `--json` is a boolean stdout

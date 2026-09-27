@@ -172,3 +172,9 @@ describe("status output contract", () => {
     expect(bad.stderr).toContain("requires --repo and --author");
   });
 });
+
+test("status reads the shared --no-save and --format human", () => {
+  const a = parseStatusArgs(["--repo", "o/r", "--author", "a", "--no-save", "--format", "human"]);
+  expect(a.noSnapshot).toBe(true);
+  expect(a.format).toBe("table");
+});

@@ -72,9 +72,8 @@ describe("parseArgs", () => {
 
   test("rejects unsupported formats and limits text to graph/plan", () => {
     expect(() => parseArgs(["reconcile", "--format", "xml"])).toThrow(UsageError);
-    expect(() => parseArgs(["reconcile", "--format", "text"])).toThrow(
-      "reconcile does not support --format human",
-    );
+    // human is reconcile's readable report
+    expect(parseArgs(["reconcile", "--format", "human"]).format).toBe("markdown");
     expect(() => parseArgs(["schema", "--format", "text"])).toThrow(UsageError);
     expect(parseArgs(["1", "--repo", "o/r", "--format", "text"]).format).toBe("text");
     expect(parseArgs(["plan", "--repo", "o/r", "--format", "text"]).format).toBe("text");
@@ -109,7 +108,7 @@ describe("onboarding", () => {
   test("next steps list only the views this run did not use", () => {
     const bare = nextSteps(parseArgs(["--label", "bug", "--repo", "o/r"]), "o", "r");
     expect(bare).toContain("issue-graph open o/r --label bug");
-    expect(bare).toContain("issue-graph cluster o/r --label bug");
+    expect(bare).toContain("issue-graph cluster o/r --label bug --agent claude");
     expect(bare).toContain("issue-graph rank o/r --label bug");
     const all = nextSteps(
       parseArgs([
@@ -418,4 +417,10 @@ describe("command API", () => {
     expect(statusArgs(["--author", "a"], () => "x/y")).toEqual(["--author", "a", "--repo", "x/y"]);
     expect(() => statusArgs(["o/r#1"], () => undefined)).toThrow(/repositories, not items/);
   });
+});
+
+test("status accepts the shared --no-save and --format human", () => {
+  expect(
+    statusArgs(["o/r", "--author", "a", "--no-save", "--format", "human"], () => undefined),
+  ).toEqual(["--repo", "o/r", "--author", "a", "--no-save", "--format", "human"]);
 });
