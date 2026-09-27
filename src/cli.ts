@@ -47,6 +47,7 @@ import type { NodeKey, Seed } from "./types.js";
 const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
        issue-graph --seeds 1,2,3 --repo owner/repo [options]
        issue-graph --label bug --repo owner/repo [options]
+       issue-graph --all-open --repo owner/repo [options]
        issue-graph reconcile --repo owner/repo [options]
        issue-graph plan --repo owner/repo [options]
        issue-graph status --repo owner/repo --author login[,login] [options]
@@ -62,6 +63,7 @@ const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
                       are fetched one hop and not expanded
   --seeds a,b,c       multi-seed backlog survey; adds connected components
   --label L           seed from every open issue carrying this label
+  --all-open          seed from every open issue and PR (up to --max-nodes)
   --max-nodes N       stop after this many nodes (default 80)
   --hub-threshold N   fetch but do not expand a node with more refs than this
                       (default 12), so one tracking issue cannot pull the
@@ -93,6 +95,7 @@ interface Args {
   clustersFile: string;
   seedsCsv: string;
   label: string;
+  allOpen: boolean;
   maxNodes: number;
   hubThreshold: number;
   concurrency: number;
@@ -123,6 +126,7 @@ export function parseArgs(argv: string[]): Args {
     clustersFile: "",
     seedsCsv: "",
     label: "",
+    allOpen: false,
     maxNodes: 80,
     hubThreshold: 12,
     concurrency: 4,
@@ -144,6 +148,7 @@ export function parseArgs(argv: string[]): Args {
     else if (arg === "--clusters") a.clustersFile = argv[++i];
     else if (arg === "--seeds") a.seedsCsv = argv[++i];
     else if (arg === "--label") a.label = argv[++i];
+    else if (arg === "--all-open") a.allOpen = true;
     else if (arg === "--max-nodes") a.maxNodes = Number(argv[++i]);
     else if (arg === "--hub-threshold") a.hubThreshold = Number(argv[++i]);
     else if (arg === "--concurrency") a.concurrency = Number(argv[++i]);
@@ -181,6 +186,22 @@ export function parseArgs(argv: string[]): Args {
 }
 
 async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
+  if (a.allOpen) {
+    if (!a.repo) throw new UsageError("--all-open needs --repo");
+    if (a.label || a.seedsCsv || a.seed) {
+      throw new UsageError("--all-open replaces --label, --seeds, and a seed; pass only one");
+    }
+    const [owner, repo] = a.repo.split("/");
+    if (!owner || !repo) throw new UsageError("--repo must be owner/repo");
+    const limit = Math.min(a.maxNodes, 1000);
+    const numbers = await openBacklogSeeds(transport, a.repo, limit);
+    if (numbers.length >= limit) {
+      process.stderr.write(
+        `note: ${numbers.length} open items seeded, the --max-nodes limit; raise it (up to 1000) to include more\n`,
+      );
+    }
+    return numbers.map((number) => ({ owner, repo, number }));
+  }
   if (a.label) {
     if (!a.repo) throw new UsageError("--label needs --repo");
     const [owner, repo] = a.repo.split("/");
@@ -204,11 +225,13 @@ async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
 
 /** Suggest the views this run did not use, as commands to copy. */
 export function nextSteps(a: Args, owner: string, repo: string): string {
-  const seed = a.label
-    ? `--label ${a.label} --repo ${owner}/${repo}`
-    : a.seedsCsv
-      ? `--seeds ${a.seedsCsv} --repo ${owner}/${repo}`
-      : `${a.seed} --repo ${owner}/${repo}`;
+  const seed = a.allOpen
+    ? `--all-open --repo ${owner}/${repo}`
+    : a.label
+      ? `--label ${a.label} --repo ${owner}/${repo}`
+      : a.seedsCsv
+        ? `--seeds ${a.seedsCsv} --repo ${owner}/${repo}`
+        : `${a.seed} --repo ${owner}/${repo}`;
   const lines: string[] = [];
   if (!a.htmlOut && !a.open)
     lines.push(
@@ -473,7 +496,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     const out =
       args.htmlOut ||
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
-    const model = dashboardModel(nodes, seedKeys, repoName, clusters);
+    const model = dashboardModel(nodes, seedKeys, repoName, clusters, cappedOut.size);
     await writeOutput(out, renderDashboard([model]));
     process.stderr.write(`wrote ${out}\n`);
     // keep the latest run per repository so `issue-graph dashboard` can switch between them
