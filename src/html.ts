@@ -1,5 +1,11 @@
 import { isSupersededVerdict } from "./classify.js";
 import { components } from "./crawl.js";
+import type {
+  OpenItemCount,
+  ReadCoverage,
+  RelationshipEvidence,
+  WorkLink,
+} from "./dashboard-types.js";
 import { fileOverlaps } from "./overlaps.js";
 import { prioritize } from "./priority.js";
 import type { GraphNode, NodeKey } from "./types.js";
@@ -57,11 +63,17 @@ export interface ProviderDescriptor {
   repoUrl: string;
   /** Signals only this provider has, shown in the sidebar's provider slot. */
   signals: Array<{ id: string; label: string; tone: "warn" | "danger" }>;
+  views?: Array<"explore" | "impact" | "swarm" | "rank">;
+  metrics?: Array<"heat" | "links" | "blast" | "depth">;
 }
 
 export interface Model {
-  /** Referenced items the node cap left out of this run. */
   notCrawled?: number;
+  id?: string;
+  label?: string;
+  url?: string;
+  openCount?: OpenItemCount;
+  grouping?: "components" | "themes";
   provider: ProviderDescriptor;
   repo: string;
   seeds: NodeKey[];
@@ -69,14 +81,27 @@ export interface Model {
   cleanup: CleanupItem[];
   stats: Record<string, number>;
   nodes: Record<NodeKey, ClientNode>;
+  coverage?: {
+    complete: boolean;
+    generatedAt: string;
+    maxDepth: number;
+    messages: string[];
+    warnings?: string[];
+  };
 }
 
 export interface ClientNode {
   repo: string;
   key: NodeKey;
   num: number;
+  identifier?: string;
   kind: "PullRequest" | "Issue" | "Unknown";
   state: string;
+  stateLabel?: string;
+  stateType?: string;
+  archived?: boolean;
+  read?: { fetched: boolean; error?: string; coverage: ReadCoverage[] };
+  attachments?: WorkLink[];
   title: string;
   url: string;
   author?: string;
@@ -103,8 +128,15 @@ export interface ClientNode {
     daysOpen: number;
     inboundRefs: number;
   };
-  out: Array<{ to: NodeKey; via: string; by?: string; at?: string }>;
-  in: Array<{ from: NodeKey; via: string; by?: string }>;
+  out: Array<{
+    to: NodeKey;
+    via: string;
+    by?: string;
+    at?: string;
+    undirected?: boolean;
+    evidence?: RelationshipEvidence;
+  }>;
+  in: Array<{ from: NodeKey; via: string; by?: string; evidence?: RelationshipEvidence }>;
   overlaps: Array<{ with: NodeKey; shared: string[]; significant: number; sharedIssue?: NodeKey }>;
 }
 
