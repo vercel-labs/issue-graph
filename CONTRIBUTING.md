@@ -9,7 +9,7 @@ this project are licensed under Apache-2.0.
 
 To use the latest published CLI without contributing to source, run `npx issue-graph@latest --help` or install it with `npm install --global issue-graph@latest`. Library consumers can use `npm install issue-graph@latest`. The public npm package requires Node.js 20 or later and does not require or grant source access. Check the installed command's help before relying on source-only features; `@latest` does not promise unreleased capabilities.
 
-Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Cloning the INTERNAL `vercel-labs/issue-graph` repository requires access and an authenticated GitHub CLI.
+Use pnpm and Node.js 20.19.x or 22.12+ for source development; Node.js 24 is recommended. The compiled CLI still targets Node.js 20 or later. Authenticate the GitHub CLI for live API checks.
 
 ```bash
 gh auth login
@@ -69,7 +69,7 @@ Connect the project to `vercel-labs/issue-graph` with production branch `main`. 
 
 Merging a new stable version into canonical `main` starts `.github/workflows/release.yml` automatically. Update `package.json` and the current notes between the release markers in `CHANGELOG.md`, using a `## X.Y.Z` heading. Run `pnpm --filter @issue-graph/docs sync:changelog` to update the generated docs page. Do not edit `apps/docs/content/docs/changelog.mdx` directly.
 
-Each push checks the exact commit and npm registry state. An unpublished version must be newer than `latest`. Already-published versions skip the build and publication, so ordinary merges do not create duplicate releases. Invalid identities, malformed registry data, noncanonical repositories, non-main refs, and registry/network errors fail closed. The repository remains INTERNAL; publishing does not change its visibility.
+Each push checks the exact commit and npm registry state. An unpublished version must be newer than `latest`. Already-published versions skip the build and publication, so ordinary merges do not create duplicate releases. Invalid identities, malformed registry data, noncanonical repositories, non-main refs, and registry/network errors fail closed. Publishing does not change repository visibility.
 
 The build runs lint, typecheck, and tests with Node 24 and the pinned pnpm version, then packs once through `prepack`. Node 20/22/24 consumers test that exact tarball without rebuilding. Only after all consumers pass does the publish job send the same archive to npm through OIDC, with hooks disabled and no stored npm token. It installs no project dependencies. Metadata binds the package name, version, source SHA, filename, and SHA-256 to an immutable run-specific artifact retained for 30 days.
 
@@ -109,4 +109,4 @@ To investigate without any writes to npm or GitHub, restore the original release
 node scripts/release.ts verify-published "$RUNNER_TEMP/release"
 ```
 
-Confirm the published package with a fresh install before updating installation claims. Keep `repositoryIsPublic` false while the repository is internal.
+Confirm the published package with a fresh install before updating installation claims.
