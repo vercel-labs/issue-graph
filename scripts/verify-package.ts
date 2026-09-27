@@ -336,6 +336,8 @@ try {
         name,
       ) ||
         /^dist\/.+\.(?:js|d\.ts)$/.test(name) ||
+        /^dist\/dashboard\/(?:index\.html|font-LICENSE\.txt)$/.test(name) ||
+        /^dist\/dashboard\/_next\/static\/[a-zA-Z0-9_./()[\]-]+\.(?:css|woff2)$/.test(name) ||
         name === "skills/issue-graph/SKILL.md" ||
         name === "skill-data/core/SKILL.md" ||
         name === "skill-data/core/references/workflows.md",
@@ -359,6 +361,8 @@ try {
     "skills/issue-graph/SKILL.md",
     "dist/skills-cli.js",
     "dist/skills-cli.d.ts",
+    "dist/dashboard/index.html",
+    "dist/dashboard/font-LICENSE.txt",
     "skill-data/core/SKILL.md",
     "skill-data/core/references/workflows.md",
     "LICENSE",
@@ -546,6 +550,13 @@ try {
   assert.match(html, /"openCount":\{"value":348,"issues":301,"pullRequests":47,"complete":true/);
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /Package smoke issue/);
+  assert.match(html, /id="issue-graph-data"/);
+  assert.match(html, /self\.__next_f/);
+  assert.ok(!files.includes("package/dist/dashboard/.source-hash"));
+  const dashboardAssets = [...html.matchAll(/(?:src|href)="\.\/(_next\/[^"]+)"/g)];
+  assert.ok(dashboardAssets.length > 0, "Next dashboard must reference compiled assets");
+  for (const [, asset] of dashboardAssets)
+    assert.ok(existsSync(join(consumer, dirname(htmlPath), asset)), `missing asset: ${asset}`);
   assert.ok(
     !existsSync(join(home, ".issue-graph")),
     "--no-snapshot must prevent graph persistence",

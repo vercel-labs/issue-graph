@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, rmSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDashboard } from "./build-dashboard.js";
@@ -18,4 +18,8 @@ assert.ifError(build.error);
 assert.equal(build.signal, null, `TypeScript build killed by ${build.signal}`);
 if (build.status !== 0) process.exit(build.status ?? 1);
 chmodSync(join(root, "dist/bin.js"), 0o755);
-cpSync(join(root, "apps/dashboard/out"), join(root, "dist/dashboard"), { recursive: true });
+mkdirSync(join(root, "dist/dashboard"), { recursive: true });
+for (const name of ["index.html", "_next", "font-LICENSE.txt"])
+  cpSync(join(root, "apps/dashboard/out", name), join(root, "dist/dashboard", name), {
+    recursive: true,
+  });
