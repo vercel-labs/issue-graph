@@ -1,6 +1,21 @@
 # Changelog
 
 <!-- release:start -->
+## 0.4.1
+
+### Fixes
+
+- Include `open`, `rank`, `cluster`, `dashboard`, `runs`, and `auth` in `schema`, with formats, defaults, and local-write details.
+- Correct help for labeled issue discovery, crawl budgets, and opening saved dashboards.
+
+### Documentation
+
+- Shorten the bundled agent guide while preserving coverage, privacy, scoring defaults, and exact dashboard links.
+- Document dashboard library APIs and align guides with current CLI behavior and public source access.
+- Refresh landing examples and enable site analytics.
+
+<!-- release:end -->
+
 ## 0.4.0
 
 ### Features
@@ -27,8 +42,6 @@
 - Keep exported HTML together with its sibling `_next/` directory and `font-LICENSE.txt`.
 - `ISSUE_GRAPH_HOME` now controls all local state, including config, captures, query history, saved dashboards, and graph/status/reconcile history.
 - Query and config support provider-scoped models. Live collection in this release remains GitHub-only.
-
-<!-- release:end -->
 
 ## 0.3.2
 
