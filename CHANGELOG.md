@@ -1,6 +1,35 @@
 # Changelog
 
 <!-- release:start -->
+## 0.4.0
+
+### Features
+
+- Collect a repository's open issues and pull requests with paginated discovery, a configurable node budget, and explicit coverage limits.
+- Use `open`, `graph`, `rank`, and `cluster` with repository, item, or URL scopes. Omit the repository inside a GitHub checkout to infer it from the remote.
+- Group work with the calling agent: `cluster` returns a task, and `cluster --apply` validates the answer and rebuilds the saved dashboard without another crawl. Use `--agent` for headless runs.
+- Explore linked work in Explore, Impact, Swarm, and Rank. Group Swarm by cluster, state, or item kind, and compare Heat, links, blast radius, or depth.
+- Filter across views by state, item kind, clusters, Heat thresholds or percentiles, closing PR links, review state, and search.
+- Run the same filters and scoring offline with `query`. Return an exact dashboard link, explore an immutable `--capture`, or replay frozen parameters with `--history`.
+- Save scoring defaults globally, per provider, or per project with `config`. Command overrides and dashboard sliders remain exploratory.
+- Browse saved projects with `dashboard`, manage their latest models with `runs`, and inspect GitHub sign-in with `auth status`.
+
+### Improvements
+
+- Open the original dashboard design and animations as a static Next.js export, without a server.
+- Distinguish open issues, open PRs, merged PRs, closed items, and fetch errors with consistent colors and legends. Cluster colors identify groups while nodes retain their state colors.
+- Keep filters and relationship signals compact, preserve linked context, and animate Rank on entry.
+- Updated agent guidance covers queries, capabilities, coverage, scoped defaults, and returning the exact `viewUrl`. Refreshed the README workflow demo.
+
+### Compatibility
+
+- Older flags remain available for one minor release and print their replacements. Prefer command scopes, `--budget`, `--no-save`, and `-o PATH`.
+- Keep exported HTML together with its sibling `_next/` directory and `font-LICENSE.txt`.
+- `ISSUE_GRAPH_HOME` now controls all local state, including config, captures, query history, saved dashboards, and graph/status/reconcile history.
+- Query and config support provider-scoped models. Live collection in this release remains GitHub-only.
+
+<!-- release:end -->
+
 ## 0.3.2
 
 ### Improvements
@@ -10,8 +39,6 @@
 - Explicit `--format text` for Graph and Plan. Existing JSON/Markdown contracts remain unchanged, including piped defaults and Graph `--json PATH` exports.
 - Plain output in pipes and when `NO_COLOR`, `CI`, or `TERM=dumb` disables terminal styling.
 - Narrower docs examples with the same human-output hierarchy and natural title wrapping.
-
-<!-- release:end -->
 
 ## 0.3.1
 
