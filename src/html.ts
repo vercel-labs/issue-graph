@@ -485,10 +485,10 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .item .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .dot{width:8px;height:8px;border-radius:9999px;flex-shrink:0}
 .k-iss{background:var(--open-fg)}.k-pr{background:var(--accent)}.k-merged{background:var(--merged-fg)}.k-closed{background:var(--danger-fg)}
-.k-sup{background:transparent;box-shadow:inset 0 0 0 1.5px var(--accent)}
+.k-sup-outline{background:transparent;box-shadow:inset 0 0 0 1.5px var(--accent)}
 .dot-OPEN{background:var(--open-fg)}.dot-MERGED{background:var(--merged-fg)}.dot-CLOSED{background:var(--danger-fg)}.dot-UNKNOWN{background:var(--muted)}
 .fl{color:var(--warn-fg);flex-shrink:0;font-size:12px}
-.swarm .d.hl circle{stroke:var(--fg);stroke-width:2.5}
+.swarm .d.hl .mark{stroke:var(--fg);stroke-width:2.5}
 .swarm .d.hl{filter:drop-shadow(0 0 0 var(--fg))}
 @media (prefers-reduced-motion:reduce){.chev,.mix-bar span,.grp.anim .grp-items .item{transition:none;animation:none}}
 /* main */
@@ -773,7 +773,6 @@ let view='explore';
 let impactSel=null;
 
 function kcls(n){
-  if(active(n)&&/SUPERSEDED/.test(n.verdict||''))return 'k-sup';
   return 'k-'+statusInfo(n).color;
 }
 function statusInfo(n){
