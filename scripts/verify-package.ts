@@ -666,7 +666,6 @@ try {
   assert.match(html, /"openCount":\{"value":348,"issues":301,"pullRequests":47,"complete":true/);
   assert.match(html, /<!doctype html>/i);
   assert.match(html, /Package smoke issue/);
-  assert.match(html, /"openCount":\{"value":348,"issues":301,"pullRequests":47,"complete":true/);
   assert.ok(
     !existsSync(join(home, ".issue-graph")),
     "--no-snapshot must prevent graph persistence",
