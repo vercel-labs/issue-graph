@@ -269,7 +269,16 @@ function buildModel(
     overlaps: fileOverlaps(nodes).length,
   };
 
-  return { provider: GITHUB, repo, seeds: seedKeys, groups, cleanup, stats, nodes: clientNodes };
+  return {
+    provider: GITHUB,
+    repo,
+    grouping: clusters.length ? "themes" : "components",
+    seeds: seedKeys,
+    groups,
+    cleanup,
+    stats,
+    nodes: clientNodes,
+  };
 }
 
 /** Render the graph as a self-contained, Geist-styled master–detail explorer. */
@@ -305,7 +314,13 @@ export function applyClusters(
   if (rest.length) groups.push({ label: "Ungrouped", subtitle: "no cluster", members: rest });
   for (const c of cleanup) if (c.key && !nodes[c.key]) unknown.add(c.key);
   return {
-    model: { ...model, nodes, groups, cleanup: cleanup.filter((c) => !c.key || nodes[c.key]) },
+    model: {
+      ...model,
+      nodes,
+      groups,
+      grouping: "themes",
+      cleanup: cleanup.filter((c) => !c.key || nodes[c.key]),
+    },
     unknown: [...unknown],
   };
 }
@@ -381,7 +396,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .shell{display:grid;grid-template-columns:340px 1fr;height:100vh}
 @media(max-width:820px){.shell{grid-template-columns:1fr;height:auto}}
 /* sidebar */
-.side{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.side{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--bg)}
 .side-top{padding:20px 16px 16px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:16px}
 .brand{display:flex;flex-direction:column;gap:4px}
 .brand-row{display:flex;align-items:center;gap:8px}
@@ -404,16 +419,16 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .ropt{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:6px;align-items:center;width:100%;height:32px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--fg);font-family:var(--sans);font-size:13px;text-align:left;cursor:pointer}
 .ropt:hover,.ropt:focus{background:var(--bg2);outline:none}
 .ropt b{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
-.rname{display:inline-flex;align-items:center;gap:6px;min-width:0;overflow:hidden}.rname .mono{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rname .gh-mark{width:13px;height:13px}
+.rname{display:inline-flex;align-items:center;gap:6px;min-width:0;overflow:hidden}.rname .mono{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rname svg{width:13px;height:13px}
 .rcheck{font-size:12px;color:var(--fg)}
 @media (prefers-reduced-motion:reduce){.repo-menu,.pchev{animation:none;transition:none}}
-.gh-mark{width:14px;height:14px;flex-shrink:0;display:block}
-.coverage{font-size:12px;color:var(--muted);margin-top:-8px}
-.coverage span{text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
+.gh-mark,:where(.project>svg:first-child,.rname>svg,.pv-head>svg,.pv-link>svg){width:14px;height:14px;flex-shrink:0;display:block}
+.capture-counts{font-size:12px;color:var(--muted);margin-top:-8px}
+.capture-counts span{text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
 .pv-slot{display:flex;flex-direction:column;gap:6px}
 .pv-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-.pv-head .gh-mark{width:12px;height:12px}
-.pv-link{display:inline-flex;align-items:center;gap:6px}.pv-link .gh-mark{width:13px;height:13px}
+.pv-head svg{width:12px;height:12px}
+.pv-link{display:inline-flex;align-items:center;gap:6px}.pv-link svg{width:13px;height:13px}
 .brand-sep{color:var(--border2);font-size:18px;font-weight:300;line-height:1}
 .brand-name{font-weight:600;font-size:15px;letter-spacing:-.01em}
 .mix{display:flex;flex-direction:column;gap:8px}
@@ -429,6 +444,16 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .stat-l{font-size:12px;color:var(--muted)}
 .stat.warn .stat-n{color:var(--warn-fg)}.stat.danger .stat-n{color:var(--danger-fg)}.stat.zero .stat-n{color:var(--muted)}
 .view-toggle{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:2px;background:var(--bg2);border:1px solid var(--border);border-radius:9999px}
+.coverage{font-size:12px;line-height:18px;color:var(--fg2)}
+.coverage.partial{padding:8px 10px;border:1px solid var(--warn-fg);border-radius:6px}
+.coverage summary{cursor:pointer}
+.coverage ul{padding-left:16px;margin:6px 0}
+.coverage time{float:right;font-size:11px}
+.coverage .coverage-warning{color:var(--warn-fg)}
+.read-coverage{font-size:12px;color:var(--fg2)}
+.read-coverage summary{cursor:pointer}
+.read-coverage.partial{padding:12px 14px;border:1px solid var(--warn-fg);border-radius:6px}
+.read-coverage ul{padding-left:18px;margin:6px 0 0}
 .view-btn{height:28px;border:0;border-radius:9999px;background:transparent;color:var(--muted);font-family:var(--sans);font-size:13px;cursor:pointer;transition:color 150ms,background 150ms}
 .view-btn:hover{color:var(--fg)}.view-btn.active{background:var(--bg);color:var(--fg);box-shadow:0 0 0 1px var(--border2)}
 .view-btn:focus-visible,.item:focus-visible,.cleanup-pill:focus-visible,.grp>summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -459,15 +484,15 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .item .num{font-family:var(--mono);font-size:12px;color:var(--muted);flex-shrink:0;font-variant-numeric:tabular-nums}
 .item .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .dot{width:8px;height:8px;border-radius:9999px;flex-shrink:0}
-.k-iss{background:var(--open-fg)}.k-pr{background:var(--accent)}.k-merged{background:var(--merged-fg)}.k-closed{background:var(--closed-fg)}
+.k-iss{background:var(--open-fg)}.k-pr{background:var(--accent)}.k-merged{background:var(--merged-fg)}.k-closed{background:var(--danger-fg)}
 .k-sup{background:transparent;box-shadow:inset 0 0 0 1.5px var(--accent)}
-.dot-OPEN{background:var(--open-fg)}.dot-MERGED{background:var(--merged-fg)}.dot-CLOSED{background:var(--closed-fg)}.dot-UNKNOWN{background:var(--muted)}
+.dot-OPEN{background:var(--open-fg)}.dot-MERGED{background:var(--merged-fg)}.dot-CLOSED{background:var(--danger-fg)}.dot-UNKNOWN{background:var(--muted)}
 .fl{color:var(--warn-fg);flex-shrink:0;font-size:12px}
 .swarm .d.hl circle{stroke:var(--fg);stroke-width:2.5}
 .swarm .d.hl{filter:drop-shadow(0 0 0 var(--fg))}
 @media (prefers-reduced-motion:reduce){.chev,.mix-bar span,.grp.anim .grp-items .item{transition:none;animation:none}}
 /* main */
-.main{overflow-y:auto;padding:32px 40px 80px;min-height:0}
+.main{overflow-y:auto;padding:32px 40px 80px;min-height:0;min-width:0}
 .empty{color:var(--muted);display:flex;height:100%;align-items:center;justify-content:center}
 .insp h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 0 4px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .insp h1 .num{font-family:var(--mono);color:var(--muted);font-size:18px}
@@ -475,6 +500,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .sec{margin-top:24px}
 .sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 8px;font-weight:600}
 .rel{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.rel>a[href]{overflow-wrap:anywhere;min-width:0}
 .rel .via{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;background:var(--closed-bg);color:var(--fg2);min-width:78px;text-align:center}
 .rel .via-closes,.rel .via-closed-by{background:var(--merged-bg);color:var(--merged-fg)}
 .rel .via-competes,.rel .via-overlaps{background:var(--warn-bg);color:var(--warn-fg)}
@@ -482,7 +508,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .verdict{padding:12px 14px;border-radius:var(--radius-md);background:var(--warn-bg);color:var(--warn-fg);font-weight:500;border:1px solid var(--border)}
 .badge{font-size:12px;font-weight:500;padding:2px 8px;border-radius:9999px;white-space:nowrap}
 .b-open{background:var(--open-bg);color:var(--open-fg)}.b-merged{background:var(--merged-bg);color:var(--merged-fg)}
-.b-closed{background:var(--closed-bg);color:var(--closed-fg)}.b-warn{background:var(--warn-bg);color:var(--warn-fg)}
+.b-closed{background:var(--danger-bg);color:var(--danger-fg)}.b-warn{background:var(--warn-bg);color:var(--warn-fg)}
 .b-danger{background:var(--danger-bg);color:var(--danger-fg)}.b-muted{background:var(--closed-bg);color:var(--muted)}
 .kind{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 /* swarm */
@@ -494,11 +520,16 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .seg button.on{background:var(--bg);color:var(--fg);box-shadow:0 0 0 1px var(--border2)}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .segs{display:flex;gap:8px;flex-wrap:wrap}
-.swarm-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--fg2);margin:4px 0 12px}
+.swarm-legend{display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--fg2);margin:4px 0 12px;max-height:112px;overflow:auto}
 .swarm-legend .lg{display:inline-flex;align-items:center;gap:6px}
+.swarm-legend svg{flex-shrink:0}
+.group-swatch{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-right:8px;vertical-align:middle}
 .swarm-legend .lg b{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
 .swarm-legend .tot{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
-.swarm-card{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);padding:16px 20px}
+#sw-legend{height:32px;max-height:32px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
+#sw-legend>*{flex-shrink:0;white-space:nowrap}
+.swarm-legend .mark{stroke-width:1.5}
+.swarm-card{overflow:auto;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);padding:16px 20px}
 .swarm svg{display:block;overflow:visible}
 .swarm .row-lbl{font-family:var(--sans);font-size:12px;fill:var(--fg2)}
 .swarm .row-n{font-family:var(--sans);font-size:12px;fill:var(--muted)}
@@ -506,11 +537,16 @@ code{font-family:var(--mono);font-size:12px;background:var(--closed-bg);padding:
 .swarm .tick{font-family:var(--mono);font-size:11px;fill:var(--muted)}
 .swarm .axis-t{font-family:var(--sans);font-size:12px;fill:var(--fg2)}.swarm .muted-t{fill:var(--muted)}
 .swarm .d{cursor:pointer;transition:transform 700ms cubic-bezier(.2,.8,.2,1),opacity 300ms}
-.swarm .d circle{stroke-width:1.5}
-.swarm .d:hover circle{stroke:var(--fg);stroke-width:2}
+.swarm .d .mark{stroke-width:1.5}
+.swarm .d:hover .mark{stroke:var(--fg);stroke-width:2}
 .swarm .d.gone{opacity:0;pointer-events:none}
 .c-iss{fill:var(--open-fg);stroke:var(--open-fg)}.c-pr{fill:var(--accent);stroke:var(--accent)}
-.c-merged{fill:var(--merged-fg);stroke:var(--merged-fg)}.c-closed{fill:var(--closed-fg);stroke:var(--closed-fg)}
+.c-merged{fill:var(--merged-fg);stroke:var(--merged-fg)}.c-closed{fill:var(--danger-fg);stroke:var(--danger-fg)}
+.c-canceled{fill:var(--danger-fg);stroke:var(--danger-fg)}.c-archived{fill:var(--warn-fg);stroke:var(--warn-fg)}
+.c-duplicate{fill:#bf5af2;stroke:#bf5af2}.c-unknown{fill:var(--muted);stroke:var(--muted)}
+.c-sup-outline{fill:var(--bg);stroke:#6486ac}
+.c-group{fill:var(--group-color);stroke:var(--group-color)}
+.k-canceled{background:var(--danger-fg)}.k-archived{background:var(--warn-fg)}.k-duplicate{background:#bf5af2}.k-unknown{background:var(--muted)}
 .c-sup{fill:var(--bg)!important}
 .swarm-tip{position:fixed;pointer-events:none;z-index:10;max-width:320px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 10px;font-size:12px;line-height:17px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .swarm-tip .mono{color:var(--muted)}
@@ -701,16 +737,23 @@ const LABS_SVG =
 const APP = `
 const LABS_SVG=${JSON.stringify(LABS_SVG)};
 const PROJECTS=JSON.parse(document.getElementById('data').textContent).projects;
+const projectId=p=>p.id||p.repo;
+const projectLabel=p=>p.label||p.repo;
 const wanted=(()=>{try{return new URLSearchParams(location.search).get('project')}catch{return null}})();
-let DATA=PROJECTS.find(p=>p.repo===wanted)||PROJECTS[0];
+let DATA=PROJECTS.find(p=>projectId(p)===wanted)||PROJECTS[0];
 let N=DATA.nodes;
 let PV=DATA.provider;
-document.title='issue-graph · '+DATA.repo;
+document.title='issue-graph · '+projectLabel(DATA);
 const repoUrl=r=>PV.repoUrl.replace('{repo}',r);
 const app=document.getElementById('app');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hasView=name=>(PV.views||['explore','impact','swarm','rank']).includes(name);
+const hasMetric=name=>(PV.metrics||['heat','links','blast','depth']).includes(name);
+const stateLabel=n=>n.stateLabel||({OPEN:'Open',MERGED:'Merged',CLOSED:'Closed',UNKNOWN:'Unavailable'}[n.state]||n.state);
+const active=n=>n.state==='OPEN'&&!n.archived;
 // keys from the primary repo read as #123; others keep enough of their name to tell apart
-const short=k=>{const [r,n]=String(k).split('#');if(!n)return k;if(r===DATA.repo)return '#'+n;
+const shortIdentifier=id=>/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id)?id.slice(0,8)+'…'+id.slice(-4):id;
+const short=k=>{if(N[k]?.identifier)return shortIdentifier(N[k].identifier);const [r,n]=String(k).split('#');if(!n)return shortIdentifier(String(k));if(r===DATA.repo)return '#'+n;
   const [o,name]=r.split('/'),[po]=DATA.repo.split('/');return (o===po?name:r)+'#'+n};
 function statsOf(){
   // headline counts cover the project's own repo; referenced items are reported as linked
@@ -730,27 +773,77 @@ let view='explore';
 let impactSel=null;
 
 function kcls(n){
-  if(n.state==='MERGED')return 'k-merged';
-  if(n.state!=='OPEN')return 'k-closed';
-  if(/SUPERSEDED/.test(n.verdict||''))return 'k-sup';
-  return n.kind==='PullRequest'?'k-pr':'k-iss';
+  if(active(n)&&/SUPERSEDED/.test(n.verdict||''))return 'k-sup';
+  return 'k-'+statusInfo(n).color;
+}
+function statusInfo(n){
+  if(n.state==='UNKNOWN'||n.state==='FETCH_ERROR'||n.read?.fetched===false)return {label:'Unavailable',color:'unknown'};
+  if(n.archived)return {label:'Archived',color:'archived'};
+  if(n.stateType==='duplicate')return {label:'Duplicate',color:'duplicate'};
+  if(n.stateType==='canceled')return {label:'Canceled',color:'canceled'};
+  if(n.stateType==='completed')return {label:'Completed',color:'merged'};
+  if(n.state==='MERGED')return {label:'Merged',color:'merged'};
+  if(n.state!=='OPEN')return {label:'Closed',color:'closed'};
+  if(/SUPERSEDED/.test(n.verdict||''))return {label:'Superseded',color:'sup-outline'};
+  return n.kind==='PullRequest'?{label:'Open PR',color:'pr'}:{label:'Open issue',color:'iss'};
+}
+function statusGroups(nodes){
+  const groups=new Map();
+  for(const n of nodes){const s=statusInfo(n),key=s.color;
+    if(!groups.has(key))groups.set(key,{...s,members:[],kinds:[]});
+    const g=groups.get(key);g.members.push(n.key);
+    if(!g.kinds.includes(n.kind))g.kinds.push(n.kind);}
+  return [...groups.values()];
+}
+function colorAttrs(color){
+  return color.startsWith('hsl(')?'class="c-group" style="--group-color:'+color+'"':'class="c-'+color+'"';
+}
+function stateColor(n){
+  const color=statusInfo(n).color;
+  return color==='sup-outline'?(n.kind==='PullRequest'?'pr':'iss'):color;
+}
+function stateGroupLabel(n){
+  const label=n.state==='OPEN'&&!n.stateLabel?(n.kind==='PullRequest'?'Open PR':'Open issue'):stateLabel(n);
+  return label+(n.archived?' · archived':'');
+}
+function diamondPath(r){
+  const d=r*1.3;
+  return 'M0,-'+d+'L'+d+',0 0,'+d+' -'+d+',0Z';
+}
+function itemMark(kind,r){
+  return kind==='PullRequest'?'<path class="mark" d="'+diamondPath(r)+'"/>':'<circle class="mark" r="'+r+'"/>';
+}
+function legendMarkup(groups,shapes=false){
+  return groups.map(g=>'<span class="lg">'+(shapes?
+    g.kinds.map(kind=>'<svg width="12" height="12" viewBox="-6 -6 12 12" aria-hidden="true" '+colorAttrs(g.color)+'>'+itemMark(kind,3)+'</svg>').join(''):
+    '<svg width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="4" '+colorAttrs(g.color)+' stroke-width="1.5"/></svg>')+
+    esc(g.label)+' <b>'+g.members.length+'</b></span>').join('');
+}
+function groupColor(index){
+  return 'hsl('+((216+index*137.508)%360).toFixed(3)+' 62% 55%)';
+}
+function proposedGroups(){
+  return DATA.grouping==='themes'||(!DATA.grouping&&DATA.groups.some(g=>!/^Component \\d+$/.test(g.label)));
 }
 const statGrid=rows=>'<div class="stats">'+rows.map(t=>'<div class="stat '+(t[1]===0?'zero':t[2])+'"><div class="stat-n">'+t[1]+'</div><div class="stat-l">'+t[0]+'</div></div>').join('')+'</div>';
 function setProject(repo){
-  const next=PROJECTS.find(p=>p.repo===repo);if(!next||next===DATA)return;
+  const next=PROJECTS.find(p=>projectId(p)===repo);if(!next||next===DATA)return;
   DATA=next;N=DATA.nodes;PV=DATA.provider;impactSel=null;REACH=null;loadDone();
   try{const u=new URL(location.href);u.searchParams.set('project',repo);history.replaceState(null,'',u)}catch{}
-  document.title='issue-graph · '+repo;
+  document.title='issue-graph · '+projectLabel(DATA);
   app.querySelector('.side').outerHTML=sidebar();wireSidebar();
   lastHash=null;route();
 }
 const CHEV='<svg class="pchev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function projectMenu(){
-  const opt=p=>'<button class="ropt'+(p===DATA?' on':'')+'" role="option" aria-selected="'+(p===DATA)+'" data-repo="'+esc(p.repo)+'">'+
-    '<span class="rcheck" aria-hidden="true">'+(p===DATA?'✓':'')+'</span><span class="rname">'+p.provider.logo+'<span class="mono">'+esc(p.repo)+'</span></span>'+
-    '<b>'+Object.keys(p.nodes).length+'</b></button>';
+  const count=p=>{const c=p.openCount;if(!c||!Number.isSafeInteger(c.value)||c.value<0)return '<b title="Total open items not fetched">—</b>';
+    const text=(c.complete?'':'≥')+c.value+' open',detail=c.issues+' open issues'+(c.pullRequests===undefined?'':' + '+c.pullRequests+' open PRs')+' · '+(c.complete?'entire project':'partial count')+' · '+c.observedAt;
+    return '<b title="'+esc(detail)+'" aria-label="'+esc(detail)+'">'+text+'</b>'};
+  const opt=p=>'<button class="ropt'+(p===DATA?' on':'')+'" role="option" aria-selected="'+(p===DATA)+'" data-repo="'+esc(projectId(p))+'">'+
+    '<span class="rcheck" aria-hidden="true">'+(p===DATA?'✓':'')+'</span><span class="rname">'+p.provider.logo+'<span class="mono">'+esc(projectLabel(p))+'</span></span>'+
+    count(p)+'</button>';
   return '<button class="project pbtn" id="repo-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="repo-menu">'+
-    PV.logo+'<span class="pname">'+esc(DATA.repo)+'</span>'+CHEV+'</button>'+
+    PV.logo+'<span class="pname">'+esc(projectLabel(DATA))+'</span>'+CHEV+'</button>'+
     '<div class="repo-menu" id="repo-menu" role="listbox" aria-label="Projects" hidden>'+PROJECTS.map(opt).join('')+'</div>';
 }
 function wireProjectMenu(){
@@ -769,16 +862,13 @@ function wireProjectMenu(){
 }
 function projectRow(){
   if(PROJECTS.length>1)return '<div class="project-row">'+projectMenu()+
-    '<a class="project-gh" href="'+esc(repoUrl(DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a></div>';
-  return '<div class="project-row"><span class="project">'+PV.logo+'<span class="pname">'+esc(DATA.repo)+'</span></span>'+
-    '<a class="project-gh" href="'+esc(repoUrl(DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a></div>';
+    '<a class="project-gh" href="'+esc(DATA.url||repoUrl(DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a></div>';
+  return '<div class="project-row"><span class="project">'+PV.logo+'<span class="pname">'+esc(projectLabel(DATA))+'</span></span>'+
+    '<a class="project-gh" href="'+esc(DATA.url||repoUrl(DATA.repo))+'" target="_blank" rel="noopener" aria-label="Open on '+esc(PV.name)+'" title="Open on '+esc(PV.name)+'">↗</a></div>';
 }
 function sidebar(){
   const s=statsOf(),all=Object.values(N);
-  const mix=[['k-iss','Open issues',all.filter(n=>n.state==='OPEN'&&n.kind!=='PullRequest').length],
-    ['k-pr','Open PRs',all.filter(n=>n.state==='OPEN'&&n.kind==='PullRequest').length],
-    ['k-merged','Merged',all.filter(n=>n.state==='MERGED').length],
-    ['k-closed','Closed',all.filter(n=>n.state!=='OPEN'&&n.state!=='MERGED').length]].filter(m=>m[2]);
+  const mix=statusGroups(all).map(g=>['k-'+g.color,g.label,g.members.length]);
   const stats=[['Open here',s.openHere,''],['Open PRs',s.openPRs,''],['Open issues',s.openIssues,'']];
   const signals=PV.signals.map(g=>[g.label,s[g.id]??0,g.tone]);
   const chev='<svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -787,9 +877,9 @@ function sidebar(){
     if(!ms.length)return '';
     const items=ms.map((k,i)=>{const n=N[k];
       const fl=n.flags.length?'<span class="fl" title="'+esc(n.flags.join(' · '))+'">⚠</span>':'';
-      const t=(n.key+' '+n.title+' '+(n.author||'')).toLowerCase();
+      const t=(n.key+' '+(n.identifier||'')+' '+n.title+' '+(n.author||'')).toLowerCase();
       return '<button class="item" data-key="'+esc(k)+'" data-t="'+esc(t)+'" style="animation-delay:'+Math.min(i*18,220)+'ms">'+
-        '<span class="dot '+kcls(n)+'"></span><span class="num">'+short(k)+'</span>'+
+        '<span class="dot '+kcls(n)+'"></span><span class="num">'+esc(short(k))+'</span>'+
         '<span class="t">'+esc(n.title||'(no title)')+'</span>'+fl+'</button>';
     }).join('');
     const dots=ms.slice().sort((a,b)=>kcls(N[a]).localeCompare(kcls(N[b]))).map(k=>'<i class="'+kcls(N[k])+'"></i>').join('');
@@ -807,12 +897,23 @@ function sidebar(){
     '<div class="mix"><div class="mix-bar" role="img" aria-label="'+esc(mix.map(m=>m[2]+' '+m[1].toLowerCase()).join(', '))+'">'+
       mix.map(m=>'<span class="'+m[0]+'" style="flex-grow:'+(m[2]/total)+'"></span>').join('')+'</div>'+
       '<div class="mix-legend">'+mix.map(m=>'<span><i class="dot '+m[0]+'"></i>'+m[1]+' <b>'+m[2]+'</b></span>').join('')+'</div></div>'+
+    (DATA.coverage?'<details class="coverage'+(DATA.coverage.complete?'':' partial')+'" aria-label="Graph coverage">'+
+      '<summary>'+(DATA.coverage.complete?'Snapshot details':'Some data is missing')+
+      '<time datetime="'+esc(DATA.coverage.generatedAt)+'" title="'+esc(DATA.coverage.generatedAt)+'">'+
+      esc(new Date(DATA.coverage.generatedAt).toLocaleDateString(undefined,{month:'short',day:'numeric'}))+'</time></summary>'+
+      '<p>Read-only snapshot · '+esc(new Date(DATA.coverage.generatedAt).toLocaleString())+'. Regenerate the capture to refresh.</p>'+
+      (DATA.coverage.warnings?.length?'<ul class="coverage-warning">'+DATA.coverage.warnings.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul>':'')+
+      '<ul>'+DATA.coverage.messages.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul></details>':'')+
     statGrid(stats)+
-    ((s.linked||DATA.notCrawled)?'<div class="coverage">'+(s.linked?'+'+s.linked+' linked item'+(s.linked===1?'':'s'):'')+
+    ((s.linked||DATA.notCrawled)?'<div class="capture-counts">'+(s.linked?'+'+s.linked+' linked item'+(s.linked===1?'':'s'):'')+
       (DATA.notCrawled?(s.linked?' · ':'')+'<span title="Referenced items the node cap left out; raise --max-nodes to include them">'+DATA.notCrawled+' not crawled (node cap)</span>':'')+'</div>':'')+
     (signals.length?'<div class="pv-slot"><div class="pv-head">'+PV.logo+'<span>'+esc(PV.name)+' signals</span></div>'+statGrid(signals)+'</div>':'')+
-    '<div class="view-toggle" role="group" aria-label="View"><button class="view-btn active" id="explore-view">Explore</button><button class="view-btn" id="impact-view">Impact</button><button class="view-btn" id="swarm-view">Swarm</button><button class="view-btn" id="rank-view">Rank</button></div>'+
-    '<input class="filter" id="filter" placeholder="Filter by #, title, author" aria-label="Filter nodes"/>'+cleanupBtn+'</div>'+
+    '<div class="view-toggle" style="grid-template-columns:repeat('+['explore','impact','swarm','rank'].filter(hasView).length+',1fr)" role="group" aria-label="View">'+
+      '<button class="view-btn" id="explore-view">Explore</button>'+
+      (hasView('impact')?'<button class="view-btn" id="impact-view">Impact</button>':'')+
+      '<button class="view-btn" id="swarm-view">Swarm</button>'+
+      (hasView('rank')?'<button class="view-btn" id="rank-view">Rank</button>':'')+'</div>'+
+    '<input class="filter" id="filter" placeholder="Filter by identifier, title, author" aria-label="Filter nodes"/>'+cleanupBtn+'</div>'+
     '<div class="tree">'+groups+'</div></div>';
 }
 
@@ -826,13 +927,13 @@ function egoSvg(n){
   const parts=cap.map((x,i)=>{const a=(i/cap.length)*2*Math.PI-Math.PI/2,px=cx+r*Math.cos(a)*1.9,py=cy+r*Math.sin(a);
     const t=N[x.k];
     return '<line x1="'+cx+'" y1="'+cy+'" x2="'+px+'" y2="'+py+'" stroke="'+col(x.via)+'" stroke-width="1.5"/>'+
-      '<circle cx="'+px+'" cy="'+py+'" r="4" fill="var(--'+tone(t.state)+'-fg)"/>'+
-      '<text class="lbl rellink" data-key="'+esc(x.k)+'" x="'+px+'" y="'+(py-8)+'" text-anchor="middle">'+short(x.k)+' '+esc(x.via)+'</text>';
+      '<circle cx="'+px+'" cy="'+py+'" r="4" fill="'+(t.state==='UNKNOWN'?'var(--muted)':'var(--'+tone(t.archived?'CLOSED':t.state)+'-fg)')+'"/>'+
+      '<text class="lbl rellink" data-key="'+esc(x.k)+'" x="'+px+'" y="'+(py-8)+'" text-anchor="middle">'+esc(x.via+' '+short(x.k))+'</text>';
   }).join('');
   const more=nb.length>cap.length?'<text class="lbl" x="'+(W-8)+'" y="'+(H-8)+'" text-anchor="end">+'+(nb.length-cap.length)+' more</text>':'';
   return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="'+H+'">'+parts+
     '<circle cx="'+cx+'" cy="'+cy+'" r="6" fill="var(--accent)"/>'+
-    '<text class="lbl center" x="'+cx+'" y="'+(cy-12)+'" text-anchor="middle">'+short(n.key)+'</text>'+more+'</svg>';
+    '<text class="lbl center" x="'+cx+'" y="'+(cy-12)+'" text-anchor="middle">'+esc(short(n.key))+'</text>'+more+'</svg>';
 }
 
 function relList(title,arr,fmt){if(!arr.length)return '';
@@ -841,10 +942,11 @@ function relList(title,arr,fmt){if(!arr.length)return '';
 function inspector(k){
   const n=N[k];if(!n){app.querySelector('.main').innerHTML='<div class="empty">not found</div>';return}
   const badges=[];
-  badges.push('<span class="badge b-'+tone(n.state)+'">'+n.state+'</span>');
+  badges.push('<span class="badge b-'+tone(n.state)+'">'+esc(stateLabel(n))+'</span>');
   badges.push('<span class="kind">'+(n.kind==='PullRequest'?'PR':'issue')+'</span>');
   if(n.author)badges.push('<span class="muted">@'+esc(n.author)+'</span>');
   if(n.seed)badges.push('<span class="badge b-muted">seed</span>');
+  if(n.archived)badges.push('<span class="badge b-muted">archived</span>');
   let pr='';
   if(n.pr){const p=n.pr,m=[];
     if(p.draft)m.push('<span class="badge b-muted">draft</span>');
@@ -859,35 +961,42 @@ function inspector(k){
   const otherOut=n.out.filter(e=>e.via!=='closes');
   const closedByIn=n.in.filter(e=>e.via==='closes').map(e=>({k:e.from,via:'closed by'}));
   const otherIn=n.in.filter(e=>e.via!=='closes');
-  const rel=(x)=>{const t=N[x.k];const lbl=t?esc(t.title):'(beyond depth)';
-    return '<div class="rel"><span class="via via-'+(x.via.replace(' ','-'))+'">'+esc(x.via)+'</span>'+
-      '<span class="dot dot-'+(t?t.state:'UNKNOWN')+'"></span>'+
-      (t?'<a class="rellink" data-key="'+esc(x.k)+'">'+short(x.k)+'</a>':short(x.k))+
+  const rel=(x)=>{const t=N[x.k];const lbl=t?esc(t.title):'(outside this view)';
+    return '<div class="rel"><span class="via via-'+esc(x.via.replace(/[^a-z-]/g,'-'))+'">'+esc(x.via)+'</span>'+
+      '<span class="dot dot-'+(t?t.archived?'CLOSED':t.state:'UNKNOWN')+'"></span>'+
+      (t?'<a class="rellink" data-key="'+esc(x.k)+'">'+esc(short(x.k))+'</a>':esc(short(x.k)))+
       ' <span class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lbl+'</span></div>';};
   const ovl=n.overlaps.slice().sort((a,b)=>b.significant-a.significant).map(o=>{
-    const dup=o.sharedIssue?' <span class="badge b-warn">both close '+short(o.sharedIssue)+'</span>':'';
+    const dup=o.sharedIssue?' <span class="badge b-warn">both close '+esc(short(o.sharedIssue))+'</span>':'';
     return '<div class="rel"><span class="via via-overlaps">overlaps</span>'+
-      '<a class="rellink" data-key="'+esc(o.with)+'">'+short(o.with)+'</a>'+dup+
+      '<a class="rellink" data-key="'+esc(o.with)+'">'+esc(short(o.with))+'</a>'+dup+
       '<span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"> '+o.shared.map(f=>'<code>'+esc(f)+'</code>').join(' ')+'</span></div>';});
-  const ext=n.external.map(u=>'<div class="rel"><span class="via">external</span><a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(u)+'</a></div>');
+  const ext=n.attachments
+    ?n.attachments.map(a=>'<div class="rel"><span class="via">attachment</span><a href="'+esc(a.url)+'" target="_blank" rel="noopener">'+esc(a.title||a.url)+'</a></div>')
+    :n.external.map(u=>'<div class="rel"><span class="via">external</span><a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(u)+'</a></div>');
   const ment=n.mentionedBy.length?'<div class="sec"><h3>mentioned by</h3><div class="row">'+n.mentionedBy.map(u=>'<span class="badge b-muted">@'+esc(u)+'</span>').join(' ')+'</div></div>':'';
+  const readIncomplete=n.read&&(!n.read.fetched||n.read.coverage.some(c=>!c.complete));
+  const read=n.read?'<details class="sec read-coverage'+(readIncomplete?' partial':'')+'" aria-label="Issue read coverage"'+(readIncomplete?' open':'')+'><summary>'+
+    (!n.read.fetched?'Issue unavailable':readIncomplete?'Some connections could not be read':'Connection details')+'</summary>'+
+    (n.read.error?'<div>'+esc(n.read.error)+'</div>':'')+
+    '<ul>'+n.read.coverage.map(c=>'<li>'+esc(c.source)+': '+(c.complete?'read':esc(c.reason||'incomplete'))+' · '+c.pages+' page(s)</li>').join('')+'</ul></details>':'';
 
   app.querySelector('.main').innerHTML='<div class="insp">'+
-    '<h1><span class="num">'+short(n.key)+'</span> '+esc(n.title||'(no title)')+'</h1>'+
-    '<div class="row">'+badges.join(' ')+' <a class="pv-link" href="'+esc(n.url)+'" target="_blank" rel="noopener">'+PV.logo+'Open on '+esc(PV.name)+' ↗</a></div>'+
-    pr+flags+verdict+
+    '<h1><span class="num" title="'+esc(n.identifier||n.key)+'">'+esc(short(n.key))+'</span> '+esc(n.title||'(no title)')+'</h1>'+
+    '<div class="row">'+badges.join(' ')+(n.url?' <a class="pv-link" href="'+esc(n.url)+'" target="_blank" rel="noopener">'+PV.logo+'Open on '+esc(PV.name)+' ↗</a>':'')+'</div>'+
+    pr+flags+verdict+read+
     '<div class="sec"><h3>neighborhood</h3>'+egoSvg(n)+'</div>'+
     relList('closes',closesOut,rel)+relList('closed by',closedByIn,rel)+
     relList('overlaps (shared files)',ovl,x=>x)+
-    relList('references out',otherOut.map(e=>({k:e.to,via:e.via})),rel)+
-    relList('referenced by',otherIn.map(e=>({k:e.from,via:e.via})),rel)+
+    relList('Relationships from this item',otherOut.map(e=>({k:e.to,via:e.via})),rel)+
+    relList('Relationships to this item',otherIn.map(e=>({k:e.from,via:e.via})),rel)+
     ment+relList('external links',ext,x=>x)+'</div>';
   for(const b of app.querySelectorAll('.item'))b.classList.toggle('sel',b.dataset.key===k);
 }
 
 // Cleanup progress is per-viewer scratch; nothing is posted to GitHub.
 let CL_KEY='',DONE=new Set();
-function loadDone(){CL_KEY='issue-graph:cleanup:'+DATA.repo;
+function loadDone(){CL_KEY='issue-graph:cleanup:'+projectId(DATA);
   DONE=new Set((()=>{try{return JSON.parse(localStorage.getItem(CL_KEY)||'[]')}catch{return []}})());}
 loadDone();
 const saveDone=()=>{try{localStorage.setItem(CL_KEY,JSON.stringify([...DONE]))}catch{}};
@@ -909,7 +1018,7 @@ function cleanupView(){
     const rs=rows.filter(r=>r.a[0]===a[0]);if(!rs.length)return '';
     return '<section class="cl-sec"><h2 class="cl-h">'+a[1]+' <span>'+rs.length+'</span></h2>'+rs.map(r=>{
       const n=r.c.key&&N[r.c.key];
-      const target=n?'<a class="rellink cl-key" data-key="'+esc(r.c.key)+'">'+short(r.c.key)+'</a>':'<span class="cl-key">'+esc(r.c.key?r.c.key.split('/').slice(1).join('/'):'')+'</span>';
+      const target=n?'<a class="rellink cl-key" data-key="'+esc(r.c.key)+'">'+esc(short(r.c.key))+'</a>':'<span class="cl-key">'+esc(r.c.key?r.c.key.split('/').slice(1).join('/'):'')+'</span>';
       return '<label class="cl-row'+(DONE.has(r.id)?' done':'')+'" data-id="'+esc(r.id)+'">'+
         '<input type="checkbox"'+(DONE.has(r.id)?' checked':'')+'/>'+
         '<span class="cl-body"><span class="cl-top">'+(n?'<i class="dot '+kcls(n)+'"></i>':'')+target+
@@ -1057,12 +1166,12 @@ function ripple(k){
     return '<line class="ray" x1="'+cx+'" y1="'+cy+'" x2="'+x+'" y2="'+y+'" style="--len:'+len+';animation-delay:'+d+'ms"/>'+
       '<g class="sat" data-key="'+esc(it[0])+'"><title>'+esc(short(it[0])+' '+(N[it[0]]?.title||''))+'</title>'+
       '<circle class="s-'+it[1]+'" cx="'+x+'" cy="'+y+'" r="6" style="animation-delay:'+(d+220)+'ms"/>'+
-      '<text x="'+lx+'" y="'+ly+'" text-anchor="'+(Math.abs(lx-cx)<8?'middle':lx<cx?'end':'start')+'">'+short(it[0])+'</text></g>';}).join('');
+      '<text x="'+lx+'" y="'+ly+'" text-anchor="'+(Math.abs(lx-cx)<8?'middle':lx<cx?'end':'start')+'">'+esc(short(it[0]))+'</text></g>';}).join('');
   const more=[...r1.more,...r2.more].map(m=>m[1]).reduce((a,b)=>a+b,0);
   return '<svg class="im-rip" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(r1.total+r2.total)+' items affected by '+esc(short(k))+'">'+
     arcs(r1,R1)+arcs(r2,R2)+'<circle class="wave" cx="'+cx+'" cy="'+cy+'" r="'+R2+'"/>'+
     ring(r1.shown,R1,0)+ring(r2.shown,R2,Math.PI/Math.max(r2.shown.length,1))+
-    '<circle class="core" cx="'+cx+'" cy="'+cy+'" r="22"/><text class="core-t" x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle">'+short(k)+'</text>'+
+    '<circle class="core" cx="'+cx+'" cy="'+cy+'" r="22"/><text class="core-t" x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle">'+esc(short(k))+'</text>'+
     (more?'<text class="more-t" x="'+cx+'" y="'+(H-6)+'" text-anchor="middle">Showing the strongest '+(r1.shown.length+r2.shown.length)+'; +'+more+' more in the list below</text>':'')+'</svg>';
 }
 function affectedList(k){
@@ -1070,7 +1179,7 @@ function affectedList(k){
   return '<div class="im-aff">'+affected(k).filter(g=>g.items.length).map(g=>
     '<details class="im-aff-g"'+(g.items.length<=8?' open':'')+'><summary><i class="b-'+g.id+'"></i>'+g.label+'<b>'+g.items.length+'</b></summary>'+
     g.items.map(it=>{const n=N[it.x],f=g.id==='overlaps'?rarest(k,it.x):null;
-      return '<button class="im-aff-row" data-key="'+esc(it.x)+'"><span class="k">'+short(it.x)+'</span><span class="t">'+esc(n?.title||'')+'</span>'+
+      return '<button class="im-aff-row" data-key="'+esc(it.x)+'"><span class="k">'+esc(short(it.x))+'</span><span class="t">'+esc(n?.title||'')+'</span>'+
         (f?'<span class="why" title="'+esc(f)+'">shares <code>'+esc(f.split('/').pop())+'</code> · '+(R.get(f)||0)+' PRs</span>':'')+'</button>';}).join('')+
     '</details>').join('')+'</div>';
 }
@@ -1083,7 +1192,7 @@ function hotspot(k){
 }
 function impactPanel(k){
   const n=N[k],b=blastRadius(k);
-  return '<div class="im-panel view-in" id="im-panel"><h2><span class="k">'+short(k)+'</span>'+(n.kind==='PullRequest'?'If this PR ships':'If this issue is resolved')+'</h2>'+
+  return '<div class="im-panel view-in" id="im-panel"><h2><span class="k">'+esc(short(k))+'</span>'+(n.kind==='PullRequest'?'If this PR ships':'If this issue is resolved')+'</h2>'+
     '<div class="sub">'+esc(n.title||'')+'</div>'+ripple(k)+
     '<div class="im-legend">'+BUCKETS.map(x=>'<span><i class="b-'+x[0]+'"></i>'+x[1]+'<b>'+b[x[0]].size+'</b></span>').join('')+
     '<span><i style="background:var(--fg)"></i>Total affected<b>'+b.total+'</b></span></div>'+
@@ -1092,6 +1201,7 @@ function impactPanel(k){
     '<div class="im-hint">Inner ring: direct effects. Outer ring: work that touches it. A projection from visible links, not proof.</div></div>';
 }
 function impactView(k){
+  if(!hasView('impact'))return exploreView();
   setView('impact');
   const rows=impactRows();
   if(k!==undefined&&k!==null&&N[k])impactSel=k;
@@ -1101,7 +1211,7 @@ function impactView(k){
     const lane=BUCKETS.map((x,j)=>r.parts[x[0]]>0?'<span class="b-'+x[0]+'" style="width:'+(r.parts[x[0]]/max*100)+'%;animation-delay:'+(Math.min(i,14)*25+j*40)+'ms"></span>':'').join('');
     const tip=r.b.total+' items touched: '+BUCKETS.filter(x=>r.b[x[0]].size).map(x=>r.b[x[0]].size+' '+x[1].toLowerCase()).join(', ');
     return '<button class="im-row'+(r.k===impactSel?' on':'')+'" data-k="'+esc(r.k)+'" title="'+esc(tip)+'"><span class="im-rank">'+(i+1)+'</span>'+
-      '<span class="im-who"><i class="dot '+kcls(n)+'"></i><span class="k">'+short(r.k)+'</span><span class="t">'+esc(n.title||'')+'</span></span>'+
+      '<span class="im-who"><i class="dot '+kcls(n)+'"></i><span class="k">'+esc(short(r.k))+'</span><span class="t">'+esc(n.title||'')+'</span></span>'+
       '<span class="im-lane" aria-hidden="true">'+lane+'</span><span class="im-total">'+(Math.round(r.score*10)/10)+'</span></button>';}).join('');
   app.querySelector('.main').innerHTML='<div class="view-in">'+
     '<div class="swarm-head"><div><h1>Impact</h1><div class="muted">Open items ranked by the work their resolution touches. Direct effects count 1; an overlap counts more the fewer PRs share its file. Pick one to see its ripple; use ↑ and ↓ to move.</div></div></div>'+
@@ -1127,7 +1237,7 @@ function wireImpactPanel(){
 
 // Explore: the cluster map first, then one cluster's subgraph, then a node.
 function clusterStats(g){
-  const ms=g.members.filter(k=>N[k]),open=ms.filter(k=>N[k].state==='OPEN');
+  const ms=g.members.filter(k=>N[k]),open=ms.filter(k=>active(N[k]));
   const pend=clPending();
   const hot=open.filter(k=>N[k].heat).sort((a,b)=>heatScore(N[b])-heatScore(N[a]))[0];
   return {ms,open:open.length,prs:open.filter(k=>N[k].kind==='PullRequest').length,cleanup:ms.filter(k=>pend.has(k)).length,
@@ -1142,22 +1252,22 @@ function exploreView(gi){
   const cards=order.map((c,j)=>{const st=c.st;
     const dots=st.ms.slice().sort((a,b)=>kcls(N[a]).localeCompare(kcls(N[b]))).map(k=>'<i class="'+kcls(N[k])+'"></i>').join('');
     return '<button class="ex-card" data-gi="'+c.i+'" style="animation-delay:'+Math.min(j*45,360)+'ms">'+
-      '<span class="ex-top"><span class="ex-label">'+esc(c.g.label)+'</span><span class="ex-n">'+st.ms.length+'</span></span>'+
-      '<span class="ex-cause">'+esc(c.g.subtitle||'No root cause recorded.')+'</span>'+
+      '<span class="ex-top"><span class="ex-label"><i class="group-swatch" style="background:'+groupColor(c.i)+'"></i>'+esc(c.g.label)+'</span><span class="ex-n">'+st.ms.length+'</span></span>'+
+      '<span class="ex-cause">'+esc(c.g.subtitle||'No grouping rationale recorded.')+'</span>'+
       '<span class="ex-dots" aria-hidden="true">'+dots+'</span>'+
-      (st.hot?'<span class="ex-hot">Hottest: <span>'+short(st.hot)+'</span> '+esc(N[st.hot].title)+'</span>':'<span class="ex-hot">Nothing open.</span>')+
-      '<span class="ex-meta"><span><b>'+st.open+'</b> open</span><span><b>'+st.prs+'</b> PRs</span><span><b>'+st.heat+'</b> heat</span>'+
+      (hasMetric('heat')?(st.hot?'<span class="ex-hot">Hottest: <span>'+esc(short(st.hot))+'</span> '+esc(N[st.hot].title)+'</span>':'<span class="ex-hot">'+(st.open?'No heat data.':'Nothing open.')+'</span>'):'')+
+      '<span class="ex-meta"><span><b>'+st.open+'</b> active</span><span>'+(proposedGroups()?'Proposed theme':'Connected component')+'</span>'+(hasMetric('heat')?'<span><b>'+st.heat+'</b> heat</span>':'')+
       (st.cleanup?'<span class="warn"><b>'+st.cleanup+'</b> to clean up</span>':'')+'</span></button>';}).join('');
   app.querySelector('.main').innerHTML='<div class="view-in"><div class="swarm-head"><div><h1>Explore</h1><div class="muted">'+
-    DATA.groups.length+' groups, hottest first. Open one to see how its items reference each other.</div></div></div>'+
-    '<div class="ex-grid stagger">'+cards+'</div></div>';
+    DATA.groups.length+(proposedGroups()?' proposed themes. Grouping does not establish a shared root cause.':' connected groups. Open one to inspect relationships.')+(hasMetric('heat')?' Ordered by heat.':' Ordered by active items.')+'</div></div></div>'+
+    '<div class="ex-grid stagger">'+(cards||'<div class="empty">No issues in this capture.</div>')+'</div></div>';
   for(const c of app.querySelectorAll('.ex-card'))c.onclick=()=>exploreView(+c.dataset.gi);
   setHash('explore');sel='explore';
 }
 function layoutCluster(keys,W,H){
   const P={},n=keys.length,idx=new Map(keys.map((k,i)=>[k,i]));
   keys.forEach((k,i)=>{const a=(i/n)*2*Math.PI;P[k]={x:W/2+Math.cos(a)*W*.3,y:H/2+Math.sin(a)*H*.3,vx:0,vy:0}});
-  const links=[];keys.forEach(k=>N[k].out.forEach(e=>{if(idx.has(e.to)&&e.to!==k)links.push([k,e.to,e.via])}));
+  const links=[];keys.forEach(k=>N[k].out.forEach(e=>{if(idx.has(e.to)&&e.to!==k&&(!e.undirected||k<e.to))links.push([k,e.to,e.via,e.undirected===false||e.via==='closes'])}));
   keys.forEach(k=>N[k].overlaps.forEach(o=>{if(idx.has(o.with)&&k<o.with)links.push([k,o.with,'overlaps'])}));
   for(let it=0;it<260;it++){
     for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const a=P[keys[i]],b=P[keys[j]];let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||1;
@@ -1172,24 +1282,28 @@ function layoutCluster(keys,W,H){
 function clusterView(gi){
   const g=DATA.groups[gi],st=clusterStats(g),keys=st.ms,W=860,H=Math.min(460,220+keys.length*14);
   const {P,links}=layoutCluster(keys,W,H),pend=clPending();
-  const edges=links.map(([s,t,via],i)=>{const a=P[s],b=P[t],len=Math.round(Math.hypot(b.x-a.x,b.y-a.y));
-    return '<line class="e draw'+(via==='closes'?' closes':'')+'" data-s="'+esc(s)+'" data-t="'+esc(t)+'" x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" style="--len:'+len+';animation-delay:'+(200+i*30)+'ms"><title>'+esc(via)+'</title></line>';}).join('');
+  const edges=links.map(([s,t,via,directed],i)=>{const a=P[s],b=P[t],len=Math.round(Math.hypot(b.x-a.x,b.y-a.y));
+    return '<line class="e draw'+(via==='closes'?' closes':'')+'" data-s="'+esc(s)+'" data-t="'+esc(t)+'"'+(directed?' marker-end="url(#edge-arrow)"':'')+' x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" style="--len:'+len+';animation-delay:'+(200+i*30)+'ms"><title>'+esc(short(s)+' '+via+' '+short(t))+'</title></line>';}).join('');
   const nodes=keys.map((k,i)=>{const p=P[k],n=N[k],r=n.heat?5+Math.min(9,Math.sqrt(heatScore(n))):5;
     return '<g class="n" data-key="'+esc(k)+'" tabindex="0"><title>'+esc(short(k)+' '+n.title)+'</title>'+
       (pend.has(k)?'<circle class="ring" cx="'+p.x+'" cy="'+p.y+'" r="'+(r+4)+'"/>':'')+
       '<circle class="'+swClass(n)+(/SUPERSEDED/.test(n.verdict||'')?' c-sup':'')+'" cx="'+p.x+'" cy="'+p.y+'" r="'+r+'" style="animation-delay:'+(i*35)+'ms"/>'+
-      '<text x="'+p.x+'" y="'+(p.y-r-6)+'" text-anchor="middle">'+short(k)+'</text></g>';}).join('');
+      '<text x="'+p.x+'" y="'+(p.y-r-6)+'" text-anchor="middle">'+esc(short(k))+'</text></g>';}).join('');
   const labels=DATA.cleanup.reduce((m,c,i)=>{if(c.key&&!DONE.has(clId(c,i)))m[c.key]=c.text;return m},{});
   const rows=keys.slice().sort((a,b)=>(N[b].heat?heatScore(N[b]):-1)-(N[a].heat?heatScore(N[a]):-1)).map(k=>{const n=N[k];
-    return '<tr data-key="'+esc(k)+'"><td><span class="who"><i class="dot '+kcls(n)+'"></i><span class="k">'+short(k)+'</span><span class="t">'+esc(n.title)+'</span></span>'+
+    return '<tr data-key="'+esc(k)+'"><td><span class="who"><i class="dot '+kcls(n)+'"></i><span class="k">'+esc(short(k))+'</span><span class="t">'+esc(n.title)+'</span></span>'+
       (labels[k]?'<div class="act">'+esc(labels[k])+'</div>':'')+(n.verdict&&!labels[k]?'<div class="act">'+esc(n.verdict)+'</div>':'')+'</td>'+
-      '<td>'+n.state.toLowerCase()+'</td><td class="num">'+(n.heat?heatScore(n):'')+'</td><td class="num">'+neighbors(k).size+'</td></tr>';}).join('');
+      '<td>'+esc(stateLabel(n))+(n.archived?' · archived':'')+'</td>'+(hasMetric('heat')?'<td class="num">'+(n.heat?heatScore(n):'')+'</td>':'')+'<td class="num">'+neighbors(k).size+'</td></tr>';}).join('');
   app.querySelector('.main').innerHTML='<div class="view-in"><button class="ex-back" id="ex-back">← All groups</button>'+
-    '<div class="swarm-head"><div><h1>'+esc(g.label)+'</h1><div class="muted">'+esc(g.subtitle||'')+'</div></div>'+
-    '<div class="segs"><span class="muted" style="font-size:13px">'+st.open+' open · '+st.prs+' PRs · '+st.heat+' heat'+(st.cleanup?' · '+st.cleanup+' to clean up':'')+'</span></div></div>'+
-    '<div class="ex-graph" id="ex-graph"><svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="References between the items in '+esc(g.label)+'">'+edges+nodes+'</svg></div>'+
-    '<div class="muted" style="font-size:12px;margin:-8px 0 16px">Dot size is heat; purple lines close, grey lines reference or share files; an amber ring needs cleanup. Hover to trace, click to inspect.</div>'+
-    '<div class="card-wrap"><table class="tbl"><thead><tr><th>Item</th><th>State</th><th class="num">Heat</th><th class="num">Links</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    '<div class="swarm-head"><div><h1><i class="group-swatch" style="background:'+groupColor(gi)+'"></i>'+esc(g.label)+'</h1><div class="muted">'+esc(g.subtitle||'')+'</div></div>'+
+    '<div class="segs"><button class="cl-swarm" id="ex-swarm">View in Swarm</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">'+(proposedGroups()?'Proposed theme':'Connected component')+' · '+keys.length+' items · '+st.open+' active · '+links.length+' connections'+(hasMetric('heat')?' · '+st.heat+' heat':'')+(st.cleanup?' · '+st.cleanup+' to clean up':'')+'</div>'+
+    '<div class="swarm-legend" aria-label="Item status">'+legendMarkup(statusGroups(keys.map(k=>N[k])))+'</div>'+
+    '<div class="ex-graph" id="ex-graph"><svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="References between the items in '+esc(g.label)+'"><defs><marker id="edge-arrow" viewBox="0 0 8 8" refX="14" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L8 4L0 8" fill="var(--fg2)"/></marker></defs>'+edges+nodes+'</svg></div>'+
+    '<div class="muted" style="font-size:12px;margin:-8px 0 16px">'+
+    (links.length?'Lines show captured relationships; arrows show explicit direction.':'No explicit connections between these items in this capture.')+
+    (keys.some(k=>N[k].heat)?' Dot size reflects heat.':'')+(st.cleanup?' Amber rings mark pending cleanup.':'')+' Hover to trace, click to inspect.</div>'+
+    '<div class="card-wrap"><table class="tbl"><thead><tr><th>Item</th><th>State</th>'+(hasMetric('heat')?'<th class="num">Heat</th>':'')+'<th class="num">Links</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   const graph=document.getElementById('ex-graph');
   const focus=k=>{graph.classList.toggle('focus',!!k);if(!k)return;
     const on=new Set([k]);for(const e of graph.querySelectorAll('.e')){const hit=e.dataset.s===k||e.dataset.t===k;e.classList.toggle('on',hit);if(hit){on.add(e.dataset.s);on.add(e.dataset.t)}}
@@ -1200,6 +1314,7 @@ function clusterView(gi){
   for(const tr of app.querySelectorAll('.tbl tbody tr')){tr.onclick=()=>select(tr.dataset.key);
     tr.onmouseenter=()=>focus(tr.dataset.key);tr.onmouseleave=()=>focus(null);}
   document.getElementById('ex-back').onclick=()=>exploreView();
+  document.getElementById('ex-swarm').onclick=()=>swarmView('cluster','links');
   setHash('explore:'+gi);sel='explore:'+gi;
 }
 
@@ -1217,22 +1332,18 @@ const SW_META={
     say:'the items whose fix unblocks the most other work'},
   depth:{axis:'How many reference hops from the seed bugs?',dir:'further away',
     say:'items pulled in indirectly, several references away from the seeds'}};
-const SW_BY_SAY={cluster:'Each row is a root cause the agent found.',state:'Each row is a state: open, merged, closed.',
-  kind:'Each row is issues or pull requests.',all:'One row with every node.'};
 function swClass(n){
-  if(n.state==='MERGED')return 'c-merged';
-  if(n.state!=='OPEN')return 'c-closed';
-  return n.kind==='PullRequest'?'c-pr':'c-iss';
+  return 'c-'+statusInfo(n).color;
 }
 function swGroups(){
   const keys=Object.keys(N);
-  if(SW.by==='all')return [{label:'All nodes',members:keys}];
+  if(SW.by==='all')return keys.length?[{label:'All items',members:keys}]:[];
   if(SW.by==='state'||SW.by==='kind'){
-    const f=SW.by==='state'?(n=>n.state):(n=>n.kind==='PullRequest'?'Pull requests':'Issues');
+    const f=SW.by==='state'?stateGroupLabel:(n=>n.kind==='PullRequest'?'Pull requests':'Issues');
     const m=new Map();keys.forEach(k=>{const g=f(N[k]);(m.get(g)??m.set(g,[]).get(g)).push(k)});
-    return [...m].map(([label,members])=>({label:label.charAt(0)+label.slice(1).toLowerCase(),members})).sort((a,b)=>b.members.length-a.members.length);
+    return [...m].map(([label,members])=>({label,members})).sort((a,b)=>b.members.length-a.members.length||a.label.localeCompare(b.label)).map(g=>({...g,color:SW.by==='state'?stateColor(N[g.members[0]]):N[g.members[0]].kind==='PullRequest'?'pr':'iss'}));
   }
-  return DATA.groups.map(g=>({label:g.label,members:g.members.filter(k=>N[k])})).filter(g=>g.members.length);
+  return DATA.groups.map((g,index)=>({label:g.label,members:g.members.filter(k=>N[k]),color:groupColor(index)})).filter(g=>g.members.length);
 }
 function swMetric(k){
   const n=N[k];
@@ -1298,7 +1409,7 @@ function swLayoutAt(W,avail,R){
     const h=Math.max(30,2*spread+D+20);
     const cy=y+h/2+6;
     placed.forEach(p=>{pos[p.k]={x:p.x,y:cy+p.o}});
-    rows.push({label:g.label,n:g.members.length,top:y,h,cy});
+    rows.push({label:g.label,color:g.color,n:g.members.length,top:y,h,cy});
     y+=h;
   }
   let ticks=[];
@@ -1314,7 +1425,7 @@ function swLayoutAt(W,avail,R){
 // layouts are pure given these inputs, so toggling back to a view reuses its layout
 const SW_CACHE=new Map();
 function swLayout(W,avail){
-  const ck=[DATA.repo,SW.by,SW.x,Math.round(W),Math.round(avail),RK.join(',')].join('|');
+  const ck=[projectId(DATA),SW.by,SW.x,Math.round(W),Math.round(avail),RK.join(',')].join('|');
   if(SW_CACHE.has(ck))return SW_CACHE.get(ck);
   const L=swLayoutFit(W,avail);SW_CACHE.set(ck,L);return L;
 }
@@ -1327,7 +1438,8 @@ function swarmSvg(W,avail){
   const L=swLayout(W,avail);
   const rows=L.rows.map((r,i)=>
     (i?'<line class="grid" x1="0" x2="'+W+'" y1="'+r.top+'" y2="'+r.top+'"/>':'')+
-    '<text class="row-lbl" x="0" y="'+(r.cy+4)+'">'+esc(r.label.length>26?r.label.slice(0,25)+'…':r.label)+'</text>'+
+    (SW.by==='all'?'':'<circle cx="4" cy="'+r.cy+'" r="4" '+colorAttrs(r.color)+'/>')+
+    '<text class="row-lbl" x="16" y="'+(r.cy+4)+'"><title>'+esc(r.label)+'</title>'+esc(r.label.length>23?r.label.slice(0,22)+'…':r.label)+'</text>'+
     '<text class="row-n" x="'+(L.lblEnd-16)+'" y="'+(r.cy+4)+'" text-anchor="end">'+r.n+'</text>').join('');
   const ay=L.H-48,meta=SW_META[SW.x];
   const axis='<line class="grid" x1="'+L.x0+'" x2="'+L.x1+'" y1="'+ay+'" y2="'+ay+'"/>'+
@@ -1339,14 +1451,22 @@ function swarmSvg(W,avail){
 }
 function swarmRender(){
   const card=document.getElementById('swarm-card');if(!card)return;
+  const visible=new Set(Object.keys(N).filter(k=>swMetric(k)!=null));
+  const legend=statusGroups([...visible].map(k=>N[k]));
+  const rowCount=swGroups().filter(g=>g.members.some(k=>visible.has(k))).length,rowUnit=SW.by==='cluster'?'cluster':'row';
+  document.getElementById('sw-legend').innerHTML=legendMarkup(legend,true)+
+    (DATA.cleanup.length?'<span class="lg">Needs cleanup (ring) <b>'+clPending().size+'</b></span>':'')+
+    '<span class="tot">'+visible.size+(visible.size===Object.keys(N).length?'':' of '+Object.keys(N).length)+' items · '+rowCount+' '+rowUnit+(rowCount===1?'':'s')+'</span>';
+  const say=document.getElementById('sw-say');
+  if(say)say.textContent='Each dot is a captured item. Further right: '+SW_META[SW.x].say+'.';
+  if(!Object.keys(N).length){card.innerHTML='<div class="empty">No items in this capture.</div>';return}
   const W=Math.max(480,card.clientWidth-40);
   // card padding (32) plus the axis block (52) sit outside the rows
   const avail=Math.max(240,window.innerHeight-card.getBoundingClientRect().top-32-52-24);
   const {L,frame}=swarmSvg(W,avail);
   let svg=card.querySelector('svg');
   if(!svg){
-    const dots=Object.keys(N).map(k=>{const n=N[k];const sup=/SUPERSEDED/.test(n.verdict||'')?' c-sup':'';
-      return '<g class="d" data-key="'+esc(k)+'"><circle class="ring" r="'+(L.R+2.5)+'"/><circle r="'+L.R+'" class="'+swClass(n)+sup+'"/></g>'}).join('');
+    const dots=Object.keys(N).map(k=>'<g class="d" data-key="'+esc(k)+'"><circle class="ring"/>'+itemMark(N[k].kind,L.R)+'</g>').join('');
     card.innerHTML='<svg width="'+W+'"><g class="sw-frame"></g><g class="sw-dots">'+dots+'</g></svg>';
     svg=card.querySelector('svg');
     // first paint: start every dot on the baseline, then let it travel in
@@ -1355,10 +1475,14 @@ function swarmRender(){
   }
   svg.setAttribute('width',W);svg.setAttribute('height',L.H);svg.setAttribute('viewBox','0 0 '+W+' '+L.H);
   svg.querySelector('.sw-frame').innerHTML=frame;
-  const say=document.getElementById('sw-say');
-  if(say)say.textContent='Each dot is an issue or PR. '+SW_BY_SAY[SW.by]+' Further right: '+SW_META[SW.x].say+'.';
   const pend=clPending();
-  for(const g of svg.querySelectorAll('.d'))g.classList.toggle('cl',pend.has(g.dataset.key));
+  for(const g of svg.querySelectorAll('.d')){
+    g.classList.toggle('cl',pend.has(g.dataset.key));
+    const n=N[g.dataset.key],dot=g.querySelector('.mark');
+    dot.setAttribute('class','mark '+swClass(n)+(/SUPERSEDED/.test(n.verdict||'')?' c-sup':''));
+    if(n.kind==='PullRequest')dot.setAttribute('d',diamondPath(L.R));else dot.setAttribute('r',L.R);
+    g.querySelector('.ring').setAttribute('r',L.R+2.5);
+  }
   const ordered=[...svg.querySelectorAll('.d')].sort((a,b)=>(L.pos[a.dataset.key]?.x??0)-(L.pos[b.dataset.key]?.x??0));
   ordered.forEach((g,i)=>{const p=L.pos[g.dataset.key];
     g.style.transitionDelay=Math.min(i*2,240)+'ms';
@@ -1366,21 +1490,14 @@ function swarmRender(){
 }
 function swarmView(by,x){
   if(by&&SW_BY.some(b=>b[0]===by))SW.by=by;
-  if(x&&SW_X.some(b=>b[0]===x))SW.x=x;
+  if(x&&SW_X.some(b=>b[0]===x)&&hasMetric(x))SW.x=x;
+  if(!hasMetric(SW.x))SW.x='links';
   setView('swarm');
   const seg=(id,opts,cur)=>'<div class="seg" role="group" id="'+id+'">'+opts.map(o=>'<button data-v="'+o[0]+'" class="'+(o[0]===cur?'on':'')+'" aria-pressed="'+(o[0]===cur)+'">'+o[1]+'</button>').join('')+'</div>';
-  const all=Object.values(N);
-  const cnt=f=>all.filter(f).length;
-  const lg=(c,l,n,hollow)=>'<span class="lg"><svg width="10" height="10"><circle cx="5" cy="5" r="4" class="'+c+(hollow?' c-sup':'')+'" stroke-width="1.5"/></svg>'+l+' <b>'+n+'</b></span>';
   app.querySelector('.main').innerHTML='<div class="swarm">'+
     '<div class="swarm-head"><div><h1>Swarm</h1><div class="muted" id="sw-say"></div></div>'+
-    '<div class="segs">'+seg('sw-x',SW_X,SW.x)+seg('sw-by',SW_BY,SW.by)+'</div></div>'+
-    '<div class="swarm-legend">'+lg('c-iss','Open issue',cnt(n=>n.state==='OPEN'&&n.kind!=='PullRequest'))+
-    lg('c-pr','Open PR',cnt(n=>n.state==='OPEN'&&n.kind==='PullRequest'))+
-    lg('c-merged','Merged',cnt(n=>n.state==='MERGED'))+lg('c-closed','Closed',cnt(n=>n.state!=='OPEN'&&n.state!=='MERGED'))+
-    lg('c-pr','Superseded',statsOf().superseded,true)+
-    (DATA.cleanup.length?'<span class="lg"><svg width="16" height="16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--warn-fg)" stroke-width="1.5"/></svg>Needs cleanup (ring) <b>'+clPending().size+'</b></span>':'')+
-    '<span class="tot">'+all.length+' nodes, '+DATA.groups.length+' groups</span></div>'+
+    '<div class="segs">'+seg('sw-x',SW_X.filter(m=>hasMetric(m[0])),SW.x)+seg('sw-by',SW_BY,SW.by)+'</div></div>'+
+    '<div class="swarm-legend" id="sw-legend" aria-label="Chart summary"></div>'+
     '<div class="swarm-card" id="swarm-card"></div></div>';
   for(const b of app.querySelectorAll('.item'))b.classList.remove('sel');
   const wireSeg=(id,key)=>{for(const b of document.querySelectorAll('#'+id+' button'))b.onclick=()=>{
@@ -1393,7 +1510,7 @@ function swarmView(by,x){
   if(!tip){tip=document.createElement('div');tip.id='swarm-tip';tip.className='swarm-tip';tip.hidden=true;document.body.appendChild(tip)}
   card.onmousemove=e=>{const g=e.target.closest('.d');if(!g){tip.hidden=true;return}
     const n=N[g.dataset.key];tip.hidden=false;
-    tip.innerHTML='<span class="mono">'+short(n.key)+'</span> '+esc(n.title||'(no title)')+'<br><span class="muted">'+n.state.toLowerCase()+' · '+swMetric(n.key)+' '+SW_X.find(o=>o[0]===SW.x)[1].toLowerCase()+'</span>'+
+    tip.innerHTML='<span class="mono">'+esc(short(n.key))+'</span> '+esc(n.title||'(no title)')+'<br><span class="muted">'+(n.kind==='PullRequest'?'Pull request':'Issue')+' · '+esc(stateLabel(n))+' · '+swMetric(n.key)+' '+SW_X.find(o=>o[0]===SW.x)[1].toLowerCase()+'</span>'+
       DATA.cleanup.filter((c,i)=>c.key===n.key&&!DONE.has(clId(c,i))).map(c=>'<br><span class="tip-cl">'+esc(c.text)+'</span>').join('');
     tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px'};
   card.onmouseleave=()=>{tip.hidden=true};
@@ -1430,7 +1547,7 @@ function rankRender(){
     const bar=r.parts.map((p,j)=>p>0?'<span class="rk-s'+j+'" style="width:'+(p/max*100)+'%" title="'+RK_SIGNALS[j][1]+': '+Math.round(p*10)/10+'"></span>':'').join('');
     return '<tr data-key="'+esc(n.key)+'" tabindex="0">'+
       '<td class="rk-n">'+(i+1)+'</td>'+
-      '<td class="rk-item"><span class="rk-top"><i class="dot '+kcls(n)+'"></i><span class="rk-key">'+short(n.key)+'</span>'+
+      '<td class="rk-item"><span class="rk-top"><i class="dot '+kcls(n)+'"></i><span class="rk-key">'+esc(short(n.key))+'</span>'+
         '<span class="rk-title">'+esc(n.title||'(no title)')+'</span></span>'+
         '<span class="rk-bar" aria-hidden="true">'+bar+'</span></td>'+
       '<td class="rk-grp"><span>'+esc(labels[n.key]||'Ungrouped')+'</span></td>'+
@@ -1446,6 +1563,7 @@ function rankRender(){
   if(f)f.innerHTML=RK_SIGNALS.map((sg,i)=>'<span class="rk-s'+i+'-t">'+sg[1].toLowerCase()+' × '+RK[i]+'</span>').join(' + ');
 }
 function rankView(w){
+  if(!hasView('rank'))return exploreView();
   if(w){const v=w.split(',').map(Number);if(v.length===5&&v.every(x=>Number.isFinite(x)&&x>=0&&x<=10))RK=v;}
   setView('rank');
   const sliders=RK_SIGNALS.map((sg,i)=>'<label class="rk-w"><span class="rk-w-top"><span><i class="rk-sw rk-s'+i+'"></i>'+sg[1]+'</span><output id="rk-o'+i+'">× '+RK[i]+'</output></span>'+
@@ -1489,9 +1607,9 @@ function wireSidebar(){
   wireProjectMenu();
   const cb=document.getElementById('cleanup-btn');if(cb)cb.onclick=cleanupView;
   document.getElementById('explore-view').onclick=()=>exploreView();
-  document.getElementById('impact-view').onclick=()=>impactView();
+  const impact=document.getElementById('impact-view');if(impact)impact.onclick=()=>impactView();
   document.getElementById('swarm-view').onclick=()=>swarmView();
-  document.getElementById('rank-view').onclick=()=>rankView();
+  const rank=document.getElementById('rank-view');if(rank)rank.onclick=()=>rankView();
   for(const g of app.querySelectorAll('.grp'))g.addEventListener('toggle',()=>{
     g.classList.remove('anim');if(g.open){void g.offsetWidth;g.classList.add('anim')}});
   for(const b of app.querySelectorAll('.item')){b.onclick=()=>select(b.dataset.key);
