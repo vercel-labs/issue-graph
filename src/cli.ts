@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { classify, fillMentionedBy } from "./classify.js";
 import {
   clusterJsonPrompt,
@@ -23,15 +24,18 @@ import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
 import { ISSUE_GRAPH_SCHEMA } from "./schema.js";
+import { inferRepo, parseScope, type Scope } from "./scope.js";
 import { runSkills } from "./skills-cli.js";
 import {
   diffReconcileSnapshots,
   diffSnapshots,
+  listDashboardRuns,
   listSnapshots,
   readDashboardModels,
   readReconcileSnapshot,
   readSnapshot,
   reconcileSnapshotDir,
+  removeDashboardRun,
   snapshotDir,
   toReconcileSnapshot,
   toSnapshot,
@@ -44,50 +48,80 @@ import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
 import type { NodeKey, Seed } from "./types.js";
 
-const USAGE = `usage: issue-graph <url|number> --repo owner/repo [options]
-       issue-graph --seeds 1,2,3 --repo owner/repo [options]
-       issue-graph --label bug --repo owner/repo [options]
-       issue-graph --all-open --repo owner/repo [options]
-       issue-graph reconcile --repo owner/repo [options]
-       issue-graph plan --repo owner/repo [options]
-       issue-graph status --repo owner/repo --author login[,login] [options]
-       issue-graph dashboard [--open] [--html PATH]
-       issue-graph schema
-       issue-graph skills [list]
-       issue-graph skills get core [--full] [--json]
+const USAGE = `usage: issue-graph [command] [scope...] [options]
 
-  skills --help      bundled agent guides, no network or authentication
-  status --help      PR counts by author/project and an evidence ledger
-  --repo owner/repo   required for a bare number, --seeds, or --label
-  --depth N           same-repo recursion depth (default 2); cross-repo refs
-                      are fetched one hop and not expanded
-  --seeds a,b,c       multi-seed backlog survey; adds connected components
-  --label L           seed from every open issue carrying this label
-  --all-open          seed from every open issue and PR (up to --max-nodes)
-  --max-nodes N       stop after this many nodes (default 80)
-  --hub-threshold N   fetch but do not expand a node with more refs than this
-                      (default 12), so one tracking issue cannot pull the
-                      whole tracker
-  --concurrency N     GitHub node requests in flight (default 4, max 32)
-  --prioritize        rank open nodes by discussion heat
-  --cluster           print a root-cause clustering prompt for your agent
-  --cluster-run A     run that prompt through 'claude' or 'codex' instead
-  --json PATH         write the machine-readable graph
-  --html PATH         graph only: write a self-contained HTML explorer
-  --clusters PATH     group the explorer by agent-named clusters
-  --open              write the explorer (to a temp file unless --html) and open it
-  --format F          auto (default), text, markdown, or json
-                      graph: TTY text / pipe markdown; --json PATH exports JSON
-                      graph --format json retains Markdown stdout
-                      plan: TTY text / pipe JSON; reconcile: TTY markdown / pipe JSON
-                      text is graph/plan only; bold/dim requires TTY
-                      NO_COLOR, CI, or TERM=dumb disables styling
-  --no-snapshot       do not persist this run to ~/.issue-graph/
-  -h, --help          show this`;
+Run with no arguments inside a GitHub repository to open its backlog dashboard.
+
+commands
+  open [repo]              open issues and PRs → optional root-cause clusters → dashboard
+  graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
+  rank [repo]              what to fix first, by discussion heat
+  cluster [repo]           group open work by root cause with an agent; saved for the dashboard
+  reconcile [repo]         open-backlog verification queue
+  plan [repo]              next backlog action
+  status [repo...] --author login[,login]   PR counts by author, project, or review state
+  dashboard                every saved run in one explorer, with a project switcher
+  runs [list | rm <repo>]  saved runs behind the dashboard
+  auth [status]            provider sign-in state
+  schema                   JSON contract for reconcile, plan, and status
+  skills [list | get core] bundled agent guides
+
+scope
+  (none)                   the GitHub repository of the current directory
+  owner/repo               a repository; github:owner/repo names the provider
+  123  #123  owner/repo#123  <issue or PR URL>   one or more items
+
+options
+  --label L                only items with this label
+  --state open|all         which items a repository scope covers (default open)
+  --format F               human, markdown, or json (default: human in a terminal, else markdown)
+  -o, --out PATH           also write a file; .json for the graph, .html for the explorer
+  --open, --no-open        open the explorer (open defaults to yes in an interactive terminal)
+  --agent A                claude, codex, or none; open and cluster ask before using a detected agent
+  --clusters PATH          group the explorer by clusters from a JSON file instead of an agent
+  --no-save                do not keep this run under ~/.issue-graph/
+  -h, --help               show this
+
+advanced
+  --budget N               stop after N items (default 80, or 1000 for a whole repository)
+  --depth N                same-repository reference depth (default 2)
+  --hub-threshold N        fetch but do not expand an item with more references (default 12)
+  --concurrency N          GitHub requests in flight (default 4, max 32)
+
+Older flags still work for one minor release and print their replacement.
+NO_COLOR, CI, or TERM=dumb disables styling.`;
+
+type Command =
+  | "graph"
+  | "open"
+  | "rank"
+  | "cluster"
+  | "reconcile"
+  | "plan"
+  | "schema"
+  | "dashboard"
+  | "runs"
+  | "auth";
+const COMMANDS: Command[] = [
+  "graph",
+  "open",
+  "rank",
+  "cluster",
+  "reconcile",
+  "plan",
+  "schema",
+  "dashboard",
+  "runs",
+  "auth",
+];
 
 interface Args {
-  command: "graph" | "reconcile" | "plan" | "schema" | "dashboard";
+  command: Command;
+  /** true when the command was typed, false when a bare seed implied graph */
+  explicit: boolean;
   seed: string;
+  items: Array<{ repo?: string; number: number }>;
+  rest: string[];
   repo: string;
   depth: number;
   jsonOut: string;
@@ -95,30 +129,41 @@ interface Args {
   clustersFile: string;
   seedsCsv: string;
   label: string;
+  state: "open" | "all";
   allOpen: boolean;
   maxNodes: number;
+  budgetSet: boolean;
   hubThreshold: number;
   concurrency: number;
   cluster: boolean;
   clusterRun: string;
+  agent: "" | "claude" | "codex" | "none";
   open: boolean;
+  openMode: "auto" | "yes" | "no";
   noSnapshot: boolean;
   prioritize: boolean;
   format: "auto" | "json" | "markdown" | "text";
   help: boolean;
+  deprecations: string[];
 }
 
 export class UsageError extends Error {}
 
+const need = (argv: string[], i: number, flag: string): string => {
+  const v = argv[i];
+  if (v === undefined || v.startsWith("-")) throw new UsageError(`${flag} needs a value`);
+  return v;
+};
+
 export function parseArgs(argv: string[]): Args {
-  const command =
-    argv[0] === "reconcile" || argv[0] === "plan" || argv[0] === "schema" || argv[0] === "dashboard"
-      ? argv[0]
-      : "graph";
-  const start = command === "graph" ? 0 : 1;
+  const explicit = (COMMANDS as string[]).includes(argv[0] ?? "");
+  const command: Command = explicit ? (argv[0] as Command) : "graph";
   const a: Args = {
     command,
+    explicit,
     seed: "",
+    items: [],
+    rest: [],
     repo: "",
     depth: 2,
     jsonOut: "",
@@ -126,124 +171,214 @@ export function parseArgs(argv: string[]): Args {
     clustersFile: "",
     seedsCsv: "",
     label: "",
+    state: "open",
     allOpen: false,
     maxNodes: 80,
+    budgetSet: false,
     hubThreshold: 12,
     concurrency: 4,
     cluster: false,
     clusterRun: "",
+    agent: "",
     open: false,
+    openMode: "auto",
     noSnapshot: false,
     prioritize: false,
     format: "auto",
     help: false,
+    deprecations: [],
   };
-  for (let i = start; i < argv.length; i++) {
+  const old = (flag: string, now: string) => a.deprecations.push(`${flag} is now ${now}`);
+  const positional: string[] = [];
+  for (let i = explicit ? 1 : 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") a.help = true;
-    else if (arg === "--repo") a.repo = argv[++i];
-    else if (arg === "--depth") a.depth = Number(argv[++i]);
-    else if (arg === "--json") a.jsonOut = argv[++i];
-    else if (arg === "--html") a.htmlOut = argv[++i];
-    else if (arg === "--clusters") a.clustersFile = argv[++i];
-    else if (arg === "--seeds") a.seedsCsv = argv[++i];
-    else if (arg === "--label") a.label = argv[++i];
-    else if (arg === "--all-open") a.allOpen = true;
-    else if (arg === "--max-nodes") a.maxNodes = Number(argv[++i]);
-    else if (arg === "--hub-threshold") a.hubThreshold = Number(argv[++i]);
-    else if (arg === "--concurrency") a.concurrency = Number(argv[++i]);
+    else if (arg === "--repo") a.repo = need(argv, ++i, arg);
+    else if (arg === "--depth") a.depth = Number(need(argv, ++i, arg));
+    else if (arg === "--label") a.label = need(argv, ++i, arg);
+    else if (arg === "--state") {
+      const v = need(argv, ++i, arg);
+      if (v !== "open" && v !== "all") throw new UsageError("--state must be open or all");
+      a.state = v;
+    } else if (arg === "--budget" || arg === "--max-nodes") {
+      if (arg === "--max-nodes") old(arg, "--budget");
+      a.maxNodes = Number(need(argv, ++i, arg));
+      a.budgetSet = true;
+    } else if (arg === "--hub-threshold") a.hubThreshold = Number(need(argv, ++i, arg));
+    else if (arg === "--concurrency") a.concurrency = Number(need(argv, ++i, arg));
     else if (arg === "--format") {
-      const format = argv[++i];
-      if (format !== "auto" && format !== "json" && format !== "markdown" && format !== "text") {
-        throw new UsageError(`unknown format: ${format}\n\n${USAGE}`);
-      }
-      a.format = format;
-    } else if (arg === "--prioritize") a.prioritize = true;
-    else if (arg === "--cluster") a.cluster = true;
+      const f = need(argv, ++i, arg);
+      const map: Record<string, Args["format"]> = {
+        auto: "auto",
+        human: "text",
+        text: "text",
+        markdown: "markdown",
+        json: "json",
+      };
+      if (!map[f]) throw new UsageError(`unknown format: ${f} (use human, markdown, or json)`);
+      a.format = map[f];
+    } else if (arg === "-o" || arg === "--out") {
+      const out = need(argv, ++i, arg);
+      if (out.endsWith(".html")) a.htmlOut = out;
+      else if (out.endsWith(".json")) a.jsonOut = out;
+      else throw new UsageError(`${arg} takes a .json or .html path`);
+    } else if (arg === "--json") {
+      old(arg, "-o PATH.json");
+      a.jsonOut = need(argv, ++i, arg);
+    } else if (arg === "--html") {
+      old(arg, "-o PATH.html");
+      a.htmlOut = need(argv, ++i, arg);
+    } else if (arg === "--clusters") a.clustersFile = need(argv, ++i, arg);
+    else if (arg === "--seeds") {
+      old(arg, "a list of items, e.g. issue-graph graph 1 2 3");
+      a.seedsCsv = need(argv, ++i, arg);
+    } else if (arg === "--all-open") {
+      old(arg, "issue-graph open");
+      a.allOpen = true;
+    } else if (arg === "--prioritize") {
+      old(arg, "issue-graph rank");
+      a.prioritize = true;
+    } else if (arg === "--cluster") a.cluster = true;
     else if (arg === "--cluster-run") {
+      old(arg, "--agent");
       a.cluster = true;
-      a.clusterRun = argv[++i];
-    } else if (arg === "--no-snapshot") a.noSnapshot = true;
-    else if (arg === "--open") a.open = true;
+      a.clusterRun = need(argv, ++i, arg);
+    } else if (arg === "--agent") {
+      const v = need(argv, ++i, arg);
+      if (v !== "claude" && v !== "codex" && v !== "none")
+        throw new UsageError("--agent must be claude, codex, or none");
+      a.agent = v;
+    } else if (arg === "--open") a.openMode = "yes";
+    else if (arg === "--no-open") a.openMode = "no";
+    else if (arg === "--no-save" || arg === "--no-snapshot") {
+      if (arg === "--no-snapshot") old(arg, "--no-save");
+      a.noSnapshot = true;
+    } else if (arg === "--save") a.noSnapshot = false;
     // An unrecognized flag used to fall through to the seed, so a typo became
     // "Cannot parse seed: --hlep" — and `--help` crashed the same way.
     else if (arg.startsWith("-")) throw new UsageError(`unknown flag: ${arg}\n\n${USAGE}`);
-    else a.seed = arg;
+    else positional.push(arg);
   }
+  if (a.command === "runs" || a.command === "auth") a.rest = positional;
+  else
+    for (const p of positional) {
+      let sc: Scope;
+      try {
+        sc = parseScope(p);
+      } catch (e) {
+        throw new UsageError(e instanceof Error ? e.message : String(e));
+      }
+      if (sc.kind === "repo") {
+        if (a.repo && a.repo !== sc.repo)
+          throw new UsageError(`one repository per run: ${a.repo} and ${sc.repo}`);
+        a.repo = sc.repo;
+      } else a.items.push({ repo: sc.repo, number: sc.number });
+    }
+  // keep the legacy single-seed field for callers and messages that read it
+  if (a.items.length === 1 && !a.explicit)
+    a.seed = positional.find((p) => !p.includes("/") || p.includes("#")) ?? "";
+  if (a.clusterRun) {
+    if (a.clusterRun !== "claude" && a.clusterRun !== "codex")
+      throw new UsageError("--cluster-run must be claude or codex");
+    a.agent = a.clusterRun;
+  }
+  if (a.agent === "claude" || a.agent === "codex") {
+    a.cluster = true;
+    a.clusterRun = a.agent;
+  }
+  // repository-wide commands cover the whole open backlog unless items or a label narrow them
+  const wide = a.command === "open" || a.command === "rank" || a.command === "cluster";
+  if (wide && !a.items.length && !a.label && !a.seedsCsv) a.allOpen = true;
+  if (a.allOpen && !a.budgetSet) a.maxNodes = 1000;
+  if (a.command === "rank") a.prioritize = true;
+  if (a.command === "cluster") a.cluster = true;
+  a.open = a.openMode === "yes";
   if (!Number.isInteger(a.maxNodes) || a.maxNodes < 1 || a.maxNodes > 1000) {
-    throw new UsageError("--max-nodes must be an integer from 1 to 1000");
+    throw new UsageError("--budget must be an integer from 1 to 1000");
   }
   if (!Number.isInteger(a.concurrency) || a.concurrency < 1 || a.concurrency > 32) {
     throw new UsageError("--concurrency must be an integer from 1 to 32");
   }
-  if (a.format === "text" && a.command !== "graph" && a.command !== "plan") {
-    throw new UsageError(`${a.command} does not support --format text`);
+  if (a.format === "text" && !["graph", "plan", "open", "rank", "cluster"].includes(a.command)) {
+    throw new UsageError(`${a.command} does not support --format human`);
   }
-  if (a.command === "plan" && (a.htmlOut || a.open)) {
+  if (a.command === "plan" && (a.htmlOut || a.openMode === "yes")) {
     throw new UsageError("plan does not support --html or --open");
   }
   return a;
 }
 
+/** Whether a person is at the terminal: prompts and opening a browser need one. */
+function interactive(): boolean {
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env.CI;
+}
+
+/** The repository for a run: --repo or a scope, else the current directory's GitHub remote. */
+function resolveRepo(a: Args, infer: () => string | undefined = inferRepo): string {
+  const fromItem = a.items.find((i) => i.repo)?.repo;
+  const repo = a.repo || fromItem || infer();
+  if (!repo)
+    throw new UsageError("no repository: pass owner/repo, or run inside a GitHub repository");
+  return repo;
+}
+
 async function resolveSeeds(a: Args, transport: GhTransport): Promise<Seed[]> {
-  if (a.allOpen) {
-    if (!a.repo) throw new UsageError("--all-open needs --repo");
-    if (a.label || a.seedsCsv || a.seed) {
-      throw new UsageError("--all-open replaces --label, --seeds, and a seed; pass only one");
-    }
-    const [owner, repo] = a.repo.split("/");
-    if (!owner || !repo) throw new UsageError("--repo must be owner/repo");
+  const split = (full: string) => {
+    const [owner, repo] = full.split("/");
+    if (!owner || !repo) throw new UsageError("repository must be owner/repo");
+    return { owner, repo };
+  };
+  if (a.items.length || (a.seed && !a.explicit)) {
+    const needsRepo = a.items.some((i) => !i.repo);
+    const fallback = needsRepo ? resolveRepo(a) : "";
+    return a.items.map((i) => ({ ...split(i.repo || fallback), number: i.number }));
+  }
+  if (a.seedsCsv) {
+    const { owner, repo } = split(resolveRepo(a));
+    return a.seedsCsv.split(",").map((s) => ({ owner, repo, number: Number(s.trim()) }));
+  }
+  if (a.label) {
+    const full = resolveRepo(a);
+    const { owner, repo } = split(full);
+    const numbers = await labelSeeds(transport, full, a.label, Math.min(a.maxNodes, 1000));
+    return numbers.map((number) => ({ owner, repo, number }));
+  }
+  if (a.allOpen || a.command === "reconcile" || a.command === "plan") {
+    const full = resolveRepo(a);
+    const { owner, repo } = split(full);
     const limit = Math.min(a.maxNodes, 1000);
-    const numbers = await openBacklogSeeds(transport, a.repo, limit);
-    if (numbers.length >= limit) {
+    const numbers =
+      a.state === "all" && a.allOpen
+        ? (await transport.search(`repo:${full}`, limit)).map((h) => h.number)
+        : await openBacklogSeeds(transport, full, limit);
+    if (a.allOpen && numbers.length >= limit) {
       process.stderr.write(
-        `note: ${numbers.length} open items seeded, the --max-nodes limit; raise it (up to 1000) to include more\n`,
+        `note: ${numbers.length} items seeded, the --budget limit; raise it (up to 1000) to include more\n`,
       );
     }
     return numbers.map((number) => ({ owner, repo, number }));
   }
-  if (a.label) {
-    if (!a.repo) throw new UsageError("--label needs --repo");
-    const [owner, repo] = a.repo.split("/");
-    const numbers = await labelSeeds(transport, a.repo, a.label, Math.min(a.maxNodes, 1000));
-    return numbers.map((number) => ({ owner, repo, number }));
-  }
-  if (a.seedsCsv) {
-    if (!a.repo) throw new UsageError("--seeds needs --repo");
-    const [owner, repo] = a.repo.split("/");
-    return a.seedsCsv.split(",").map((s) => ({ owner, repo, number: Number(s.trim()) }));
-  }
-  if (a.command === "reconcile" || a.command === "plan") {
-    if (!a.repo) throw new UsageError(`${a.command} needs --repo`);
-    const [owner, repo] = a.repo.split("/");
-    if (!owner || !repo) throw new UsageError("--repo must be owner/repo");
-    const numbers = await openBacklogSeeds(transport, a.repo, Math.min(a.maxNodes, 1000));
-    return numbers.map((number) => ({ owner, repo, number }));
-  }
+  if (a.command === "graph")
+    throw new UsageError("graph needs an item: issue-graph graph 123, or use issue-graph open");
   return [parseSeed(a.seed, a.repo)];
 }
 
 /** Suggest the views this run did not use, as commands to copy. */
 export function nextSteps(a: Args, owner: string, repo: string): string {
-  const seed = a.allOpen
-    ? `--all-open --repo ${owner}/${repo}`
-    : a.label
-      ? `--label ${a.label} --repo ${owner}/${repo}`
-      : a.seedsCsv
-        ? `--seeds ${a.seedsCsv} --repo ${owner}/${repo}`
-        : `${a.seed} --repo ${owner}/${repo}`;
+  const full = `${owner}/${repo}`;
+  const scope = a.label ? `${full} --label ${a.label}` : full;
   const lines: string[] = [];
-  if (!a.htmlOut && !a.open)
+  if (a.command !== "open" && !a.htmlOut && !a.open)
     lines.push(
-      `- Open the dashboard (Swarm, Impact, Rank, Cleanup): \`issue-graph ${seed} --open\``,
+      `- Open the dashboard (Swarm, Impact, Rank, Cleanup): \`issue-graph open ${scope}\``,
     );
   if (!a.cluster)
     lines.push(
-      `- Group by root cause (sends titles and edges to that agent): \`issue-graph ${seed} --cluster-run claude --open\``,
+      `- Group by root cause (asks before sending titles and links to your agent): \`issue-graph cluster ${scope}\``,
     );
-  if (!a.prioritize) lines.push(`- Rank what to fix first: \`issue-graph ${seed} --prioritize\``);
-  if ((a.htmlOut || a.open) && !a.noSnapshot)
-    lines.push("- See every saved run in one dashboard: `issue-graph dashboard --open`");
+  if (!a.prioritize) lines.push(`- Rank what to fix first: \`issue-graph rank ${scope}\``);
+  if ((a.command === "open" || a.htmlOut || a.open) && !a.noSnapshot)
+    lines.push("- See every saved run in one dashboard: `issue-graph dashboard`");
   return lines.length ? `\n## Next steps\n\n${lines.join("\n")}\n` : "";
 }
 
@@ -254,9 +389,13 @@ async function writeOutput(file: string, content: string): Promise<void> {
 
 export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (!argv.length) {
-    console.error(USAGE);
-    process.exitCode = 2;
-    return;
+    // a person inside a GitHub repository gets its dashboard; scripts and CI keep the usage
+    if (interactive() && inferRepo()) argv = ["open"];
+    else {
+      console.error(USAGE);
+      process.exitCode = 2;
+      return;
+    }
   }
   if (argv[0] === "skills") {
     process.exitCode = await runSkills(argv.slice(1), {
@@ -266,7 +405,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
   if (argv[0] === "status") {
-    process.exitCode = await runStatus(argv.slice(1), shellTransport(), {
+    process.exitCode = await runStatus(statusArgs(argv.slice(1)), shellTransport(), {
       isTTY: Boolean(process.stdout.isTTY),
       noColor: process.env.NO_COLOR !== undefined || process.env.TERM === "dumb",
       ci: Boolean(process.env.CI),
@@ -281,6 +420,9 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     console.log(USAGE);
     return;
   }
+  for (const d of new Set(args.deprecations)) process.stderr.write(`note: ${d}\n`);
+  if (args.command === "runs") return runRuns(args);
+  if (args.command === "auth") return runAuth(args);
   if (args.command === "dashboard") {
     const models = readDashboardModels<Model>();
     if (!models.length) {
@@ -291,7 +433,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     const out = args.htmlOut || join(tmpdir(), `issue-graph-dashboard-${Date.now()}.html`);
     await writeOutput(out, renderDashboard(models));
     process.stderr.write(`wrote ${out} (${models.map((m) => m.repo).join(", ")})\n`);
-    if (args.open) openInBrowser(out);
+    if (args.openMode === "yes" || (args.openMode === "auto" && interactive())) openInBrowser(out);
     return;
   }
   if (args.command === "schema") {
@@ -401,7 +543,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (hubs.length) {
     md += "\n## Hubs not expanded — re-seed to explore\n\n";
     for (const h of hubs) {
-      md += `- ${h.key} (${h.edges.length} refs) → \`issue-graph ${h.number} --repo ${h.owner}/${h.repo} --depth 1\`\n`;
+      md += `- ${h.key} (${h.edges.length} refs) → \`issue-graph graph ${h.owner}/${h.repo}#${h.number} --depth 1\`\n`;
     }
   }
 
@@ -423,10 +565,46 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         ? human(output, "graph")
         : output,
     );
-  printGraph(md + nextSteps(args, primary.owner, primary.repo));
-
   const repoName = `${primary.owner}/${primary.repo}`;
-  const wantsHtml = Boolean(args.htmlOut || args.open);
+  const own = [...nodes.values()].filter(
+    (n) => `${n.owner}/${n.repo}` === repoName && n.state === "OPEN",
+  );
+  if (args.command === "graph") printGraph(md + nextSteps(args, primary.owner, primary.repo));
+  else if (args.command === "rank") {
+    if (args.format === "json")
+      console.log(JSON.stringify({ repo: repoName, priorities }, null, 2));
+    else printGraph(renderPriority(priorities) + nextSteps(args, primary.owner, primary.repo));
+  } else {
+    // open and cluster summarize; the full report stays one command away
+    const linked = nodes.size - own.length;
+    process.stdout.write(
+      `${repoName} · ${own.length} open issues and PRs` +
+        (linked
+          ? ` (+${linked} linked${cappedOut.size ? `, ${cappedOut.size} not crawled` : ""})`
+          : "") +
+        "\n",
+    );
+  }
+
+  const openAfter =
+    args.openMode === "yes" ||
+    (args.openMode === "auto" && args.command === "open" && interactive());
+  const wantsHtml = Boolean(
+    args.htmlOut || args.open || args.command === "open" || args.command === "cluster",
+  );
+  // open and cluster may use a detected agent, but only after a person agrees to send it data
+  if (
+    (args.command === "open" || args.command === "cluster") &&
+    !args.clusterRun &&
+    args.agent !== "none" &&
+    !args.clustersFile
+  ) {
+    const agent = await chooseAgent(own.length || nodes.size);
+    if (agent) {
+      args.clusterRun = agent;
+      args.cluster = true;
+    }
+  }
   let agentClusters: ClustersConfig | undefined;
   if (args.clusterRun && wantsHtml) {
     process.stderr.write(`\nclustering via ${args.clusterRun}...\n`);
@@ -435,7 +613,10 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         runAgent(args.clusterRun, clusterJsonPrompt(repoName, clusterPayload(nodes, seedKeys))),
       );
       agentClusters = parsed;
-      console.log(`\n## Root-cause clusters (${args.clusterRun})\n\n${renderClusters(parsed)}\n`);
+      if (args.command === "open" || args.command === "cluster")
+        process.stdout.write(`${parsed.clusters.length} root causes via ${args.clusterRun}\n`);
+      else
+        console.log(`\n## Root-cause clusters (${args.clusterRun})\n\n${renderClusters(parsed)}\n`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.log(
@@ -498,13 +679,141 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
     const model = dashboardModel(nodes, seedKeys, repoName, clusters, cappedOut.size);
     await writeOutput(out, renderDashboard([model]));
-    process.stderr.write(`wrote ${out}\n`);
+    if (args.command !== "open" && args.command !== "cluster")
+      process.stderr.write(`wrote ${out}\n`);
     // keep the latest run per repository so `issue-graph dashboard` can switch between them
     if (!args.noSnapshot) {
-      process.stderr.write(`dashboard run saved: ${writeDashboardModel(repoName, model)}\n`);
+      const saved = writeDashboardModel(repoName, model);
+      if (args.command !== "open" && args.command !== "cluster")
+        process.stderr.write(`dashboard run saved: ${saved}\n`);
     }
-    if (args.open) openInBrowser(out);
+    if (openAfter) {
+      openInBrowser(out);
+      process.stdout.write(`opened ${out}\n`);
+    } else if (args.command === "open" || args.command === "cluster")
+      process.stdout.write(
+        `dashboard: ${out}${args.noSnapshot ? "" : " (also in issue-graph dashboard)"}\n`,
+      );
   }
+}
+
+/** A detected agent the person agreed to use, or undefined. Never asks without a terminal. */
+async function chooseAgent(count: number): Promise<"claude" | "codex" | undefined> {
+  const found = (["claude", "codex"] as const).find((name) => {
+    try {
+      execFileSync("which", [name], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (!found) return undefined;
+  if (!interactive()) {
+    process.stderr.write(`note: pass --agent ${found} to group these by root cause\n`);
+    return undefined;
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  let answer = "n";
+  try {
+    answer = await rl.question(
+      `Group ${count} items by root cause with ${found}? Sends titles and links. (Y/n) `,
+    );
+  } catch {
+    // Ctrl+D or a closed stdin is a no, not a crash
+    process.stderr.write("\n");
+  } finally {
+    rl.close();
+  }
+  return /^(y|yes|)$/i.test(answer.trim()) ? found : undefined;
+}
+
+/** status keeps its own parser; a positional or inferred repository becomes --repo. */
+export function statusArgs(argv: string[], infer: () => string | undefined = inferRepo): string[] {
+  const out: string[] = [];
+  let hasRepo = false;
+  const valued = new Set([
+    "--repo",
+    "--author",
+    "--view",
+    "--format",
+    "--concurrency",
+    "--max-pages",
+    "--since",
+  ]);
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (valued.has(arg)) {
+      if (arg === "--repo") hasRepo = true;
+      out.push(arg, argv[++i]);
+    } else if (!arg.startsWith("-")) {
+      let sc: Scope;
+      try {
+        sc = parseScope(arg);
+      } catch (e) {
+        throw new UsageError(e instanceof Error ? e.message : String(e));
+      }
+      if (sc.kind !== "repo") throw new UsageError(`status takes repositories, not items: ${arg}`);
+      out.push("--repo", sc.repo);
+      hasRepo = true;
+    } else out.push(arg);
+  }
+  if (!hasRepo && !argv.includes("--help") && !argv.includes("-h")) {
+    const repo = infer();
+    if (repo) out.push("--repo", repo);
+  }
+  return out;
+}
+
+function runRuns(a: Args): void {
+  const [sub = "list", target] = a.rest;
+  if (sub === "rm") {
+    if (!target) throw new UsageError("runs rm needs a repository: issue-graph runs rm owner/repo");
+    const repo = parseScope(target);
+    if (repo.kind !== "repo") throw new UsageError("runs rm takes a repository");
+    if (!removeDashboardRun(repo.repo)) throw new UsageError(`no saved run for ${repo.repo}`);
+    process.stdout.write(`removed ${repo.repo}\n`);
+    return;
+  }
+  if (sub !== "list") throw new UsageError(`unknown runs command: ${sub} (use list or rm)`);
+  const runs = listDashboardRuns();
+  if (a.format === "json") {
+    console.log(
+      JSON.stringify(
+        runs.map(({ file: _f, ...r }) => r),
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  if (!runs.length) {
+    process.stdout.write("no saved runs yet: issue-graph open\n");
+    return;
+  }
+  const w = Math.max(...runs.map((r) => r.repo.length));
+  for (const r of runs)
+    process.stdout.write(
+      `${r.repo.padEnd(w)}  ${String(r.nodes).padStart(5)} items  ${r.savedAt.slice(0, 16).replace("T", " ")}\n`,
+    );
+}
+
+function runAuth(a: Args): void {
+  const [sub = "status"] = a.rest;
+  if (sub !== "status") throw new UsageError(`unknown auth command: ${sub} (use status)`);
+  let ok = true;
+  try {
+    execFileSync("gh", ["auth", "status"], { stdio: "ignore" });
+  } catch {
+    ok = false;
+  }
+  const rows = [{ provider: "github", signedIn: ok, via: "gh", fix: ok ? "" : "gh auth login" }];
+  if (a.format === "json") console.log(JSON.stringify(rows, null, 2));
+  else
+    for (const r of rows)
+      process.stdout.write(
+        `${r.provider}  ${r.signedIn ? "signed in" : "not signed in"} via ${r.via}${r.fix ? `  (run: ${r.fix})` : ""}\n`,
+      );
+  if (!ok) process.exitCode = 1;
 }
 
 /** Best-effort: hand the file to the OS opener; the path is already printed. */

@@ -30,14 +30,15 @@ fabricate results, or install/upgrade anything automatically.
 
 | Request | Command |
 | --- | --- |
-| PR counts by author, project, or review state | `issue-graph status --repo owner/repo --author login,other` |
+| PR counts by author, project, or review state | `issue-graph status owner/repo --author login,other` |
 | PR evidence, assignees, requested reviewers | Same scope with `--view prs` |
 | Project totals | Same scope with `--view projects` |
 | Changes since a status capture | Same scope with `--since last` or `--since PATH` |
-| Linked work, competing fixes, overlap | `issue-graph <url\|number> --repo owner/repo` |
-| Whole open backlog, clustered and visualized | `issue-graph --all-open --repo owner/repo --max-nodes 1000 --cluster-run claude --open` |
-| Open-backlog verification queue | `issue-graph reconcile --repo owner/repo` |
-| Next backlog action | `issue-graph plan --repo owner/repo` |
+| Linked work, competing fixes, overlap | `issue-graph graph owner/repo#123` |
+| Whole open backlog, clustered and visualized | `issue-graph open owner/repo --agent claude` |
+| What to fix first | `issue-graph rank owner/repo` |
+| Open-backlog verification queue | `issue-graph reconcile owner/repo` |
+| Next backlog action | `issue-graph plan owner/repo` |
 
 For counts, skip graph discovery and do not reconstruct counts through ad hoc queries
 when status is available. Resolve repository and author scope from the request and
@@ -46,20 +47,34 @@ Repeated `--repo` and repeated/comma-separated `--author` define status scope;
 matching is case-insensitive. Ask for scope only if it remains unresolved.
 Before starting issue work, inspect its graph for existing work and credit contributors.
 
+## Scope and commands
+
+Commands take a verb and a scope: `issue-graph <verb> [scope]`. The scope is `owner/repo`
+(or `github:owner/repo`), one or more items (`123`, `#123`, `owner/repo#123`, a URL), or
+nothing, which means the GitHub repository of the current directory. Other providers
+are not supported yet; a `provider:` prefix other than `github` fails with that message.
+Older flags (`--prioritize`, `--cluster-run`, `--max-nodes`, `--json PATH`, `--html`,
+`--all-open`, `--seeds`, `--no-snapshot`) still work and print their replacement; use
+the new forms.
+
 ## Offer the next view
 
 After relaying a graph, offer the views the run did not use as a short numbered menu,
 built from the printed "Next steps" commands. Keep it concrete, for example:
 
-1. Open the dashboard: Swarm, Impact, Rank, and Cleanup (`--open`)
-2. Group these items by root cause (`--cluster-run claude --open`); say that this
-   sends titles and edges to that agent, and run it only after the user agrees
-3. Rank what to fix first (`--prioritize`), or adjust the weights in the Rank view
-4. See every saved run in one dashboard with a project switcher (`issue-graph dashboard --open`)
+1. Open the dashboard: Swarm, Impact, Rank, and Cleanup (`issue-graph open owner/repo`)
+2. Group these items by root cause (`issue-graph cluster owner/repo --agent claude`); say
+   that this sends titles and links to that agent, and run it only after the user agrees
+3. Rank what to fix first (`issue-graph rank owner/repo`), or adjust the weights in the Rank view
+4. See every saved run in one dashboard with a project switcher (`issue-graph dashboard`)
 
-For "cluster the open issues and open the dashboard", seed with `--all-open`; it takes
-up to `--max-nodes` items (default 80), so raise it for a large backlog and relay the
-printed note when the limit cuts the seed list.
+For "cluster the open issues and open the dashboard", run `issue-graph open owner/repo
+--agent claude` once the user agrees to send titles and links. `open`, `rank`, and
+`cluster` cover the whole open backlog up to `--budget` (1000 for a repository scope)
+and print a note when that limit cuts the list; relay it.
+
+Agents always pass `--agent` explicitly: without a terminal, `open` and `cluster` never
+prompt and never cluster on their own. `--agent none` skips clustering.
 
 Run the chosen command; do not run all of them. Offering clustering is fine; sending
 evidence to an agent still needs the user's consent and the boundary check below.
@@ -97,22 +112,29 @@ Report coverage with findings; use printed hub re-seed commands to explore omiss
 
 ## Output and local history
 
-- Graph/plan default to human text on TTY; pipes retain graph Markdown and plan JSON.
-  `--format text` selects human output even in a pipe; `--format markdown` selects Markdown.
-  Bold/dim is TTY-only, disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
-- Graph `--json PATH` writes a file; legacy `--format json` keeps Markdown stdout.
-- Status defaults to a terminal table or versioned JSON in a pipe. `--json` is a
-  boolean stdout flag; `--format table|markdown|json` selects output explicitly.
-- Reconcile keeps terminal Markdown or piped JSON; `--format text` is unsupported.
+- `--format human|markdown|json` selects stdout. The default is human text in a terminal and
+  Markdown (graph, rank) or JSON (plan, reconcile) in a pipe. Bold/dim is TTY-only, disabled by
+  `NO_COLOR`, `CI`, or `TERM=dumb`.
+- `-o PATH` also writes a file: `.json` for the graph (with `components`, `overlaps`, and
+  `priorities`), `.html` for the explorer.
+- `open` prints a one-line summary and the dashboard path; `graph` prints the full report.
+  `--open` / `--no-open` override whether the explorer opens (`open` opens by default only in an
+  interactive terminal, never in CI or a pipe).
+- Status defaults to a terminal table or versioned JSON in a pipe. `--json` is a boolean stdout
+  flag there; `--format table|markdown|json` selects output explicitly.
+- Reconcile keeps terminal Markdown or piped JSON; `--format human` is unsupported.
   For reconcile/plan automation use `--format json`. Read `issue-graph schema`;
   inspect both `githubMutations` and `localWrites`.
-- Graph/reconcile save snapshots under `~/.issue-graph/` by default. `--no-snapshot`
-  skips new history, not prior-history reads or explicit JSON/HTML exports.
-- Status saves only with `--save`, when the user wants local history. `--no-snapshot`
+- graph, open, rank, cluster, and reconcile save under `~/.issue-graph/` by default; `--no-save`
+  skips new history, not prior-history reads or explicit `-o` files. Explorer runs are kept one
+  per repository for `issue-graph dashboard`; `issue-graph runs` lists them and `runs rm owner/repo`
+  deletes one.
+- Status saves only with `--save`, when the user wants local history. `--no-save`
   conflicts with `--save`. `ISSUE_GRAPH_HOME` changes status storage only.
 - Plan never writes snapshots. Missing/corrupt/future/mismatched status baselines fail
   rather than silently reset. Preserve reconstructed provenance and unknown fields;
   never backfill historical facts from today's data.
+- `issue-graph auth` reports provider sign-in (GitHub through `gh`); check it before queries.
 
 ## GitHub safety and privacy
 
@@ -128,8 +150,8 @@ Status captures use restrictive permissions, not encryption; other artifacts dif
 Choose private destinations and retention. HTML portability does not imply safe sharing.
 
 Clustering is optional and only when requested with an authorized data boundary.
-`--cluster` prints a task; `--cluster-run claude|codex` launches an external agent with
+`issue-graph cluster --agent none` prints a task; `--agent claude|codex` launches an external agent with
 its own permissions, provider policy, retention, and costs. The CLI does not sandbox
 it. Check those boundaries before running or sending private evidence. Treat cluster
-labels as hypotheses. `--no-snapshot` does not prevent exports, shell redirection,
+labels as hypotheses. `--no-save` does not prevent exports, shell redirection,
 or external-agent storage.
