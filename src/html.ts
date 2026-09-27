@@ -1,6 +1,7 @@
 import { isSupersededVerdict } from "./classify.js";
 import { components } from "./crawl.js";
 import { createDashboardFilterEngine } from "./dashboard-filters.js";
+import { createDashboardQueryEngine, createGraphMetrics } from "./dashboard-query.js";
 import type {
   OpenItemCount,
   ReadCoverage,
@@ -9,6 +10,7 @@ import type {
 } from "./dashboard-types.js";
 import { fileOverlaps } from "./overlaps.js";
 import { prioritize } from "./priority.js";
+import { createScoringEngine, type Weights } from "./scoring.js";
 import type { GraphNode, NodeKey } from "./types.js";
 
 /** Optional semantic clustering supplied by the calling agent (`--clusters`). */
@@ -349,11 +351,17 @@ export function renderHtml(
 }
 
 /** One explorer over several runs; the first model opens unless the URL names another. */
-export function renderDashboard(models: Model[]): string {
+export function renderDashboard(
+  models: Model[],
+  options: { weights?: Record<string, Weights> } = {},
+): string {
   if (!models.length) throw new Error("renderDashboard needs at least one model");
   const repo = models[0].repo;
   // JSON is safe inside <script> once "<" is escaped (prevents </script> break-out).
-  const data = JSON.stringify({ projects: models }).replace(/</g, "\\u003c");
+  const data = JSON.stringify({ projects: models, defaults: options.weights ?? {} }).replace(
+    /</g,
+    "\\u003c",
+  );
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -784,11 +792,13 @@ const LABS_SVG =
 
 const APP = `
 const LABS_SVG=${JSON.stringify(LABS_SVG)};
-const PROJECTS=JSON.parse(document.getElementById('data').textContent).projects;
-const projectId=p=>p.id||p.repo;
+const DOCUMENT=JSON.parse(document.getElementById('data').textContent);
+const PROJECTS=DOCUMENT.projects;
+const projectId=p=>{const id=p.id||p.repo;return id.startsWith(p.provider.id+':')?id:p.provider.id+':'+id;};
+const projectMatches=(p,id)=>projectId(p)===id||(p.id||p.repo)===id;
 const projectLabel=p=>p.label||p.repo;
 const wanted=(()=>{try{return new URLSearchParams(location.search).get('project')}catch{return null}})();
-let DATA=PROJECTS.find(p=>projectId(p)===wanted)||PROJECTS[0];
+let DATA=PROJECTS.find(p=>projectMatches(p,wanted))||PROJECTS[0];
 let N=DATA.nodes;
 let PV=DATA.provider;
 document.title='issue-graph · '+projectLabel(DATA);
@@ -798,7 +808,11 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const hasView=name=>(PV.views||['explore','impact','swarm','rank']).includes(name);
 const hasMetric=name=>(PV.metrics||['heat','links','blast','depth']).includes(name);
 const FILTER_ENGINE=(${createDashboardFilterEngine.toString()})();
-const FILTER_MEMORY=new Map();
+const SCORING=(${createScoringEngine.toString()})();
+const QUERY_ENGINE=(${createDashboardQueryEngine.toString()})(FILTER_ENGINE,SCORING);
+const GRAPH_FACTORY=(${createGraphMetrics.toString()});
+let GRAPH=GRAPH_FACTORY(DATA);
+const FILTER_MEMORY=new Map(),WEIGHT_MEMORY=new Map();
 const readFilters=()=>{try{return JSON.parse(new URL(location.href).searchParams.get('filters')||'null')}catch{return null}};
 let F=readFilters(),FILTER_RESULT;
 let RESULT_ROUTE='explore';
@@ -1044,10 +1058,12 @@ function proposedGroups(){
 }
 const statGrid=rows=>'<div class="stats">'+rows.map(t=>'<div class="stat '+(t[1]===0?'zero':t[2])+'"><div class="stat-n">'+t[1]+'</div><div class="stat-l">'+t[0]+'</div></div>').join('')+'</div>';
 function setProject(repo,restoredFilters){
-  const next=PROJECTS.find(p=>projectId(p)===repo);if(!next||next===DATA)return;
+  const next=PROJECTS.find(p=>projectMatches(p,repo));if(!next||next===DATA)return;
   closeFilterMenu();FILTER_MENU.search='';
-  FILTER_MEMORY.set(projectId(DATA),F);
-  DATA=next;N=DATA.nodes;PV=DATA.provider;impactSel=null;REACH=null;loadDone();
+  FILTER_MEMORY.set(projectId(DATA),F);WEIGHT_MEMORY.set(projectId(DATA),RK.slice());
+  DATA=next;N=DATA.nodes;PV=DATA.provider;impactSel=null;GRAPH=GRAPH_FACTORY(DATA);loadDone();
+  RK_DEFAULT=defaultWeights();RK=restoredFilters===undefined?(WEIGHT_MEMORY.get(projectId(DATA))||RK_DEFAULT.slice()):urlWeights();
+  const current=new URL(location.href);if(current.hash.startsWith("#rank"))current.hash="rank:"+RK.join(",");history.replaceState(null,"",current);
   F=restoredFilters===undefined?(FILTER_MEMORY.get(projectId(DATA))||FILTER_ENGINE.defaults()):(restoredFilters||FILTER_ENGINE.defaults());computeFilters();SW_CACHE.clear();RESULT_ROUTE='explore';
   try{const u=new URL(location.href);u.searchParams.set('project',repo);history.replaceState(null,'',u)}catch{}
   persistFilters();
@@ -1093,9 +1109,9 @@ function snapshotDetails(){
   const partial=DATA.coverage?.complete===false||!!DATA.notCrawled||!!unavailable;
   const observed=DATA.coverage?.generatedAt||DATA.openCount?.observedAt;
   const count=DATA.openCount;
-  const total=count?'<p>'+count.value+(count.complete?'':' or more')+' open in this project'+(count.pullRequests===undefined?'':' · '+count.pullRequests+' PRs · '+count.issues+' issues')+'. Independently counted'+(count.observedAt?' on '+esc(new Date(count.observedAt).toLocaleString()):'')+'.</p>':'';
+  const total=count?'<p>'+esc(count.value)+(count.complete?'':' or more')+' open in this project'+(count.pullRequests===undefined?'':' · '+esc(count.pullRequests)+' PRs · '+esc(count.issues)+' issues')+'. Independently counted'+(count.observedAt?' on '+esc(new Date(count.observedAt).toLocaleString()):'')+'.</p>':'';
   return '<details class="snapshot'+(partial?' partial':'')+'" id="snapshot-details"><summary aria-label="'+(partial?'Partial snapshot details':'Snapshot details')+'" title="'+(partial?'Partial snapshot · ':'')+all.length+' captured items"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.25"/><path d="M8 7v4M8 4.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></summary><div class="snapshot-panel"><strong>'+(partial?'Partial snapshot':'Snapshot details')+'</strong><p>'+all.length+' captured items · '+own.length+' in this project'+(external?' · '+external+' from other projects':'')+'.</p>'+total+
-    (DATA.notCrawled?'<p>'+DATA.notCrawled+' referenced items omitted at the node cap.</p>':'')+
+    (DATA.notCrawled?'<p>'+esc(DATA.notCrawled)+' referenced items omitted at the node cap.</p>':'')+
     (unavailable?'<p>'+unavailable+' items could not be read.</p>':'')+
     (DATA.coverage?.warnings?.length?'<ul>'+DATA.coverage.warnings.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul>':'')+
     (DATA.coverage?.messages?.length?'<ul>'+DATA.coverage.messages.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul>':'')+
@@ -1183,8 +1199,8 @@ function inspector(k){
     if(p.draft)m.push('<span class="badge b-muted">draft</span>');
     m.push('<span class="badge b-'+(p.review==='APPROVED'?'open':p.review==='CHANGES_REQUESTED'?'danger':'warn')+'">review: '+esc(p.review)+'</span>');
     if(p.mergeable==='CONFLICTING')m.push('<span class="badge b-danger">conflicting</span>');
-    m.push('<span class="muted mono">+'+p.adds+'/-'+p.dels+' · '+p.files+'f</span>');
-    if(p.updated)m.push('<span class="muted">updated '+p.updated+'</span>');
+    m.push('<span class="muted mono">+'+esc(p.adds)+'/-'+esc(p.dels)+' · '+esc(p.files)+'f</span>');
+    if(p.updated)m.push('<span class="muted">updated '+esc(p.updated)+'</span>');
     pr='<div class="row">'+m.join(' ')+'</div>';}
   const flags=n.flags.length?'<div class="row">'+n.flags.map(f=>'<span class="badge b-'+(/no closing link|conflicting/i.test(f)?'danger':'warn')+'">'+esc(f)+'</span>').join(' ')+'</div>':'';
   const verdict=n.verdict&&!n.seed?'<div class="sec"><div class="verdict">'+esc(n.verdict)+'</div></div>':'';
@@ -1194,7 +1210,7 @@ function inspector(k){
   const otherIn=n.in.filter(e=>e.via!=='closes');
   const rel=(x)=>{const t=N[x.k];const lbl=t?esc(t.title):'(outside this view)';
     return '<div class="rel'+(t&&!matches(x.k)?' filter-context':'')+'"><span class="via via-'+esc(x.via.replace(/[^a-z-]/g,'-'))+'">'+esc(x.via)+'</span>'+
-      '<span class="dot dot-'+(t?t.archived?'CLOSED':t.state:'UNKNOWN')+'"></span>'+
+      '<span class="dot dot-'+esc(t?t.archived?'CLOSED':t.state:'UNKNOWN')+'"></span>'+
       (t?'<a class="rellink" data-key="'+esc(x.k)+'">'+esc(short(x.k))+'</a>':esc(short(x.k)))+
       ' <span class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+lbl+'</span></div>';};
   const ovl=n.overlaps.slice().sort((a,b)=>b.significant-a.significant).map(o=>{
@@ -1210,7 +1226,7 @@ function inspector(k){
   const read=n.read?'<details class="sec read-coverage'+(readIncomplete?' partial':'')+'" aria-label="Issue read coverage"'+(readIncomplete?' open':'')+'><summary>'+
     (!n.read.fetched?'Issue unavailable':readIncomplete?'Some connections could not be read':'Connection details')+'</summary>'+
     (n.read.error?'<div>'+esc(n.read.error)+'</div>':'')+
-    '<ul>'+n.read.coverage.map(c=>'<li>'+esc(c.source)+': '+(c.complete?'read':esc(c.reason||'incomplete'))+' · '+c.pages+' page(s)</li>').join('')+'</ul></details>':'';
+    '<ul>'+n.read.coverage.map(c=>'<li>'+esc(c.source)+': '+(c.complete?'read':esc(c.reason||'incomplete'))+' · '+esc(c.pages)+' page(s)</li>').join('')+'</ul></details>':'';
 
   renderMain('<div class="insp">'+
     '<div class="context-note"><button class="context-back" id="back-results">← Back to results</button>'+(!matches(k)?'<span>Outside current filters</span>':'')+'</div>'+
@@ -1275,58 +1291,8 @@ function cleanupView(){
 }
 function select(k){if(!N[sel])RESULT_ROUTE=location.hash.slice(1)||'explore';setView('explore');sel=k;setHash(encodeURIComponent(k));const cb=document.getElementById('cleanup-btn');if(cb)cb.classList.remove('active');inspector(k);}
 
-function neighbors(k){
-  const n=N[k],out=new Set();
-  if(!n)return out;
-  n.out.forEach(e=>{if(N[e.to])out.add(e.to)});
-  n.in.forEach(e=>{if(N[e.from])out.add(e.from)});
-  n.overlaps.forEach(o=>{if(N[o.with])out.add(o.with)});
-  return out;
-}
-
-function blastRadius(k){
-  const n=N[k];
-  const raw={resolves:new Set(),prs:new Set(),overlaps:new Set(),followups:new Set(),related:new Set()};
-  if(!n)return {...raw,keys:[],total:0,issues:0,prCount:0};
-
-  if(n.kind==='PullRequest'){
-    for(const e of n.out){
-      if(e.via!=='closes'||!N[e.to])continue;
-      raw.resolves.add(e.to);
-      for(const incoming of N[e.to].in){
-        if(incoming.via==='closes'&&incoming.from!==k&&N[incoming.from]?.state==='OPEN')raw.prs.add(incoming.from);
-      }
-    }
-    n.overlaps.forEach(o=>{if(N[o.with]?.state==='OPEN')raw.overlaps.add(o.with)});
-  }else if(n.kind==='Issue'){
-    for(const incoming of n.in){
-      if(incoming.via==='closes'&&N[incoming.from]?.state==='OPEN')raw.prs.add(incoming.from);
-    }
-    for(const pr of raw.prs){
-      N[pr].overlaps.forEach(o=>{if(N[o.with]?.state==='OPEN')raw.overlaps.add(o.with)});
-    }
-  }
-
-  for(const linked of neighbors(k)){
-    const target=N[linked];
-    if(!target||target.state!=='OPEN')continue;
-    if(target.kind==='Issue')raw.followups.add(linked);
-    else if(target.kind==='PullRequest'&&/^POSSIBLY SUPERSEDED|^SUPERSEDED/.test(target.verdict||''))raw.prs.add(linked);
-    else raw.related.add(linked);
-  }
-
-  const seen=new Set([k]);
-  const ordered=['resolves','prs','overlaps','followups','related'];
-  for(const bucket of ordered){
-    for(const key of [...raw[bucket]]){
-      if(seen.has(key))raw[bucket].delete(key);else seen.add(key);
-    }
-  }
-  const keys=[...seen].filter(x=>x!==k);
-  const issues=keys.filter(x=>N[x]?.kind==='Issue').length;
-  const prCount=keys.filter(x=>N[x]?.kind==='PullRequest').length;
-  return {...raw,keys,total:keys.length,issues,prCount};
-}
+const neighbors=k=>GRAPH.neighbors(k);
+const blastRadius=k=>GRAPH.blastRadius(k);
 
 function groupLabels(){
   const labels={};
@@ -1335,45 +1301,18 @@ function groupLabels(){
 }
 
 const BUCKETS=[['resolves','Issues it resolves'],['prs','PRs to reconcile'],['overlaps','Overlapping PRs'],['followups','Follow-up issues'],['related','Other open links']];
-// Direct effects count 1 each; an overlap counts 2 / (PRs touching its rarest shared
-// source file), so a file only the pair touches weighs 1 and a hotspot weighs almost 0.
-function overlapWeight(k,x){const f=rarest(k,x);return f?Math.min(1,2/(reach().get(f)||2)):0}
-function impactParts(k,b){
-  const parts={};for(const [id] of BUCKETS)parts[id]=id==='overlaps'?[...b.overlaps].reduce((a,x)=>a+overlapWeight(k,x),0):b[id].size;
-  return parts;
-}
-function impactRows(){
-  return Object.keys(N).filter(k=>active(N[k])&&matches(k)).map(k=>{const b=blastRadius(k),parts=impactParts(k,b);
-      return {k,b,parts,score:Object.values(parts).reduce((a,v)=>a+v,0)};}).filter(r=>r.b.total>0)
-    .sort((x,y)=>y.score-x.score||y.b.resolves.size-x.b.resolves.size||x.k.localeCompare(y.k));
-}
-// How many open PRs touch each file, from the overlap pairs; rare shared files are
-// the strong duplicate signal, hotspot files that most PRs touch are not.
-function fileReach(){
-  const by=new Map();
-  for(const n of Object.values(N))for(const o of n.overlaps)for(const f of srcFiles(o)){
-    const s=by.get(f)??by.set(f,new Set()).get(f);s.add(n.key);s.add(o.with);}
-  return new Map([...by].map(([f,s])=>[f,s.size]));
-}
-let REACH=null;const reach=()=>REACH??(REACH=fileReach());
-// shared files arrive source-first; docs and lockfiles after o.significant are incidental
-const srcFiles=o=>o.shared.slice(0,o.significant);
-// an issue has no files: its overlaps are those of the open PRs that close it, and the
-// one sharing the most source files with x speaks for it
-function overlapWith(k,x){
-  const own=N[k].overlaps.find(o=>o.with===x);if(own||N[k].kind==='PullRequest')return own;
-  let best;for(const e of N[k].in){if(e.via!=='closes'||N[e.from]?.state!=='OPEN')continue;
-    const o=N[e.from].overlaps.find(o=>o.with===x);if(o&&(!best||o.significant>best.significant))best=o;}
-  return best;
-}
+const impactParts=(k,b)=>GRAPH.impactParts(k,b);
+const impactRows=()=>GRAPH.impactRows(FILTER_RESULT.matches);
+const reach=()=>GRAPH.reach();
+const srcFiles=o=>GRAPH.srcFiles(o);
+const overlapWith=(k,x)=>GRAPH.overlapWith(k,x);
 // strength of a link from k to x: rarity of shared files for overlaps, heat otherwise
 function strength(k,x,bucket){
   if(bucket==='overlaps'){const o=overlapWith(k,x);if(!o)return 0;const R=reach(),P=Math.max(2,R.size);
     return srcFiles(o).reduce((a,f)=>a+Math.log((P+1)/(R.get(f)||1)),0)+(o.sharedIssue?5:0);}
   return N[x]?.heat?heatScore(N[x]):0;
 }
-function rarest(k,x){const o=overlapWith(k,x);if(!o)return null;const R=reach();
-  return srcFiles(o).slice().sort((a,b)=>(R.get(a)||0)-(R.get(b)||0))[0];}
+const rarest=(k,x)=>GRAPH.rarest(k,x);
 function affected(k){
   const b=blastRadius(k);
   return BUCKETS.map(([id,label])=>({id,label,items:[...b[id]].map(x=>({x,s:strength(k,x,id)})).sort((p,q)=>q.s-p.s||p.x.localeCompare(q.x))}));
@@ -1758,21 +1697,16 @@ function swarmView(by,x){
 window.addEventListener('resize',()=>{if(view==='swarm')swarmRender()});
 
 // Rank: the CLI's --prioritize score, recomputed live from editable weights.
-const RK_DEFAULT=[3,2,2,2,1];
+const defaultWeights=()=>SCORING.keys.map(k=>(DOCUMENT.defaults?.[projectId(DATA)]||SCORING.defaults)[k]);
+let RK_DEFAULT=defaultWeights();
 const RK_SIGNALS=[['comments','Comments','Discussion depth'],['participants','People','Distinct participants'],
   ['reactions','Reactions','Frustration signal'],['inboundRefs','Refs','Other items pointing here'],['age','Age','Per 30 days open, max 12']];
 function urlWeights(){const raw=new URL(location.href).searchParams.get('weights');if(!raw)return RK_DEFAULT.slice();const v=raw.split(',').map(Number);return v.length===5&&v.every(x=>Number.isFinite(x)&&x>=0&&x<=10)?v:RK_DEFAULT.slice();}
 let RK=urlWeights();
-function heatParts(n){
-  const h=n.heat;if(!h)return null;
-  const v=[h.comments,h.participants,h.reactions,h.inboundRefs,Math.min(12,h.daysOpen/30)];
-  return v.map((x,i)=>x*RK[i]);
-}
-function heatScore(n){const p=heatParts(n);return p?Math.round(p.reduce((a,b)=>a+b,0)*10)/10:0}
-function rankRows(){
-  return Object.values(N).filter(n=>n.heat&&matches(n.key)).map(n=>({n,parts:heatParts(n),score:heatScore(n)}))
-    .sort((a,b)=>b.score-a.score||a.n.key.localeCompare(b.n.key));
-}
+function heatParts(n){return n.heat?SCORING.parts(n.heat,SCORING.fromArray(RK)):null;}
+function heatScore(n){return n.heat?SCORING.score(n.heat,SCORING.fromArray(RK)):0;}
+function rankRows(){return QUERY_ENGINE.rank(DATA,FILTER_RESULT.matches,SCORING.fromArray(RK));}
+
 function rankHash(){return 'rank:'+RK.join(',')}
 function rankRender(){
   const body=document.getElementById('rk-body');if(!body)return;
@@ -1805,11 +1739,11 @@ function rankView(w){
   computeFilters();SW_CACHE.clear();persistFilters();syncSidebarFilters();renderFilterBar();
   setView('rank');
   const sliders=RK_SIGNALS.map((sg,i)=>'<label class="rk-w"><span class="rk-w-top"><span><i class="rk-sw rk-s'+i+'"></i>'+sg[1]+'</span><output id="rk-o'+i+'">× '+RK[i]+'</output></span>'+
-    '<input type="range" min="0" max="5" step="0.5" value="'+RK[i]+'" data-i="'+i+'" aria-label="'+sg[1]+' weight"/>'+
+    '<input type="range" min="0" max="10" step="0.1" value="'+RK[i]+'" data-i="'+i+'" aria-label="'+sg[1]+' weight"/>'+
     '<span class="rk-w-sub">'+sg[2]+'</span></label>').join('');
   const n=rankRows().length;
   renderMain('<div class="rk view-in">'+
-    '<div class="swarm-head"><div><h1>Rank</h1><div class="muted"><span id="rank-count">'+n+'</span> open items ordered by triage score, the same one <code>--prioritize</code> prints. Drag a weight to change what counts; the order is a place to start reading, not a verdict.</div></div>'+
+    '<div class="swarm-head"><div><h1>Rank</h1><div class="muted"><span id="rank-count">'+n+'</span> open items ordered by triage score, shared with the CLI. Explore weights for this session; the order is a place to start reading, not a verdict.</div></div>'+
     '<div class="segs"><button class="cl-swarm" id="rk-swarm">Show heat in Swarm</button><button class="cl-swarm" id="rk-reset">Reset weights</button></div></div>'+
     '<div class="rk-weights">'+sliders+'</div>'+
     '<div class="rk-formula muted" id="rk-formula"></div>'+
@@ -1870,7 +1804,7 @@ renderFilterBar();syncSidebarFilters();
 wire();
 function route(){
   const project=new URL(location.href).searchParams.get('project');
-  if(project&&project!==projectId(DATA)&&PROJECTS.some(p=>projectId(p)===project)){setProject(project,readFilters());return;}
+  if(project&&!projectMatches(DATA,project)&&PROJECTS.some(p=>projectMatches(p,project))){setProject(project,readFilters());return;}
   const incoming=FILTER_ENGINE.normalize(readFilters(),DATA);
   const weights=urlWeights();
   if(JSON.stringify(incoming)!==JSON.stringify(F)||weights.join(',')!==RK.join(',')){F=incoming;RK=weights;computeFilters();SW_CACHE.clear();syncSidebarFilters();renderFilterBar();lastHash=null;}
