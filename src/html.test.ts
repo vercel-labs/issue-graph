@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { dashboardModel, renderDashboard, renderHtml } from "./html.js";
+import { applyClusters, dashboardModel, renderDashboard, renderHtml } from "./html.js";
 import type { GraphNode, NodeKey, PullRequestMeta } from "./types.js";
 
 const meta = (files: string[]): PullRequestMeta => ({
@@ -127,4 +127,40 @@ test("a --clusters entry without members is skipped instead of crashing", () => 
   });
   expect(html).toContain("Good");
   expect(html).not.toContain('"label":"Broken"');
+});
+
+describe("applyClusters", () => {
+  const model = dashboardModel(
+    asMap([node("o/r#1"), node("o/r#2"), node("o/r#3")]),
+    ["o/r#1"],
+    "o/r",
+  );
+
+  test("groups a saved run, keeps the rest in Ungrouped, and lets the cluster verdict win", () => {
+    const { model: next, unknown } = applyClusters(model, {
+      clusters: [
+        {
+          label: "A",
+          root_cause: "why",
+          members: [{ key: "o/r#1", verdict: "close it" }, { key: "o/r#2" }],
+        },
+      ],
+      cleanup: [{ key: "o/r#2", text: "retest" }],
+    });
+    expect(unknown).toEqual([]);
+    expect(next.groups.map((g) => [g.label, g.members])).toEqual([
+      ["A", ["o/r#1", "o/r#2"]],
+      ["Ungrouped", ["o/r#3"]],
+    ]);
+    expect(next.nodes["o/r#1"].verdict).toBe("close it");
+    expect(next.cleanup).toEqual([{ key: "o/r#2", text: "retest" }]);
+    expect(model.nodes["o/r#1"].verdict).not.toBe("close it");
+  });
+
+  test("reports keys the run does not contain", () => {
+    const { unknown } = applyClusters(model, {
+      clusters: [{ label: "A", members: [{ key: "o/r#9" }] }],
+    });
+    expect(unknown).toEqual(["o/r#9"]);
+  });
 });

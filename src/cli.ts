@@ -15,7 +15,13 @@ import {
 } from "./cluster.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds } from "./github.js";
-import { type ClustersConfig, dashboardModel, type Model, renderDashboard } from "./html.js";
+import {
+  applyClusters,
+  type ClustersConfig,
+  dashboardModel,
+  type Model,
+  renderDashboard,
+} from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
@@ -31,6 +37,7 @@ import {
   diffSnapshots,
   listDashboardRuns,
   listSnapshots,
+  readDashboardModel,
   readDashboardModels,
   readReconcileSnapshot,
   readSnapshot,
@@ -56,7 +63,8 @@ commands
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
   rank [repo]              what to fix first, by discussion heat
-  cluster [repo]           group open work by root cause with an agent; saved for the dashboard
+  cluster [repo]           the task for your agent to group open work by root cause
+  cluster [repo] --apply F apply the agent's answer (a file, or - for stdin) to the dashboard
   reconcile [repo]         open-backlog verification queue
   plan [repo]              next backlog action
   status [repo...] --author login[,login]   PR counts by author, project, or review state
@@ -77,7 +85,7 @@ options
   --format F               human, markdown, or json (default: human in a terminal, else markdown)
   -o, --out PATH           also write a file; .json for the graph, .html for the explorer
   --open, --no-open        open the explorer (open defaults to yes in an interactive terminal)
-  --agent A                claude, codex, or none; open and cluster ask before using a detected agent
+  --agent A                claude or codex: cluster without an agent session (cron, CI)
   --clusters PATH          group the explorer by clusters from a JSON file instead of an agent
   --no-save                do not keep this run under ~/.issue-graph/
   -h, --help               show this
@@ -138,6 +146,7 @@ interface Args {
   cluster: boolean;
   clusterRun: string;
   agent: "" | "claude" | "codex" | "none";
+  apply: string;
   open: boolean;
   openMode: "auto" | "yes" | "no";
   noSnapshot: boolean;
@@ -180,6 +189,7 @@ export function parseArgs(argv: string[]): Args {
     cluster: false,
     clusterRun: "",
     agent: "",
+    apply: "",
     open: false,
     openMode: "auto",
     noSnapshot: false,
@@ -248,6 +258,11 @@ export function parseArgs(argv: string[]): Args {
       if (v !== "claude" && v !== "codex" && v !== "none")
         throw new UsageError("--agent must be claude, codex, or none");
       a.agent = v;
+    } else if (arg === "--apply") {
+      // "-" means stdin, so it cannot go through need(), which rejects dash-leading values
+      const v = argv[++i];
+      if (v === undefined) throw new UsageError("--apply needs a file, or - for stdin");
+      a.apply = v;
     } else if (arg === "--open") a.openMode = "yes";
     else if (arg === "--no-open") a.openMode = "no";
     else if (arg === "--no-save" || arg === "--no-snapshot") {
@@ -304,6 +319,8 @@ export function parseArgs(argv: string[]): Args {
   if (a.format === "text" && !["graph", "plan", "open", "rank", "cluster"].includes(a.command)) {
     throw new UsageError(`${a.command} does not support --format human`);
   }
+  if (a.apply && a.command !== "cluster")
+    throw new UsageError("--apply belongs to issue-graph cluster");
   if (a.command === "plan" && (a.htmlOut || a.openMode === "yes")) {
     throw new UsageError("plan does not support --html or --open");
   }
@@ -376,7 +393,7 @@ export function nextSteps(a: Args, owner: string, repo: string): string {
     );
   if (!a.cluster)
     lines.push(
-      `- Group by root cause (sends titles and links to the agent): \`issue-graph cluster ${scope} --agent claude\``,
+      `- Group by root cause (your agent answers the task, then --apply): \`issue-graph cluster ${scope}\``,
     );
   if (!a.prioritize) lines.push(`- Rank what to fix first: \`issue-graph rank ${scope}\``);
   if ((a.command === "open" || a.htmlOut || a.open) && !a.noSnapshot)
@@ -424,6 +441,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
   for (const d of new Set(args.deprecations)) process.stderr.write(`note: ${d}\n`);
   if (args.command === "runs") return runRuns(args);
+  if (args.command === "cluster" && args.apply) return runApply(args);
   if (args.command === "auth") return runAuth(args);
   if (args.command === "dashboard") {
     const models = readDashboardModels<Model>();
@@ -616,11 +634,14 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     args.htmlOut || args.open || args.command === "open" || args.command === "cluster",
   );
   // open and cluster may use a detected agent, but only after a person agrees to send it data
+  // the calling agent clusters in its own context; only a person at a terminal is offered
+  // an installed agent, because nobody else is there to answer the task
   if (
-    (args.command === "open" || args.command === "cluster") &&
+    args.command === "open" &&
     !args.clusterRun &&
     args.agent !== "none" &&
-    !args.clustersFile
+    !args.clustersFile &&
+    interactive()
   ) {
     const agent = await chooseAgent(own.length || nodes.size);
     if (agent) {
@@ -670,6 +691,17 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
           `\n## Root-cause clusters\n\n(agent '${args.clusterRun}' failed: ${msg}. Prompt below.)\n`,
         );
         printGraph(`\`\`\`\n${prompt}\n\`\`\``);
+      }
+    } else if (args.command === "cluster") {
+      // the handshake: the calling agent answers this in its own context, then applies it
+      const task = clusterJsonPrompt(repoName, clusterPayload(nodes, seedKeys));
+      const apply = `issue-graph cluster ${repoName} --apply -`;
+      result.task = task;
+      result.apply = apply;
+      if (!machine) {
+        printGraph("\n## Cluster task (answer it in your agent, then apply the JSON)\n");
+        printGraph(`\`\`\`cluster-task\n${task}\n\`\`\``);
+        say(`\napply the answer: ${apply} < answer.json`);
       }
     } else if (machine) result.prompt = prompt;
     else {
@@ -727,7 +759,73 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     } else if (summarizes)
       say(`dashboard: ${out}${args.noSnapshot ? "" : " (also in issue-graph dashboard)"}`);
   }
-  if (machine) console.log(JSON.stringify(result, null, 2));
+  if (machine) {
+    if (args.command === "open" && !result.clusters)
+      result.next = `issue-graph cluster ${repoName}`;
+    console.log(JSON.stringify(result, null, 2));
+  }
+}
+
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const c of process.stdin) chunks.push(c as Buffer);
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/** Attach an agent's clusters to the saved run and rebuild its dashboard; no crawl. */
+async function runApply(a: Args): Promise<void> {
+  const repo = resolveRepo(a);
+  const model = readDashboardModel<Model>(repo);
+  if (!model)
+    throw new UsageError(`no saved run for ${repo}: run issue-graph cluster ${repo} first`);
+  const raw = a.apply === "-" ? await readStdin() : readFileSync(a.apply, "utf8");
+  let parsed: ReturnType<typeof parseClustersReply>;
+  try {
+    parsed = parseClustersReply(raw);
+  } catch (e) {
+    throw new UsageError(
+      `the answer is not usable: ${e instanceof Error ? e.message : String(e)}; expected {"clusters":[{"label","root_cause","members":[{"key"}]}],"cleanup":[{"key","text"}]}`,
+    );
+  }
+  const { model: next, unknown } = applyClusters(model, parsed);
+  if (unknown.length) {
+    throw new UsageError(
+      `the answer names ${unknown.length} item(s) this run does not contain (${unknown.slice(0, 5).join(", ")}${unknown.length > 5 ? ", …" : ""}); use keys exactly as the task lists them`,
+    );
+  }
+  writeDashboardModel(repo, next);
+  const out =
+    a.htmlOut || join(tmpdir(), `issue-graph-${repo.replace("/", "-")}-${Date.now()}.html`);
+  await writeOutput(out, renderDashboard([next]));
+  const opened = a.openMode === "yes" || (a.openMode === "auto" && interactive());
+  if (opened) openInBrowser(out);
+  const machine = a.format === "json" || (a.format === "auto" && !process.stdout.isTTY);
+  const clusters = parsed.clusters.map((c) => ({
+    label: c.label,
+    rootCause: c.root_cause ?? null,
+    members: c.members.length,
+  }));
+  if (machine)
+    console.log(
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          command: "cluster",
+          repo,
+          applied: true,
+          clusters,
+          dashboard: out,
+          saved: true,
+          opened,
+        },
+        null,
+        2,
+      ),
+    );
+  else
+    process.stdout.write(
+      `${repo} · ${clusters.length} root causes applied\n${opened ? "opened" : "dashboard:"} ${out}\n`,
+    );
 }
 
 /** A detected agent the person agreed to use, or undefined. Never asks without a terminal. */

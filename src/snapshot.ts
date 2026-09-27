@@ -248,3 +248,13 @@ export function removeDashboardRun(repo: string): boolean {
   fs.rmSync(file);
   return true;
 }
+
+/** One repository's saved run, or undefined when there is none or it cannot be read. */
+export function readDashboardModel<T>(repo: string): T | undefined {
+  const file = path.join(dashboardDir(), `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+  } catch {
+    return undefined;
+  }
+}

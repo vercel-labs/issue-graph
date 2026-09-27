@@ -108,7 +108,8 @@ describe("onboarding", () => {
   test("next steps list only the views this run did not use", () => {
     const bare = nextSteps(parseArgs(["--label", "bug", "--repo", "o/r"]), "o", "r");
     expect(bare).toContain("issue-graph open o/r --label bug");
-    expect(bare).toContain("issue-graph cluster o/r --label bug --agent claude");
+    expect(bare).toContain("issue-graph cluster o/r --label bug");
+    expect(bare).not.toContain("--agent");
     expect(bare).toContain("issue-graph rank o/r --label bug");
     const all = nextSteps(
       parseArgs([
@@ -423,4 +424,11 @@ test("status accepts the shared --no-save and --format human", () => {
   expect(
     statusArgs(["o/r", "--author", "a", "--no-save", "--format", "human"], () => undefined),
   ).toEqual(["--repo", "o/r", "--author", "a", "--no-save", "--format", "human"]);
+});
+
+test("--apply takes a file or stdin and only belongs to cluster", () => {
+  expect(parseArgs(["cluster", "o/r", "--apply", "-"]).apply).toBe("-");
+  expect(parseArgs(["cluster", "--apply", "answer.json"]).apply).toBe("answer.json");
+  expect(() => parseArgs(["open", "--apply", "-"])).toThrow(/belongs to issue-graph cluster/);
+  expect(() => parseArgs(["cluster", "--apply"])).toThrow(/needs a file/);
 });
