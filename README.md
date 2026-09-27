@@ -57,6 +57,7 @@ This README follows repository `main`, which can be ahead of the published packa
 
 | Need | Installed command |
 | --- | --- |
+| Capture a backlog and open its dashboard | `issue-graph open owner/repo` |
 | Inspect an issue or PR before starting work | `issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save` |
 | Survey labeled open issues | `issue-graph rank owner/repo --label bug` |
 | Filter a saved model and open its exact dashboard view | `issue-graph query github:owner/repo --state open --view rank --open` |
@@ -68,7 +69,7 @@ This README follows repository `main`, which can be ahead of the published packa
 
 Graph and plan default to compact human output in a terminal. Graph still prints Markdown in a pipe; plan prints versioned JSON. Use `--format text` for the human view outside a terminal, or `--format markdown` for Markdown. Plan also supports `--format json`. Human output wraps at up to 100 columns; monochrome bold/dim styling requires a TTY and is disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
 
-Graph `-o PATH.json` writes a graph file; its legacy `--format json` still prints Markdown, not JSON. Reconcile keeps terminal Markdown and piped JSON defaults and does not support `--format text`. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
+Graph `-o PATH.json` writes a graph file; its legacy `--format json` still prints Markdown. Reconcile defaults to terminal Markdown and piped JSON; `--format human` and `text` select Markdown. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
 
 ## Explore and compare
 
@@ -161,9 +162,9 @@ Snapshots, exports, logs, and cluster prompts can contain private repository met
 
 ## Source development
 
-Source development requires access to the INTERNAL `vercel-labs/issue-graph` repository. Use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and authenticated GitHub CLI access. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
+The source repository is public. Use Node.js 20.19.x or 22.12+ (24 recommended) and pnpm. Live queries also need GitHub CLI authentication. Follow [Contributing](CONTRIBUTING.md#setup) for setup.
 
-From an authorized checkout, after preserving local changes, update a source installation with:
+To update a clean source checkout:
 
 ```bash
 git pull --ff-only
@@ -206,12 +207,12 @@ DOCS_TEST_URL=http://127.0.0.1:3399 pnpm audit:docs
 
 The agent-readability audit may follow production canonical URLs from a localhost start URL. Check its destinations when comparing local changes. [is-agentic.com](https://is-agentic.com) requires a publicly reachable URL.
 
-## License
-
-Apache-2.0
-
 ### Dashboard development
 
 `apps/dashboard` is the Next.js dashboard used by `open`, `dashboard`, `cluster --apply`, and `query`. Its React host mounts the original dashboard renderer and CSS, preserving its layout, graphs, and animations. The renderer lives in `src/dashboard-view.js`; filters, ranking, graph metrics, and URL state share the CLI core. `src/html.ts` retains the programmatic HTML exporter using the same renderer. `apps/docs` remains the documentation site.
 
 Run `bun run dev:dashboard` and choose a normalized capture JSON locally. The browser does not upload it. `bun run build` includes the static Next.js export in the CLI package; end users do not need to run a Next.js server. `bun run test` prepares the same dashboard build before testing saved views.
+
+## License
+
+Apache-2.0

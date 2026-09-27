@@ -1,7 +1,7 @@
 ---
 title: Library
 description: Use issue-graph in your application with a GitHub CLI or HTTP transport.
-lastModified: 2026-09-23
+lastModified: 2026-09-27
 ---
 
 ## Install
@@ -104,6 +104,39 @@ console.log({ coverageComplete: report.coverageComplete, totals: report.totals }
 ```
 
 Keep `coverageComplete` and per-repository coverage alongside the counts. A `null` count means unknown. See [Status and history](/docs/status) for the report fields and comparison behavior.
+
+## Query a dashboard model
+
+The core exports the same filters and scoring used by the CLI and dashboard. Continue from the crawl example to build a normalized model and rank matching open issues:
+
+```ts
+import { dashboardModel, dashboardQuery } from "issue-graph";
+
+const model = dashboardModel(
+  nodes,
+  ["vercel-labs/portless#427"],
+  "vercel-labs/portless",
+  undefined,
+  cappedOut.size,
+);
+const query = dashboardQuery.normalize(model, {
+  view: "rank",
+  filters: { state: "open", kind: "Issue", heatMode: "min", heatMin: 50 },
+  weights: { comments: 4 },
+});
+const result = dashboardQuery.evaluate(model, query);
+
+console.log({
+  matches: [...result.matches],
+  ranking: result.ranking.map(({ n, score }) => ({ key: n.key, score })),
+});
+```
+
+`normalize` fills defaults and rejects unsupported filters or views. `evaluate` returns matching keys and ranked open items. Both run without network or filesystem access. Library calls use built-in weights unless you supply overrides; they do not read CLI configuration.
+
+`Model`, `ProviderDescriptor`, `DashboardFilters`, `DashboardQuery`, `Weights`, and `HeatSignals` are exported types. `scoring` exposes the versioned Heat formula. `createGraphMetrics(model)` computes the observed relationships used by Impact and Swarm. Live collectors support GitHub; other providers must supply a normalized model and its capabilities.
+
+The CLI writes static Next.js exports. The library's `renderHtml` and `renderDashboard` return HTML strings using the shared renderer; they do not write the Next.js assets or query history.
 
 ## Protect credentials and results
 

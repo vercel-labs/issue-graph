@@ -77,7 +77,8 @@ describe("documentation content contract", () => {
     expect(library).not.toContain("file:../issue-graph");
     expect(reference).toContain("npx issue-graph@latest");
     expect(start).toContain("supported by your installed release");
-    expect(security).toContain("INTERNAL");
+    expect(security).toContain("source repository and npm package are public");
+    expect(security).toContain("Captures can still contain private repository data");
     expect(security.toLowerCase()).toContain("snapshot");
     const files = (await readdir(contentRoot)).filter((name) => name.endsWith(".mdx"));
     for (const file of files) {
@@ -210,7 +211,7 @@ describe("documentation content contract", () => {
     }
   });
 
-  test("enables the native GitHub navbar link without changing source access", async () => {
+  test("enables source links for the public repository", async () => {
     const [config, site] = await Promise.all([
       read("src/lib/geistdocs/config.tsx"),
       read("src/lib/site.ts"),
@@ -220,7 +221,7 @@ describe("documentation content contract", () => {
     expect(config).toContain('repo: "issue-graph"');
     expect(config).not.toContain("...(repositoryIsPublic");
     expect(config).toContain("editSource: repositoryIsPublic");
-    expect(site).toContain("repositoryIsPublic = false");
+    expect(site).toContain("repositoryIsPublic = true");
   });
 
   test("pins the public runtime and uses no initializer or private provider", async () => {

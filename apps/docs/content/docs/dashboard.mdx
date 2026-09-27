@@ -13,7 +13,7 @@ issue-graph open vercel-labs/agent-browser --no-open
 issue-graph query github:vercel-labs/agent-browser --json --no-open
 ```
 
-`open` reads GitHub within the crawl budget. `query` uses the saved model without provider requests or authentication. It does not refresh the data or fetch missing nodes. A missing saved model is an error; run `open` first or import a normalized dashboard model with `--input model.json`.
+`open` reads GitHub within the crawl budget. In an interactive terminal, it can offer an installed agent for clustering. Add `--agent none` to skip that prompt. `query` uses the saved model without provider requests or authentication. It does not refresh the data or fetch missing nodes. A missing saved model is an error; run `open` first or import a normalized dashboard model with `--input model.json`.
 
 `--input` expects a dashboard model, not the graph JSON produced by `graph -o graph.json`. Do not use `--no-save` on the collection command if you want to query its saved model later.
 
@@ -30,7 +30,7 @@ Run `issue-graph dashboard` to browse the latest saved models with a project sel
 
 The compact Filters menu works across views. It supports state, item kind, clusters, Heat, search, and provider-supported solution and review filters. Context can remain visible even when it does not match a filter.
 
-The project selector's open count describes the collected inventory, when available. Query `counts.captured`, `matched`, `visible`, and `ranked` describe the saved graph and current view; they are not total repository open counts. Inspect `coverage` before interpreting them.
+For GitHub, the project selector shows a separately fetched total of open issues and PRs when available. Other providers supply their own count and coverage. Query `counts.captured`, `matched`, `visible`, and `ranked` describe the saved graph and current view. Inspect `coverage` before interpreting them.
 
 ## Prioritize with filters
 
@@ -103,3 +103,13 @@ Read `capabilities` before choosing filters, views, or metrics. Unsupported choi
 `ISSUE_GRAPH_HOME` overrides the shared state root, which defaults to `~/.issue-graph/`. Weights live in `config.json`, immutable models in `captures/`, and query receipts with their static views in `history/`. Queries save these artifacts locally; they do not mutate a provider.
 
 Reloading a saved page does not refresh its data. Captures persist until removed locally. See [Permissions and privacy](/docs/security) before storing or sharing private results, and [Command reference](/docs/reference) for all query flags.
+
+## Manage saved models
+
+```bash
+issue-graph runs list --format json
+issue-graph dashboard --no-open -o dashboard.html
+issue-graph runs rm owner/repo
+```
+
+`runs` lists the latest dashboard model per repository. `dashboard` combines those models in one export. `runs rm` removes only the selected model from that list; it leaves graph snapshots, query captures, history, and existing exports intact. Run `open` again to collect a fresh model.

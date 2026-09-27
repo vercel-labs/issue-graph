@@ -31,11 +31,16 @@ See [Get started](/docs/get-started) for a walkthrough and example output.
 
 | Task | Command | Guide |
 | --- | --- | --- |
+| Capture a backlog and open its dashboard | `issue-graph open owner/repo` | [Dashboard and saved queries](/docs/dashboard) |
 | Trace linked issues and PRs | `issue-graph graph <issue-or-pr>` | [Graph](/docs/graph) |
+| Rank a live backlog by Heat | `issue-graph rank owner/repo` | [Graph](/docs/graph) |
+| Group related work with your agent | `issue-graph cluster owner/repo` | [Agents and skills](/docs/agents) |
 | Filter saved work and open its exact view | `issue-graph query provider:scope --open` | [Dashboard and saved queries](/docs/dashboard) |
 | Count PRs by author and review state | `issue-graph status` | [Status and history](/docs/status) |
 | Find backlog items to verify | `issue-graph reconcile` | [Reconcile and plan](/docs/backlog) |
 | Choose the next review or investigation | `issue-graph plan` | [Reconcile and plan](/docs/backlog) |
+
+Use `config` for scoring defaults, `dashboard` and `runs` for saved models, and `auth status` for sign-in state. See the [Command reference](/docs/reference) for all commands.
 
 ## Use with agents and applications
 

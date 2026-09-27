@@ -70,7 +70,7 @@ commands
   dashboard                every saved run in one explorer, with a project switcher
   runs [list | rm <repo>]  saved runs behind the dashboard
   auth [status]            provider sign-in state
-  schema                   JSON contract for reconcile, plan, and status
+  schema                   JSON command contract, formats, limits, and local writes
   skills [list | get core] bundled agent guides
 
 scope
@@ -79,7 +79,7 @@ scope
   123  #123  owner/repo#123  <issue or PR URL>   one or more items
 
 options
-  --label L                only items with this label
+  --label L                seed from open issues with this label
   --state open|all         which items a repository scope covers (default open)
   --format F               human, markdown, or json (default: human in a terminal, else markdown)
   -o, --out PATH           also write a file; .json for the graph, .html for the explorer
@@ -90,7 +90,7 @@ options
   -h, --help               show this
 
 advanced
-  --budget N               stop after N items (default 80, or 1000 for a whole repository)
+  --budget N               stop after N items (80; 1000 for unfiltered open/rank/cluster repos)
   --depth N                same-repository reference depth (default 2)
   --hub-threshold N        fetch but do not expand an item with more references (default 12)
   --concurrency N          GitHub requests in flight (default 4, max 32)
@@ -447,7 +447,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     const models = readDashboardModels<Model>();
     if (!models.length) {
       throw new UsageError(
-        "no saved runs yet: run a graph with --open or --html first (without --no-snapshot)",
+        "no saved runs yet: run issue-graph open owner/repo first (without --no-save)",
       );
     }
     const out = args.htmlOut || join(tmpdir(), `issue-graph-dashboard-${Date.now()}.html`);

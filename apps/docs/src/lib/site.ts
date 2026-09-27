@@ -3,7 +3,7 @@ export const siteUrl = "https://issue-graph.dev";
 export const repositoryUrl = "https://github.com/vercel-labs/issue-graph";
 export const siteDescription =
   "Find related issues, competing changes, and unresolved follow-ups before you start work. A CLI for maintainers and coding agents.";
-export const repositoryIsPublic = false;
+export const repositoryIsPublic = true;
 export const plannedInstallCommand = "npm install -g issue-graph@latest";
 export const agentSetupPrompt = "npx skills@latest add vercel-labs/issue-graph";
 export const exampleCommand =

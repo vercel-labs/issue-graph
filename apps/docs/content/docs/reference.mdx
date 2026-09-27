@@ -31,6 +31,8 @@ issue-graph rank owner/repo --label bug --no-save
 issue-graph cluster owner/repo
 issue-graph dashboard
 issue-graph runs
+issue-graph auth status
+issue-graph skills get core --full
 issue-graph query github:owner/repo --state open --view rank --json --no-open
 issue-graph config show --provider github --scope owner/repo --json
 issue-graph status vercel-labs/portless --author ctate,Railly --json
@@ -39,7 +41,9 @@ issue-graph plan owner/repo --format json
 issue-graph schema
 ```
 
-Live graph commands take a repository scope or items (`123`, `#123`, `owner/repo#123`, or a URL); they can infer the repository from the current checkout. Status accepts repository scopes plus authors. Offline `query` selects a saved `provider:scope`, and config uses `--provider` and `--scope`. Running `issue-graph` with no arguments inside an interactive checkout opens the backlog dashboard. Older flags still work for one minor release and print their replacement.
+`open`, `rank`, and `cluster` accept repository scopes or items (`123`, `#123`, `owner/repo#123`, or a URL). `graph` needs items or `--label`. Live commands can infer the repository from the current checkout. Status accepts repositories plus authors. Offline `query` selects a saved `provider:scope`; config uses `--provider` and `--scope`.
+
+Running `issue-graph` with no arguments inside an interactive checkout opens the backlog dashboard. It prints usage in a pipe or CI. Older flags still work for one minor release and print their replacement.
 
 ## Graph selection and crawl controls
 
@@ -47,8 +51,9 @@ Live graph commands take a repository scope or items (`123`, `#123`, `owner/repo
 | --- | --- |
 | `--repo owner/repo` | Repository for bare numbers when outside its checkout |
 | `--label L` | Seed from labeled open issues, within the discovery budget |
+| `--state open\|all` | For unfiltered `open`, `rank`, or `cluster` repository scopes, seed open items (default) or all states; linked context can have any state |
 | `--depth N` | Same-repo recursion depth, default 2; cross-repository references are fetched one hop |
-| `--budget N` | Total nodes, default 80 for explicit items or 1000 for a whole repository; integer from 1 to 1000 |
+| `--budget N` | Total nodes, default 80; unfiltered `open`, `rank`, and `cluster` repository scopes default to 1000; integer from 1 to 1000 |
 | `--hub-threshold N` | Do not expand high-degree non-seed nodes above this number of references, default 12 |
 | `--concurrency N` | Node requests in flight, default 4; integer from 1 to 32 |
 | `--no-save` | Skip new run and reconcile history files; `-o` paths still write |
@@ -60,15 +65,29 @@ Reconcile and plan discover the open backlog of their repository scope and share
 
 | Flag | Meaning |
 | --- | --- |
-| `-o PATH.json` | Write a graph JSON file; the report remains on stdout |
-| `-o PATH.html` | Write a static Next.js dashboard with sibling `_next/` assets and font license |
+| `-o PATH.json`, `--out PATH.json` | Write a graph JSON file; the report remains on stdout |
+| `-o PATH.html`, `--out PATH.html` | Write a static Next.js dashboard with sibling `_next/` assets and font license |
 | `--clusters PATH` | Read cluster/cleanup labels for the HTML explorer |
 | `cluster` | Print a clustering task for the caller's agent and save the run |
 | `cluster --apply PATH` | Apply the agent's answer (a file, or `-` for stdin) to the saved run |
 | `cluster --agent claude` | Launch installed Claude headlessly with the clustering task |
 | `cluster --agent codex` | Launch installed Codex headlessly with the clustering task |
+| `open --agent none` | Skip the interactive offer to run an installed agent |
 
-`-o` can repeat. Reconcile and plan use `--format json` for structured output. Export paths write files even with `--no-save`. External agents run with their own permissions.
+Use one `.json` and one `.html` output in the same command; the last path of each type wins. Reconcile and plan use `--format json` for structured output. `open` and `cluster` always write an HTML export, even with `--no-save`. Applying clusters always updates the saved model. External agents run with their own permissions.
+
+## Saved runs and authentication
+
+| Command | Behavior |
+| --- | --- |
+| `dashboard [--no-open] [-o PATH.html]` | Export all saved models with a project selector; opens by default in an interactive terminal |
+| `runs [list] [--format json]` | List the latest saved model per repository; text by default, including in pipes |
+| `runs rm owner/repo` | Remove one saved dashboard model; preserve snapshots, captures, history, and exports |
+| `auth [status] [--format json]` | Check GitHub CLI sign-in without printing tokens; exit 1 if unavailable |
+| `skills [list] [--json]` | List bundled guides without network access |
+| `skills get core [--full] [--json]` | Read operational guidance; `--full` includes workflow references |
+
+`auth status` checks the existing login; use `gh auth login` to sign in. Query, config, and skill retrieval work without provider authentication. Skills default to text or Markdown, including in pipes. See [Agents and skills](/docs/agents) for setup.
 
 ## Saved dashboard queries
 
@@ -137,13 +156,17 @@ Status PR pages contain 50 PRs; assignees and reviewer requests are also paginat
 
 | Mode | stdout | Local persistence |
 | --- | --- | --- |
-| Graph | Formatted in a TTY, Markdown in a pipe; graph JSON only via `-o PATH.json` | Runs saved by default; `-o` paths write independently |
+| Graph | Formatted in a TTY, Markdown in a pipe; graph JSON only via `-o PATH.json` | History saved by default; dashboard model saved when exporting HTML; `-o` paths write independently |
+| Open and cluster | Human summary in a TTY, JSON in a pipe; `cluster` includes its task | History saved by default; HTML export always writes |
+| Rank | Formatted in a TTY, Markdown in a pipe; `--format json` returns `repo`, `weights`, and `priorities` | History saved by default; dashboard model saved only when exporting HTML |
 | Reconcile | `--format auto\|json\|markdown`; auto is Markdown in TTY, JSON in pipe | Repository history by default unless `--no-save` |
 | Plan | Formatted in a TTY, JSON in a pipe; `--format text\|json\|markdown` | No snapshots |
 | Status | `--format auto\|human\|markdown\|json`; auto is table in TTY, JSON in pipe | Only with `--save` |
 | Query | Short human summary in TTY, JSON in pipe; `--format human\|json` | New queries save captures, receipts, and static views; `--history` reuses them |
 | Config | Human summary in TTY, JSON in pipe; `--format human\|json` | Only `set` writes `config.json` |
 | Schema | JSON | None |
+
+Graph, rank, and plan accept `--format human` or its alias `text`. Reconcile maps both to Markdown. Status accepts `human` or its alias `table`. Graph's legacy `--format json` still prints Markdown; use `-o PATH.json` for graph data.
 
 Reconcile, plan, and status reports currently have `schemaVersion: 1`. Graph JSON currently has no report version field. It contains `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Use the schema for the mode you are consuming.
 
