@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { nextSteps, parseArgs, runCli, UsageError } from "./cli.js";
+import { nextSteps, parseArgs, runCli, statusArgs, UsageError } from "./cli.js";
 import { listSnapshots, writeSnapshot } from "./snapshot.js";
 import { shellTransport } from "./transports/shell.js";
 
@@ -72,9 +72,8 @@ describe("parseArgs", () => {
 
   test("rejects unsupported formats and limits text to graph/plan", () => {
     expect(() => parseArgs(["reconcile", "--format", "xml"])).toThrow(UsageError);
-    expect(() => parseArgs(["reconcile", "--format", "text"])).toThrow(
-      "reconcile does not support --format text",
-    );
+    // human is reconcile's readable report
+    expect(parseArgs(["reconcile", "--format", "human"]).format).toBe("markdown");
     expect(() => parseArgs(["schema", "--format", "text"])).toThrow(UsageError);
     expect(parseArgs(["1", "--repo", "o/r", "--format", "text"]).format).toBe("text");
     expect(parseArgs(["plan", "--repo", "o/r", "--format", "text"]).format).toBe("text");
@@ -108,9 +107,10 @@ describe("onboarding", () => {
 
   test("next steps list only the views this run did not use", () => {
     const bare = nextSteps(parseArgs(["--label", "bug", "--repo", "o/r"]), "o", "r");
-    expect(bare).toContain("issue-graph --label bug --repo o/r --open");
-    expect(bare).toContain("--cluster-run claude --open");
-    expect(bare).toContain("--prioritize");
+    expect(bare).toContain("issue-graph open o/r --label bug");
+    expect(bare).toContain("issue-graph cluster o/r --label bug");
+    expect(bare).not.toContain("--agent");
+    expect(bare).toContain("issue-graph rank o/r --label bug");
     const all = nextSteps(
       parseArgs([
         "1",
@@ -127,7 +127,7 @@ describe("onboarding", () => {
     );
     expect(all).toBe("");
     const saved = nextSteps(parseArgs(["1", "--repo", "o/r", "--open", "--prioritize"]), "o", "r");
-    expect(saved).toContain("issue-graph dashboard --open");
+    expect(saved).toContain("issue-graph dashboard");
   });
 });
 
@@ -345,6 +345,90 @@ describe("--all-open", () => {
 
   test("next steps repeat the whole-backlog seed", () => {
     const steps = nextSteps(parseArgs(["--all-open", "--repo", "o/r"]), "o", "r");
-    expect(steps).toContain("issue-graph --all-open --repo o/r --open");
+    expect(steps).toContain("issue-graph open o/r");
   });
+});
+
+describe("command API", () => {
+  test("verbs take a scope and repository-wide verbs cover the open backlog", () => {
+    const open = parseArgs(["open", "vercel-labs/emulate"]);
+    expect(open).toMatchObject({
+      command: "open",
+      repo: "vercel-labs/emulate",
+      allOpen: true,
+      maxNodes: 1000,
+    });
+    expect(parseArgs(["rank"])).toMatchObject({ command: "rank", allOpen: true, prioritize: true });
+    expect(parseArgs(["cluster", "o/r"])).toMatchObject({ command: "cluster", cluster: true });
+    expect(parseArgs(["open", "o/r", "--label", "bug"]).allOpen).toBe(false);
+  });
+
+  test("graph takes several items, with or without a repository", () => {
+    expect(parseArgs(["graph", "o/r#1", "2", "--repo", "o/r"]).items).toEqual([
+      { repo: "o/r", number: 1 },
+      { repo: undefined, number: 2 },
+    ]);
+  });
+
+  test("shared flags replace the old ones, which still work with a note", () => {
+    expect(parseArgs(["open", "-o", "x.html"]).htmlOut).toBe("x.html");
+    expect(parseArgs(["graph", "1", "-o", "g.json"]).jsonOut).toBe("g.json");
+    expect(() => parseArgs(["open", "-o", "x.txt"])).toThrow(/\.json or \.html/);
+    expect(parseArgs(["graph", "1", "--format", "human"]).format).toBe("text");
+    const legacy = parseArgs([
+      "1",
+      "--repo",
+      "o/r",
+      "--max-nodes",
+      "50",
+      "--cluster-run",
+      "claude",
+    ]);
+    expect(legacy).toMatchObject({ maxNodes: 50, agent: "claude", cluster: true });
+    expect(legacy.deprecations).toEqual([
+      "--max-nodes is now --budget",
+      "--cluster-run is now --agent",
+    ]);
+  });
+
+  test("--agent, --open, and --no-save are explicit choices", () => {
+    expect(parseArgs(["open", "--agent", "codex"])).toMatchObject({
+      clusterRun: "codex",
+      cluster: true,
+    });
+    expect(parseArgs(["open", "--agent", "none"]).clusterRun).toBe("");
+    expect(parseArgs(["open", "--no-open"]).openMode).toBe("no");
+    expect(parseArgs(["open", "--no-save"]).noSnapshot).toBe(true);
+    expect(() => parseArgs(["open", "--agent", "gpt"])).toThrow(/claude, codex, or none/);
+  });
+
+  test("scopes name the provider, and unsupported ones fail clearly", () => {
+    expect(parseArgs(["open", "github:o/r"]).repo).toBe("o/r");
+    expect(() => parseArgs(["open", "linear:ENG"])).toThrow(/not supported yet/);
+    expect(() => parseArgs(["open", "a/b", "c/d"])).toThrow(/one repository per run/);
+  });
+
+  test("status reads positional or inferred repositories", () => {
+    expect(statusArgs(["o/r", "--author", "a"], () => undefined)).toEqual([
+      "--repo",
+      "o/r",
+      "--author",
+      "a",
+    ]);
+    expect(statusArgs(["--author", "a"], () => "x/y")).toEqual(["--author", "a", "--repo", "x/y"]);
+    expect(() => statusArgs(["o/r#1"], () => undefined)).toThrow(/repositories, not items/);
+  });
+});
+
+test("status accepts the shared --no-save and --format human", () => {
+  expect(
+    statusArgs(["o/r", "--author", "a", "--no-save", "--format", "human"], () => undefined),
+  ).toEqual(["--repo", "o/r", "--author", "a", "--no-save", "--format", "human"]);
+});
+
+test("--apply takes a file or stdin and only belongs to cluster", () => {
+  expect(parseArgs(["cluster", "o/r", "--apply", "-"]).apply).toBe("-");
+  expect(parseArgs(["cluster", "--apply", "answer.json"]).apply).toBe("answer.json");
+  expect(() => parseArgs(["open", "--apply", "-"])).toThrow(/belongs to issue-graph cluster/);
+  expect(() => parseArgs(["cluster", "--apply"])).toThrow(/needs a file/);
 });

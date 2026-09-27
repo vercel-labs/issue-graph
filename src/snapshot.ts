@@ -209,3 +209,52 @@ export function readDashboardModels<T>(): T[] {
       }
     });
 }
+
+/** Saved runs with enough detail to list them: repository, item count, and save time. */
+export function listDashboardRuns(): Array<{
+  repo: string;
+  nodes: number;
+  savedAt: string;
+  file: string;
+}> {
+  const dir = dashboardDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .flatMap((f) => {
+      const file = path.join(dir, f);
+      try {
+        const m = JSON.parse(fs.readFileSync(file, "utf8")) as { repo?: string; nodes?: object };
+        return [
+          {
+            repo: m.repo ?? f.replace(/\.json$/, ""),
+            nodes: Object.keys(m.nodes ?? {}).length,
+            savedAt: fs.statSync(file).mtime.toISOString(),
+            file,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    })
+    .sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+}
+
+/** Delete one repository's saved run; false when there was none. */
+export function removeDashboardRun(repo: string): boolean {
+  const file = path.join(dashboardDir(), `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  if (!fs.existsSync(file)) return false;
+  fs.rmSync(file);
+  return true;
+}
+
+/** One repository's saved run, or undefined when there is none or it cannot be read. */
+export function readDashboardModel<T>(repo: string): T | undefined {
+  const file = path.join(dashboardDir(), `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+  } catch {
+    return undefined;
+  }
+}

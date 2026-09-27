@@ -241,6 +241,43 @@ function buildModel(
 }
 
 /** Render the graph as a self-contained, Geist-styled master–detail explorer. */
+/**
+ * Group a saved run by an agent's clusters without re-crawling. Same rules as
+ * buildModel: members must exist in the run, a cluster verdict wins, and items
+ * no cluster names land in Ungrouped. Keys the run does not contain are returned
+ * so the caller can tell the agent which ones to fix.
+ */
+export function applyClusters(
+  model: Model,
+  config: ClustersConfig,
+): { model: Model; unknown: NodeKey[] } {
+  const { clusters, cleanup } = normalizeClusters(config);
+  const nodes: Record<NodeKey, ClientNode> = {};
+  for (const [k, n] of Object.entries(model.nodes)) nodes[k] = { ...n };
+  const seen = new Set<NodeKey>();
+  const unknown = new Set<NodeKey>();
+  const groups: Group[] = clusters.map((c) => {
+    for (const m of c.members) {
+      seen.add(m.key);
+      const n = nodes[m.key];
+      if (!n) unknown.add(m.key);
+      else if (m.verdict) n.verdict = m.verdict;
+    }
+    return {
+      label: c.label,
+      subtitle: c.root_cause ?? "",
+      members: c.members.map((m) => m.key).filter((k) => nodes[k]),
+    };
+  });
+  const rest = Object.keys(nodes).filter((k) => !seen.has(k));
+  if (rest.length) groups.push({ label: "Ungrouped", subtitle: "no cluster", members: rest });
+  for (const c of cleanup) if (c.key && !nodes[c.key]) unknown.add(c.key);
+  return {
+    model: { ...model, nodes, groups, cleanup: cleanup.filter((c) => !c.key || nodes[c.key]) },
+    unknown: [...unknown],
+  };
+}
+
 /** The explorer's data for one run, also what `dashboard` saves and reloads. */
 export function dashboardModel(
   nodes: Map<NodeKey, GraphNode>,

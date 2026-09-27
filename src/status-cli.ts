@@ -13,20 +13,20 @@ import { toStatusSnapshot } from "./status-snapshot.js";
 import { latestStatusSnapshot, readStatusSnapshot, writeStatusSnapshot } from "./status-store.js";
 import type { GhTransport } from "./transport.js";
 
-export const STATUS_USAGE = `usage: issue-graph status --repo owner/repo --author login[,login] [options]
+export const STATUS_USAGE = `usage: issue-graph status [owner/repo...] --author login[,login] [options]
 
 Count open PRs by repository and author without a graph crawl. Local writes are opt-in.
 
   --repo owner/repo       repeat for each repository (required)
   --author login[,login]  repeat or comma-separate authors (required)
   --view VIEW            authors (default), projects, or prs
-  --format FORMAT        auto (default), table, markdown, or json
+  --format FORMAT        auto (default), human (the table), markdown, or json
   --json                 JSON on stdout; no filename (status only)
   --concurrency N        repositories in flight, 1..32 (default 4)
   --max-pages N          pages per connection, 1..1000 (default 100)
   --save                 save an immutable capture under ISSUE_GRAPH_HOME (default ~/.issue-graph)
   --since last|PATH      compare with a matching-scope snapshot or exported JSON
-  --no-snapshot          forbid snapshot writes; incompatible with --save
+  --no-save              forbid snapshot writes; incompatible with --save
   -h, --help             show this help
 
 Auto output: terminal table for TTY, JSON for pipes. NO_COLOR disables color.
@@ -34,11 +34,12 @@ Exit 0: complete inventory; 1: incomplete/runtime failure; 2: invalid arguments.
 Unknown counts are ?, not 0. Conflicts and drafts overlap review states.
 
 Examples:
-  issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly
-  issue-graph status --repo vercel-labs/wterm --author ctate --view prs
-  issue-graph status --repo vercel-labs/emulate --author ctate --json
-  issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --save
-  issue-graph status --repo vercel-labs/agent-browser --author ctate,Railly --since last --save`;
+  issue-graph status vercel-labs/agent-browser --author ctate,Railly
+  issue-graph status vercel-labs/wterm --author ctate --view prs
+  issue-graph status vercel-labs/emulate --author ctate --json
+  issue-graph status vercel-labs/agent-browser --author ctate,Railly --save
+  issue-graph status vercel-labs/agent-browser --author ctate,Railly --since last --save
+  issue-graph status --author ctate   (inside a GitHub repository)`;
 
 export class StatusUsageError extends Error {}
 
@@ -81,7 +82,7 @@ export function parseStatusArgs(argv: string[]): StatusArgs {
           .map((author) => author.trim()),
       );
     else if (flag === "--json") json = true;
-    else if (flag === "--no-snapshot") args.noSnapshot = true;
+    else if (flag === "--no-snapshot" || flag === "--no-save") args.noSnapshot = true;
     else if (flag === "--save") args.save = true;
     else if (flag === "--since") args.since = value();
     else if (flag === "--view") {
@@ -90,9 +91,11 @@ export function parseStatusArgs(argv: string[]): StatusArgs {
         throw new StatusUsageError(`unknown view: ${view}`);
       args.view = view;
     } else if (flag === "--format") {
-      const format = value();
+      // human is the shared name for this command's terminal table
+      const raw = value();
+      const format = raw === "human" ? "table" : raw;
       if (format !== "auto" && format !== "table" && format !== "markdown" && format !== "json")
-        throw new StatusUsageError(`unknown format: ${format}`);
+        throw new StatusUsageError(`unknown format: ${raw}`);
       args.format = format;
     } else if (flag === "--concurrency") args.concurrency = Number(value());
     else if (flag === "--max-pages") args.maxPages = Number(value());
@@ -109,8 +112,7 @@ export function parseStatusArgs(argv: string[]): StatusArgs {
   if (json && args.format !== "auto" && args.format !== "json")
     throw new StatusUsageError("--json conflicts with --format table or markdown");
   if (json) args.format = "json";
-  if (args.save && args.noSnapshot)
-    throw new StatusUsageError("--save conflicts with --no-snapshot");
+  if (args.save && args.noSnapshot) throw new StatusUsageError("--save conflicts with --no-save");
   if (!args.help) {
     try {
       Object.assign(args, normalizeStatusScope(args.repos, args.authors));
