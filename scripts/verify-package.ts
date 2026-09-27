@@ -90,7 +90,9 @@ const pageInfo = { hasNextPage: false, endCursor: null };
 const author = { login: "smoke-author" };
 const createdAt = "2026-01-01T00:00:00Z";
 let repository;
-if (fields.query.includes("issueOrPullRequest(number:$n)")) {
+if (fields.query.includes("IssueGraphRepositoryOpen")) {
+  repository = { nameWithOwner: "package-smoke/fixture", issues: { totalCount: 12 }, pullRequests: { totalCount: 7 } };
+} else if (fields.query.includes("issueOrPullRequest(number:$n)")) {
   assert.ok(fields.n === "1" || fields.n === "2");
   const pr = fields.n === "2";
   repository = {

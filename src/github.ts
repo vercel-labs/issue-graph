@@ -1,6 +1,54 @@
+import type { OpenItemCount } from "./dashboard-types.js";
 import { extractClosingRefs, extractRefs } from "./refs.js";
 import type { GhTransport } from "./transport.js";
 import type { Edge, GraphNode, NodeKey, Via } from "./types.js";
+
+export const REPOSITORY_OPEN_QUERY = `query IssueGraphRepositoryOpen($owner:String!,$repo:String!){
+  repository(owner:$owner,name:$repo){
+    nameWithOwner
+    issues(states:OPEN){totalCount}
+    pullRequests(states:OPEN){totalCount}
+  }
+}`;
+
+export async function repositoryOpenCount(
+  transport: Pick<GhTransport, "graphql">,
+  owner: string,
+  repo: string,
+): Promise<OpenItemCount> {
+  const response = (await transport.graphql(REPOSITORY_OPEN_QUERY, { owner, repo })) as {
+    data?: {
+      repository?: {
+        nameWithOwner?: string;
+        issues?: { totalCount?: number };
+        pullRequests?: { totalCount?: number };
+      };
+    };
+    errors?: unknown[];
+  };
+  const found = response?.data?.repository;
+  const issues = found?.issues?.totalCount;
+  const pullRequests = found?.pullRequests?.totalCount;
+  if (
+    response?.errors?.length ||
+    found?.nameWithOwner?.toLowerCase() !== `${owner}/${repo}`.toLowerCase() ||
+    typeof issues !== "number" ||
+    typeof pullRequests !== "number" ||
+    !Number.isSafeInteger(issues) ||
+    !Number.isSafeInteger(pullRequests) ||
+    issues < 0 ||
+    pullRequests < 0 ||
+    !Number.isSafeInteger(issues + pullRequests)
+  )
+    throw new Error("Repository open totals unavailable");
+  return {
+    value: issues + pullRequests,
+    issues,
+    pullRequests,
+    complete: true,
+    observedAt: new Date().toISOString(),
+  };
+}
 
 /** One call: node state + title + body + comments + structural edges. */
 export const NODE_QUERY = `query($owner:String!,$repo:String!,$n:Int!){
