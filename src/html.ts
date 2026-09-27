@@ -571,7 +571,8 @@ svg .center{font-weight:600}
 .im-total{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
 .b-resolves{background:var(--open-fg)}.b-prs{background:var(--accent)}.b-overlaps{background:var(--warn-fg)}.b-followups{background:var(--merged-fg)}.b-related{background:var(--closed-fg)}
 .s-resolves{fill:var(--open-fg)}.s-prs{fill:var(--accent)}.s-overlaps{fill:var(--warn-fg)}.s-followups{fill:var(--merged-fg)}.s-related{fill:var(--closed-fg)}
-.im-panel{position:sticky;top:0;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);padding:16px}
+#im-side{position:sticky;top:0;align-self:start}
+.im-panel{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);padding:16px;max-height:calc(100vh - 64px);overflow-y:auto;overscroll-behavior:contain}
 .im-panel h2{font-size:15px;font-weight:600;margin:0 0 2px;display:flex;gap:8px;align-items:baseline}
 .im-panel h2 .k{font-family:var(--mono);font-size:13px;color:var(--muted);font-weight:400}
 .im-panel .sub{font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
