@@ -1,7 +1,7 @@
 ---
 title: Graph
 description: Trace linked issues and pull requests, compare saved results, and export an HTML explorer.
-lastModified: 2026-09-23
+lastModified: 2026-09-27
 ---
 
 ## Start from an issue or PR
@@ -37,7 +37,7 @@ The report flags competing PRs, shared changed files, possible superseded work, 
 | Flag | Default | Effect |
 | --- | --- | --- |
 | `--depth N` | `2` | Same-repository recursion from depth-zero seeds |
-| `--budget N` | `80` | Total node cap, from 1 to 1000 |
+| `--budget N` | `80` for explicit items; `1000` for a repository | Total node cap, from 1 to 1000 |
 | `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it above this reference count |
 | `--concurrency N` | `4` | Concurrent node requests, from 1 to 32 |
 
@@ -55,7 +55,7 @@ The capture reached its depth boundary with 19 references left unfetched. It omi
 
 ## Compare snapshots
 
-Graph mode saves history under `~/.issue-graph/`, keyed by repository and seed list. Run the same seed list again to see new nodes, state changes, and new links:
+Graph mode saves history under `~/.issue-graph/`, or `ISSUE_GRAPH_HOME` when set, keyed by repository and seed list. Run the same seed list again to see new nodes, state changes, and new links:
 
 ```bash
 issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12
@@ -71,7 +71,9 @@ issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
 
 `-o PATH.json` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Graph JSON has no `schemaVersion` field. Markdown remains on stdout.
 
-`-o PATH.html` writes a self-contained explorer with filters, relationships, connected components, cleanup candidates, and an Impact view. Open it directly in your browser. The Impact view shows relationships found in the graph.
+`-o PATH.html` writes the static Next.js dashboard with Explore, Impact, Swarm, and Rank views. Open the HTML directly in your browser; no Next server is needed. Keep its sibling `_next/` assets and `font-LICENSE.txt` when moving it. Impact shows relationships found in the graph, not proven causality.
+
+To query the same data from the CLI, export a dashboard without `--no-save`, or start with `issue-graph open owner/repo`. Then use `query` for shared filters, scoring, exact links, and replay. See [Dashboard and saved queries](/docs/dashboard).
 
 Export paths write files even with `--no-save` and can overwrite existing paths. Review private results before sharing them.
 

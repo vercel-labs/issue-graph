@@ -116,7 +116,6 @@ describe("documentation content contract", () => {
       read("content/docs/graph.mdx"),
       read("../../README.md"),
     ]);
-    // The fixture records the legacy command it was captured with; docs show the current equivalent.
     expect(example.command).toBe(exampleCommand);
     for (const page of pages) {
       expect(page).toContain(exampleRerunCommand);

@@ -8,7 +8,6 @@ export const plannedInstallCommand = "npm install -g issue-graph@latest";
 export const agentSetupPrompt = "npx skills@latest add vercel-labs/issue-graph";
 export const exampleCommand =
   "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot";
-/** The captured example in the current command syntax, as the docs show it. */
 export const exampleRerunCommand =
   "issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save";
 export const isPreview = process.env.VERCEL_ENV === "preview";

@@ -1,7 +1,7 @@
 ---
 title: Permissions and privacy
 description: Configure GitHub access and understand which commands save files or send data to an external agent.
-lastModified: 2026-09-23
+lastModified: 2026-09-27
 ---
 
 ## GitHub access
@@ -16,6 +16,8 @@ Your account needs read access to each repository queried, including private rep
 
 Graph, status, reconcile, plan, and schema keep GitHub read-only. They produce reports and suggested actions. An external workflow handles any subsequent comments, closures, or merges.
 
+`query` reads saved models offline and needs no provider credentials. It writes local captures, query history, and dashboard exports. `config show` reads local defaults; `config set` explicitly changes them.
+
 For the HTTP library transport, store your token on the server and grant only the repository access needed for your queries. Keep it out of browser code, exports, and committed configuration. A broadly authorized token retains its write permissions even when the CLI only reads.
 
 The HTTP transport targets `api.github.com`.
@@ -28,9 +30,11 @@ The HTTP transport targets `api.github.com`.
 | Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-save` skips new snapshots |
 | Plan | None | Report on stdout |
 | Status | None | `--save` writes a capture; conflicts with `--no-save` |
+| Query | Immutable models in `captures/`, receipts and views in `history/` | New queries save automatically; `--history` replays existing artifacts |
+| Config | `config.json` | Only `config set` persists weights; query overrides and UI edits do not |
 | Schema and help | None | Output on stdout |
 
-`ISSUE_GRAPH_HOME` changes the status storage root. Graph and reconcile use `~/.issue-graph/`. Comparisons can read existing history while snapshot writes are disabled.
+`ISSUE_GRAPH_HOME` changes the shared state root for graph, reconcile, status, saved dashboard models, config, captures, and query history. The default is `~/.issue-graph/`. Comparisons can read existing history while snapshot writes are disabled. Query has no `--no-save` flag; `--no-open` only suppresses the browser opener.
 
 Status captures use restrictive directory and file permissions. Graph, reconcile, and exports use their destination's filesystem permissions. Stored files are unencrypted, and explicit export paths can overwrite existing files. Shell redirection and terminal logging can also retain output.
 
@@ -38,7 +42,7 @@ Status captures use restrictive directory and file permissions. Graph, reconcile
 
 Results can include private titles, repository names, URLs, authors, assignments, relationships, commit identifiers, and changed-file paths. A public seed can lead to private references accessible to your account.
 
-Review the full result before sharing it. HTML exports embed the graph and can be read by anyone with the file. Choose an appropriate storage location, retention period, and backup policy for private captures.
+Review the full result before sharing it. HTML exports embed the full captured graph, including filtered-out items, and can be read by anyone with the file. Filters are not a redaction mechanism. Keep the HTML, `_next/` assets, and `font-LICENSE.txt` together when copying a Next.js dashboard. Choose an appropriate storage location, retention period, and backup policy for private captures.
 
 ## External agents
 

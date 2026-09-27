@@ -1,7 +1,7 @@
 ---
 title: Get started
 description: Install issue-graph, sign in with GitHub CLI, and trace your first issue.
-lastModified: 2026-09-23
+lastModified: 2026-09-27
 ---
 
 ## Prerequisites
@@ -24,6 +24,8 @@ npx issue-graph@latest --help
 ```
 
 You can replace `issue-graph` with `npx issue-graph@latest` in any CLI example.
+
+These docs track repository `main`, which can be ahead of the published package. Check `issue-graph --help` for commands supported by your installed release. If a command is missing, use a release that includes it or follow the source setup below.
 
 ## Authenticate GitHub
 
@@ -68,7 +70,16 @@ Add `-o` with a `.json` or `.html` path to save the results:
 issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save -o graph.json -o graph.html
 ```
 
-Open `graph.html` in your browser. Export paths write files even with `--no-save`; choose new filenames if you want to keep earlier results.
+Open `graph.html` in your browser. Keep its sibling `_next/` directory and `font-LICENSE.txt` when moving it. Export paths write files even with `--no-save`; choose new filenames if you want to keep earlier results.
+
+For CLI filters and an exact dashboard link, save a model first:
+
+```bash
+issue-graph open vercel-labs/agent-browser --no-open
+issue-graph query github:vercel-labs/agent-browser --state open --kind Issue --view rank --json --open
+```
+
+The first command collects data within its crawl budget. The second uses saved data offline and returns `viewUrl`; it does not refresh GitHub. See [Dashboard and saved queries](/docs/dashboard) for Heat, clusters, replay, and scoring defaults.
 
 ## Update
 

@@ -1,7 +1,7 @@
 ---
 title: Agents and skills
 description: Install the issue-graph skill and use it to trace issues, check PR status, and review backlogs.
-lastModified: 2026-09-23
+lastModified: 2026-09-27
 ---
 
 ## Install the agent skill
@@ -53,6 +53,9 @@ Use `issue-graph skills list` to discover available guides and command-specific 
 | Changes since a saved capture | `issue-graph status --since last` |
 | Related work and competing fixes | `issue-graph graph <issue-or-pr>` |
 | What to fix first | `issue-graph rank` |
+| Filter saved work and return its exact dashboard link | `issue-graph query provider:scope --json --no-open` |
+| Restore an earlier view | `issue-graph query --history HISTORY_ID --json --open` |
+| Inspect persistent scoring defaults | `issue-graph config show --json` |
 | Backlog items to verify | `issue-graph reconcile` |
 | Next review or investigation | `issue-graph plan` |
 
@@ -64,7 +67,24 @@ issue-graph plan owner/repo --format json
 issue-graph schema
 ```
 
-Set repositories and authors from the user's request. Inside a GitHub checkout the repository defaults to its `git remote`. Graph prints Markdown when piped; `-o PATH.json` writes its JSON result to a file. Other modes support JSON on stdout. The schema lists `githubMutations`, `localWrites`, defaults, and limits.
+Set repositories and authors from the user's request. Live GitHub commands can infer a repository from the checkout's `git remote`. Offline `query` selects saved models by provider and project; it needs an explicit scope when several models exist. Graph prints Markdown when piped; `-o PATH.json` writes its JSON result to a file. Other modes support JSON on stdout. The schema lists `githubMutations`, `localWrites`, defaults, and limits.
+
+## Return the exact dashboard link
+
+Start with a saved model, inspect the result's `capabilities`, `coverage`, and `groups`, then apply supported filters:
+
+```bash
+issue-graph query github:owner/repo --json --no-open
+issue-graph query --capture CAPTURE_ID --state open --kind Issue --heat-min 50 --view rank --json --open
+```
+
+Replace `CAPTURE_ID` with the first result's `captureId`. Each query starts with the supplied filters; `--capture` does not inherit earlier filters. Use the returned `historyId` with `--history` to replay frozen parameters; replay rejects query overrides.
+
+Include the returned `viewUrl` unchanged as a clickable link, preserving the query string and hash. Summarize useful candidates, active filters, and coverage; leave the full ranking in the dashboard. `--open` requests the OS opener and does not prove the page loaded. If the chat client cannot open a local file URL, provide `issue-graph query --history HISTORY_ID --open` with the actual ID. Never invent a localhost port.
+
+`open` and `cluster --apply` return a `dashboard` path. Follow them with `query` on the saved scope to get a link for specific filters and selection. See [Dashboard and saved queries](/docs/dashboard).
+
+Use `query --weights` for temporary exploration. Use `config set` only when the user wants persistent defaults. Take `--provider` and `--scope` from the query result; UI changes do not write the config file. Query and config need no provider authentication.
 
 ## Report findings
 
