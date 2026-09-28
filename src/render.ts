@@ -23,7 +23,14 @@ export const kindTag = (k: string): string =>
   k === "PullRequest" ? "PR" : k === "Issue" ? "issue" : k;
 
 export const viaTag = (v: Via | string): string =>
-  ({ closes: "closes", "cross-ref": "cross-ref", connected: "linked", text: "mentions" })[v] ?? v;
+  (
+    ({
+      closes: "closes",
+      "cross-ref": "cross-ref",
+      connected: "linked",
+      text: "mentions",
+    }) as Record<string, string>
+  )[v] ?? v;
 
 /** Render the graph body: header, components (multi-seed), nodes, beyond-depth, orphan checklist. */
 export function render(

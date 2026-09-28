@@ -41,9 +41,13 @@ issue-graph plan owner/repo --format json
 issue-graph schema
 ```
 
-`open`, `rank`, and `cluster` accept repository scopes or items (`123`, `#123`, `owner/repo#123`, or a URL). `graph` needs items or `--label`. Live commands can infer the repository from the current checkout. Status accepts repositories plus authors. Offline `query` selects a saved `provider:scope`; config uses `--provider` and `--scope`.
+`open`, `rank`, and `cluster` accept GitHub repository scopes or items (`123`, `#123`, `owner/repo#123`, or a URL). `graph` needs items or `--label`. Live GitHub commands can infer the repository from the current checkout. Status accepts repositories plus authors. Offline `query` selects a saved `provider:scope`; config uses `--provider` and `--scope`.
 
 Running `issue-graph` with no arguments inside an interactive checkout opens the backlog dashboard. It prints usage in a pipe or CI. Older flags still work for one minor release and print their replacement.
+
+## YouTrack collection
+
+Set `YOUTRACK_URL` to the server base URL and `YOUTRACK_TOKEN` to a permanent token, then capture a project with `issue-graph open youtrack:PROJECT`. Project captures default to unresolved issues; `--state all` includes resolved issues. Focus one issue with `issue-graph open youtrack:PROJECT#NUMBER`; `--depth` follows subtasks and outward `epic for` links (default 2), while other links add one-hop context. Issue activity can provide linked GitHub pull requests and commit URLs. The collector is read-only; check dashboard coverage when API reads are incomplete.
 
 ## Graph selection and crawl controls
 
@@ -51,8 +55,8 @@ Running `issue-graph` with no arguments inside an interactive checkout opens the
 | --- | --- |
 | `--repo owner/repo` | Repository for bare numbers when outside its checkout |
 | `--label L` | Seed from labeled open issues, within the discovery budget |
-| `--state open\|all` | For unfiltered `open`, `rank`, or `cluster` repository scopes, seed open items (default) or all states; linked context can have any state |
-| `--depth N` | Same-repo recursion depth, default 2; cross-repository references are fetched one hop |
+| `--state open\|all` | For unfiltered GitHub `open`, `rank`, or `cluster` repository scopes, seed open items (default) or all states; YouTrack project `open` also defaults to unresolved issues |
+| `--depth N` | GitHub same-repo recursion depth (default 2); YouTrack focused issue hierarchy depth (default 2); other linked context is one hop |
 | `--budget N` | Total nodes, default 80; unfiltered `open`, `rank`, and `cluster` repository scopes default to 1000; integer from 1 to 1000 |
 | `--hub-threshold N` | Do not expand high-degree non-seed nodes above this number of references, default 12 |
 | `--concurrency N` | Node requests in flight, default 4; integer from 1 to 32 |
@@ -73,6 +77,7 @@ Reconcile and plan discover the open backlog of their repository scope and share
 | `cluster --agent claude` | Launch installed Claude headlessly with the clustering task |
 | `cluster --agent codex` | Launch installed Codex headlessly with the clustering task |
 | `open --agent none` | Skip the interactive offer to run an installed agent |
+| `open youtrack:ENG#7 --agent codex` | Capture a YouTrack issue graph, then cluster it with installed Codex |
 
 Use one `.json` and one `.html` output in the same command; the last path of each type wins. Reconcile and plan use `--format json` for structured output. `open` and `cluster` always write an HTML export, even with `--no-save`. Applying clusters always updates the saved model. External agents run with their own permissions.
 
@@ -95,7 +100,7 @@ Use one `.json` and one `.html` output in the same command; the last path of eac
 
 | Option | Meaning |
 | --- | --- |
-| `provider:scope` | Select a saved model; bare `owner/repo` means GitHub; omit only when exactly one model is available |
+| `provider:scope` | Select a saved model, such as `github:owner/repo` or `youtrack:PROJECT`; bare `owner/repo` means GitHub; omit only when exactly one model is available |
 | `--input PATH` | Import one normalized dashboard model, not a graph JSON export |
 | `--capture ID` | Query the same full captured data with current defaults and newly supplied filters; conflicts with `--input` |
 | `--history ID` | Replay frozen parameters and saved view; only output format and open controls may accompany it |
@@ -179,8 +184,10 @@ Status history adds `history` on comparison and `snapshot` on save. Graph/reconc
 | `NO_COLOR` | Disables terminal styling |
 | `CI` | Suppresses terminal color and automatic browser opening |
 | `ISSUE_GRAPH_HOME` | Shared state root for config, captures, query history, saved models, and graph/status/reconcile history; default `~/.issue-graph` |
+| `YOUTRACK_URL` | YouTrack server base URL for live collection |
+| `YOUTRACK_TOKEN` | Permanent token used for read-only YouTrack collection; keep it private |
 
-Live GitHub collection authenticates through `gh`; HTTP library callers supply a token. Offline query and config need no provider authentication. These commands run without a model unless an external clustering agent is explicitly selected.
+Live GitHub collection authenticates through `gh`; live YouTrack collection uses `YOUTRACK_URL` and `YOUTRACK_TOKEN`. Offline query and config need no provider authentication. These commands run without a model unless an external clustering agent is explicitly selected.
 
 ## Exit codes and coverage
 

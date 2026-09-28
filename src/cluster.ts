@@ -52,10 +52,25 @@ export function clusterPrompt(repo: string, payload: ClusterNode[]): string {
 }
 
 /** Shell out to a headless coding agent to run the clustering prompt. */
-export function runAgent(agent: string, prompt: string): string {
+export function runAgent(
+  agent: string,
+  prompt: string,
+  options: { model?: string; reasoningEffort?: string } = {},
+): string {
   const opts = { input: prompt, encoding: "utf8" as const, maxBuffer: 16 * 1024 * 1024 };
-  if (agent === "claude") return execFileSync("claude", ["-p"], opts);
-  if (agent === "codex") return execFileSync("codex", ["exec", "-"], opts);
+  if (agent === "claude") {
+    if (options.model || options.reasoningEffort)
+      throw new Error("agent model options currently require codex");
+    return execFileSync("claude", ["-p"], opts);
+  }
+  if (agent === "codex") {
+    const args = ["exec"];
+    if (options.model) args.push("--model", options.model);
+    if (options.reasoningEffort)
+      args.push("--config", `model_reasoning_effort="${options.reasoningEffort}"`);
+    args.push("-");
+    return execFileSync("codex", args, opts);
+  }
   throw new Error(`unknown agent: ${agent} (use claude|codex)`);
 }
 

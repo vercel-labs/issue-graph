@@ -27,7 +27,7 @@ import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
 import { ISSUE_GRAPH_SCHEMA } from "./schema.js";
-import { inferRepo, parseScope, type Scope } from "./scope.js";
+import { inferRepo, type ProviderId, parseScope, type Scope } from "./scope.js";
 import { runSkills } from "./skills-cli.js";
 import {
   diffReconcileSnapshots,
@@ -51,6 +51,7 @@ import { runStatus } from "./status-cli.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
 import type { NodeKey, Seed } from "./types.js";
+import { collectYouTrack } from "./youtrack.js";
 
 const USAGE = `usage: issue-graph [command] [scope...] [options]
 
@@ -76,6 +77,8 @@ commands
 scope
   (none)                   the GitHub repository of the current directory
   owner/repo               a repository; github:owner/repo names the provider
+  youtrack:PROJECT         a YouTrack project (set YOUTRACK_URL and YOUTRACK_TOKEN)
+  youtrack:PROJECT#NUMBER  one issue and its linked child graph
   123  #123  owner/repo#123  <issue or PR URL>   one or more items
 
 options
@@ -84,14 +87,16 @@ options
   --format F               human, markdown, or json (default: human in a terminal, else markdown)
   -o, --out PATH           also write a file; .json for the graph, .html for the explorer
   --open, --no-open        open the explorer (open defaults to yes in an interactive terminal)
-  --agent A                claude or codex: cluster without an agent session (cron, CI)
+  --agent A                claude or codex: run a local clustering agent; none opts out
+  --agent-model MODEL      Codex model (requires --agent codex)
+  --agent-reasoning-effort EFFORT  Codex effort: none, low, medium, high, xhigh, or max
   --clusters PATH          group the explorer by clusters from a JSON file instead of an agent
   --no-save                do not keep this run under ~/.issue-graph/
   -h, --help               show this
 
 advanced
   --budget N               stop after N items (80; 1000 for unfiltered open/rank/cluster repos)
-  --depth N                same-repository reference depth (default 2)
+  --depth N                GitHub reference depth or YouTrack issue hierarchy depth (default 2)
   --hub-threshold N        fetch but do not expand an item with more references (default 12)
   --concurrency N          GitHub requests in flight (default 4, max 32)
 
@@ -124,6 +129,7 @@ const COMMANDS: Command[] = [
 
 interface Args {
   command: Command;
+  provider: ProviderId;
   /** true when the command was typed, false when a bare seed implied graph */
   explicit: boolean;
   seed: string;
@@ -145,6 +151,8 @@ interface Args {
   cluster: boolean;
   clusterRun: string;
   agent: "" | "claude" | "codex" | "none";
+  agentModel: string;
+  agentReasoningEffort: "" | "none" | "low" | "medium" | "high" | "xhigh" | "max";
   apply: string;
   open: boolean;
   openMode: "auto" | "yes" | "no";
@@ -168,6 +176,7 @@ export function parseArgs(argv: string[]): Args {
   const command: Command = explicit ? (argv[0] as Command) : "graph";
   const a: Args = {
     command,
+    provider: "github",
     explicit,
     seed: "",
     items: [],
@@ -188,6 +197,8 @@ export function parseArgs(argv: string[]): Args {
     cluster: false,
     clusterRun: "",
     agent: "",
+    agentModel: "",
+    agentReasoningEffort: "",
     apply: "",
     open: false,
     openMode: "auto",
@@ -257,6 +268,14 @@ export function parseArgs(argv: string[]): Args {
       if (v !== "claude" && v !== "codex" && v !== "none")
         throw new UsageError("--agent must be claude, codex, or none");
       a.agent = v;
+    } else if (arg === "--agent-model") a.agentModel = need(argv, ++i, arg);
+    else if (arg === "--agent-reasoning-effort") {
+      const effort = need(argv, ++i, arg);
+      if (!["none", "low", "medium", "high", "xhigh", "max"].includes(effort))
+        throw new UsageError(
+          "--agent-reasoning-effort must be none, low, medium, high, xhigh, or max",
+        );
+      a.agentReasoningEffort = effort as Args["agentReasoningEffort"];
     } else if (arg === "--apply") {
       // "-" means stdin, so it cannot go through need(), which rejects dash-leading values
       const v = argv[++i];
@@ -283,10 +302,25 @@ export function parseArgs(argv: string[]): Args {
         throw new UsageError(e instanceof Error ? e.message : String(e));
       }
       if (sc.kind === "repo") {
-        if (a.repo && a.repo !== sc.repo)
+        if (a.repo && (a.repo !== sc.repo || a.provider !== sc.provider))
           throw new UsageError(`one repository per run: ${a.repo} and ${sc.repo}`);
         a.repo = sc.repo;
-      } else a.items.push({ repo: sc.repo, number: sc.number });
+        a.provider = sc.provider;
+      } else {
+        if (sc.provider === "youtrack") {
+          if (
+            (a.repo && (a.repo !== sc.repo || a.provider !== sc.provider)) ||
+            (a.items.length > 0 && a.provider !== sc.provider)
+          ) {
+            throw new UsageError(`one provider and project per run: ${a.repo} and ${sc.repo}`);
+          }
+          a.repo = sc.repo ?? "";
+          a.provider = sc.provider;
+        } else if (a.provider === "youtrack") {
+          throw new UsageError("YouTrack issue scopes cannot be mixed with GitHub scopes");
+        }
+        a.items.push({ repo: sc.repo, number: sc.number });
+      }
     }
   // keep the legacy single-seed field for callers and messages that read it
   if (a.items.length === 1 && !a.explicit)
@@ -300,6 +334,8 @@ export function parseArgs(argv: string[]): Args {
     a.cluster = true;
     a.clusterRun = a.agent;
   }
+  if ((a.agentModel || a.agentReasoningEffort) && a.agent !== "codex")
+    throw new UsageError("--agent-model and --agent-reasoning-effort require --agent codex");
   // repository-wide commands cover the whole open backlog unless items or a label narrow them
   const wide = a.command === "open" || a.command === "rank" || a.command === "cluster";
   if (wide && !a.items.length && !a.label && !a.seedsCsv) a.allOpen = true;
@@ -329,6 +365,13 @@ export function parseArgs(argv: string[]): Args {
 /** Whether a person is at the terminal: prompts and opening a browser need one. */
 function interactive(): boolean {
   return Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env.CI;
+}
+
+function runSelectedAgent(args: Args, prompt: string): string {
+  return runAgent(args.clusterRun, prompt, {
+    model: args.agentModel || undefined,
+    reasoningEffort: args.agentReasoningEffort || undefined,
+  });
 }
 
 /** The repository for a run: --repo or a scope, else the current directory's GitHub remote. */
@@ -458,6 +501,83 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
   if (args.command === "schema") {
     console.log(JSON.stringify(ISSUE_GRAPH_SCHEMA, null, 2));
+    return;
+  }
+  if (args.provider === "youtrack") {
+    if (args.command !== "open")
+      throw new UsageError("YouTrack currently supports open on a project or issue scope");
+    if (args.items.length > 1 || (args.items.length === 1 && args.items[0].repo !== args.repo)) {
+      throw new UsageError("YouTrack issue scope must be youtrack:PROJECT#NUMBER");
+    }
+    if (
+      args.label ||
+      args.seedsCsv ||
+      (args.cluster && !args.clusterRun) ||
+      args.clustersFile ||
+      args.jsonOut ||
+      args.format !== "auto" ||
+      (!args.items.length && args.depth !== 2) ||
+      args.concurrency !== 4 ||
+      args.hubThreshold !== 12
+    )
+      throw new UsageError(
+        "YouTrack open supports project or issue scope, --state, --budget, --depth for an issue, --agent, and HTML output",
+      );
+    let model = await collectYouTrack(args.repo, {
+      state: args.state,
+      maxNodes: args.maxNodes,
+      ...(args.items.length === 1 ? { issueId: `${args.repo}-${args.items[0].number}` } : {}),
+      ...(args.items.length === 1 ? { maxDepth: args.depth } : {}),
+    });
+    const clusterNodes = Object.values(model.nodes)
+      .filter((node) => node.state === "OPEN" || node.seed)
+      .map((node) => ({
+        key: node.key,
+        kind: node.kind,
+        state: node.state,
+        title: node.title,
+        verdict: node.verdict,
+        edges: node.out.map((edge) => `${edge.via} ${edge.to}`),
+      }));
+    if (!args.clusterRun && args.agent !== "none" && interactive() && clusterNodes.length) {
+      const agent = await chooseAgent(clusterNodes.length);
+      if (agent) args.clusterRun = agent;
+    }
+    if (args.clusterRun && clusterNodes.length) {
+      process.stderr.write(`\nclustering via ${args.clusterRun}...\n`);
+      try {
+        const parsed = parseClustersReply(
+          runSelectedAgent(args, clusterJsonPrompt(model.repo, clusterNodes)),
+        );
+        const applied = applyClusters(model, parsed);
+        model = applied.model;
+        if (applied.unknown.length)
+          process.stderr.write(
+            `agent output included ${applied.unknown.length} unknown issue key(s)\n`,
+          );
+        process.stderr.write(`${parsed.clusters.length} root causes via ${args.clusterRun}\n`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        process.stderr.write(
+          `agent '${args.clusterRun}' failed: ${msg}; using connected components\n`,
+        );
+      }
+    }
+    const fileKey = (model.id ?? model.repo).replace(/[^\w.-]/g, "_");
+    const out = args.htmlOut || join(tmpdir(), `issue-graph-${fileKey}-${Date.now()}.html`);
+    writeNextDashboard(out, [model], modelDefaults([model]));
+    if (!args.noSnapshot) {
+      const saved = writeDashboardModel(model.id ?? model.repo, model);
+      process.stderr.write(`dashboard run saved: ${saved}\n`);
+    }
+    if (model.coverage && !model.coverage.complete)
+      for (const warning of model.coverage.warnings ?? model.coverage.messages)
+        process.stderr.write(`YouTrack coverage: ${warning}\n`);
+    process.stderr.write(`wrote ${out} (${model.label ?? model.repo})\n`);
+    const openAfter =
+      args.openMode === "yes" ||
+      (args.openMode === "auto" && args.command === "open" && interactive());
+    if (openAfter) openInBrowser(out);
     return;
   }
   const human = (output: string, kind: "graph" | "plan") =>
@@ -662,7 +782,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     process.stderr.write(`\nclustering via ${args.clusterRun}...\n`);
     try {
       const parsed = parseClustersReply(
-        runAgent(args.clusterRun, clusterJsonPrompt(repoName, clusterPayload(nodes, seedKeys))),
+        runSelectedAgent(args, clusterJsonPrompt(repoName, clusterPayload(nodes, seedKeys))),
       );
       agentClusters = parsed;
       result.agent = args.clusterRun;
@@ -691,7 +811,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       process.stderr.write(`\nclustering via ${args.clusterRun}...\n`);
       try {
         printGraph(
-          `\n## Root-cause clusters (${args.clusterRun})\n\n${runAgent(args.clusterRun, prompt).trim()}\n`,
+          `\n## Root-cause clusters (${args.clusterRun})\n\n${runSelectedAgent(args, prompt).trim()}\n`,
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

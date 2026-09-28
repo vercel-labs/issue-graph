@@ -8,6 +8,7 @@ Use bounded reference graphs to find related work and review candidates. Classif
 ## Contents
 
 - Invocation and routing
+- YouTrack collection
 - Graph steps
 - Saved dashboard queries, links and defaults
 - Status mode and capture comparison
@@ -49,6 +50,12 @@ For PR counts or status tables, go directly to **Status mode** below; skip the g
 | Full backlog reconciliation or next-action queue | `issue-graph reconcile owner/repo` or `issue-graph plan owner/repo`; inspect their `--help` before use |
 
 Ready-for-review means non-draft, not approved or merge-ready. For a ready-for-review/unassigned intersection, filter `pullRequests` from `--json` using `isDraft === false` and an explicitly empty `assignees` array. Do not subtract independent totals or treat unknown metadata as empty. The status command does not inspect bot review findings or CI checks; those need a separate review inspection.
+
+## YouTrack collection
+
+Use `issue-graph open youtrack:PROJECT` for unresolved project issues, or add `--state all` to include resolved issues. For one issue, use `issue-graph open youtrack:PROJECT#NUMBER`; `--depth` follows subtasks and outward `epic for` links (default 2), while other issue links add one-hop context. `--budget` bounds the graph.
+
+Set `YOUTRACK_URL` to the server base URL and `YOUTRACK_TOKEN` to a permanent token in the process environment. Never ask for or print the token. Collection is read-only. Focused issue activity can reveal linked GitHub pull requests and commit URLs; treat these as observed evidence, not a complete repository history. Check dashboard coverage and collector warnings for truncated issue or activity reads.
 
 ## Graph steps
 

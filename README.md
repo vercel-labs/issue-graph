@@ -8,7 +8,7 @@
 
 Find related issues, competing changes, and unresolved follow-ups before you start work.
 
-`issue-graph` traces linked GitHub issues and pull requests. Use it to find existing fixes, check PR status by author, and choose what to review next.
+`issue-graph` traces linked GitHub issues and pull requests, or linked issues in a YouTrack project. Use it to find existing fixes and choose what to review next.
 
 ![issue-graph demo: related fixes and follow-ups, superseded PRs to review, and a per-author PR status ledger](https://issue-graph.dev/issue-graph-workflows.gif)
 
@@ -16,7 +16,7 @@ Illustrated workflows: Graph → Reconcile → PR status. [Static version](https
 
 ## Start here
 
-Install the [npm package](https://www.npmjs.com/package/issue-graph) with [Node.js](https://nodejs.org) 20 or later. GitHub queries use your [GitHub CLI](https://cli.github.com) login.
+Install the [npm package](https://www.npmjs.com/package/issue-graph) with [Node.js](https://nodejs.org) 20 or later. GitHub queries use your [GitHub CLI](https://cli.github.com) login; YouTrack reads use `YOUTRACK_URL` and `YOUTRACK_TOKEN`.
 
 Try the CLI without a global installation:
 
@@ -58,6 +58,7 @@ This README follows repository `main`, which can be ahead of the published packa
 | Need | Installed command |
 | --- | --- |
 | Capture a backlog and open its dashboard | `issue-graph open owner/repo` |
+| Capture a YouTrack project | `issue-graph open youtrack:PROJECT` |
 | Inspect an issue or PR before starting work | `issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save` |
 | Survey labeled open issues | `issue-graph rank owner/repo --label bug` |
 | Filter a saved model and open its exact dashboard view | `issue-graph query github:owner/repo --state open --view rank --open` |
@@ -83,6 +84,10 @@ Open `graph.html` directly in a browser to explore relationships, filter nodes, 
 
 Graph and reconcile runs save local history under `~/.issue-graph/` by default. Re-running the same graph seeds shows a snapshot diff; reconciliation tracks repository-level action changes. `--no-save` skips saving history but does not prevent explicitly requested `-o` exports. Plan writes no snapshots.
 
+### YouTrack
+
+Set `YOUTRACK_URL` to the server base URL and `YOUTRACK_TOKEN` to a permanent token, then run `issue-graph open youtrack:PROJECT`. Use the project's short name as the scope. The default capture includes unresolved issues; `--state all` also includes resolved issues. To focus on one issue, use `issue-graph open youtrack:PROJECT#NUMBER`; this follows subtasks and outward `epic for` links to `--depth` (default 2), includes one-hop context for other links, adds GitHub pull requests from issue activity history, and shows linked commit URLs in issue details. `--budget` limits the total graph size. The collector reports incomplete API reads in the dashboard coverage.
+
 Status history is opt-in:
 
 ```bash
@@ -104,7 +109,7 @@ issue-graph query --history HISTORY_ID --open
 
 Query prints JSON in a pipe. In a terminal it shows a short summary and requests opening the exact view; `--no-open` suppresses that request. Results include captured items, scores, capabilities, coverage, a capture ID, a history ID and `viewUrl`. Return `viewUrl` unchanged, including the query string and hash. The Next.js page embeds the capture and effective weights; its compiled assets are stored beside it, so an old link stays stable when defaults or saved runs change. Replace `HISTORY_ID` with the returned `historyId` to replay frozen parameters. `--capture` queries the same data with current defaults and newly supplied filters, without inheriting earlier filters.
 
-Scopes are provider-qualified: `github:owner/repo` or `linear:workspace:project:project-id`. Other providers can supply the same normalized dashboard model through `--input model.json`; graph JSON from `-o graph.json` is a different format. This command does not collect live Linear or Jira data. Unsupported provider filters fail explicitly. Cluster indices belong to the selected capture; inspect `groups` before choosing them. See [Dashboard and saved queries](apps/docs/content/docs/dashboard.mdx) for the full workflow.
+Scopes are provider-qualified: `github:owner/repo` or `youtrack:PROJECT`. Query reads saved captures; other providers such as Linear or Jira can supply the same normalized dashboard model through `--input model.json`. Graph JSON from `-o graph.json` is a different format. Unsupported provider filters fail explicitly. Cluster indices belong to the selected capture; inspect `groups` before choosing them. See [Dashboard and saved queries](apps/docs/content/docs/dashboard.mdx) for the full workflow.
 
 Set persistent weights explicitly:
 
@@ -135,7 +140,7 @@ issue-graph skills get core --full
 
 Use `--full` for workflow references, `issue-graph skills list` for available guides, and command-specific `--help` for syntax. If the CLI or guidance is missing, report the error and ask for an authorized setup correction. See [Agents](apps/docs/content/docs/agents.mdx) for setup.
 
-Use `issue-graph cluster owner/repo` to print a root-cause clustering task for the calling agent, then `issue-graph cluster owner/repo --apply answer.json` (or `-` for stdin) to load its answer. For cron or CI, `--agent claude` or `--agent codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
+Use `issue-graph cluster owner/repo` to print a root-cause clustering task for the calling agent, then `issue-graph cluster owner/repo --apply answer.json` (or `-` for stdin) to load its answer. For cron or CI, `--agent claude` or `--agent codex` sends it to an installed headless agent. Set the Codex model and reasoning effort with `--agent-model` and `--agent-reasoning-effort`; for example, `issue-graph open youtrack:ENG#7 --agent codex --agent-model gpt-6-luna --agent-reasoning-effort high`. The same options work for GitHub clustering. Review the payload and the agent's permissions and data policy before using private issue evidence; the CLI does not sandbox that process.
 
 Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
 

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 /** Providers the CLI can read today; a scope naming any other is a clear usage error. */
-export const PROVIDERS = ["github"] as const;
+export const PROVIDERS = ["github", "youtrack"] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 /** A positional argument: a whole repository, or one item in it. */
@@ -14,7 +14,7 @@ export class ScopeError extends Error {}
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 
 /**
- * Parse `owner/repo`, `github:owner/repo`, `owner/repo#123`, `#123`, `123`, or an
+ * Parse `owner/repo`, `github:owner/repo`, `youtrack:PROJECT`, `owner/repo#123`, `#123`, `123`, or an
  * issue/PR URL. A `provider:` prefix other than a supported one fails with the list
  * of providers, so a future `linear:ENG` reads as "not yet", not as a typo.
  */
@@ -30,6 +30,19 @@ export function parseScope(input: string): Scope {
       );
     }
     rest = prefix[2];
+    if (prefix[1] === "youtrack") {
+      const issue = rest.match(/^([\w.-]+)#(\d+)$/);
+      if (issue)
+        return {
+          kind: "item",
+          provider: "youtrack",
+          repo: issue[1],
+          number: Number(issue[2]),
+        };
+      if (!/^[\w.-]+$/.test(rest))
+        throw new ScopeError(`YouTrack scope must be PROJECT or PROJECT#NUMBER: ${rest}`);
+      return { kind: "repo", provider: "youtrack", repo: rest };
+    }
   }
   // a repository before the number needs its #, or owner/repo2 would read as item 2 of owner/repo
   const item = rest.match(/^(?:([\w.-]+\/[\w.-]+)#|#)?(\d+)$/);
