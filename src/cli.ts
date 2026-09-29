@@ -48,6 +48,7 @@ import {
   writeSnapshot,
 } from "./snapshot.js";
 import { runStatus } from "./status-cli.js";
+import { buildSweep, missingBasePaths, sweepBasePaths } from "./sweep.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
 import type { NodeKey, Seed } from "./types.js";
@@ -522,10 +523,12 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
           : "json"
         : args.format;
     if (args.command === "plan") {
+      const missing = await missingBasePaths(transport, sweepBasePaths(nodes));
       const plan = buildPlanReport(
         report,
         nodes,
         prioritize(nodes, new Date(), resolveWeights(readConfig(), "github", report.repo)),
+        buildSweep(nodes, missing),
       );
       console.log(
         format === "json"

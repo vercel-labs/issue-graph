@@ -13,6 +13,7 @@ Use bounded reference graphs to find related work and review candidates. Classif
 - Status mode and capture comparison
 - Reconcile mode
 - Plan mode
+- Sweep mode
 - Flags
 - How it reads the graph
 - Guardrails
@@ -215,6 +216,27 @@ If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limit
 Use `issue-graph plan owner/repo --format json` when a human or agent needs the next safe backlog action. It returns a ready execution queue, an investigation queue, blocked work, a single `next` item when coverage permits, and a structured `decision` for its observed neighborhood. Competing pull requests include comparable draft, review, mergeability, diff, file-count, and update signals. A `reviewFirst` value orders inspection only; it never proves correctness or chooses the winning implementation. Failed neighbor references are quarantined to their affected items. The ordering is deterministic and uses reconcile action, PR readiness, discussion heat, and visible inbound references.
 
 The plan does not infer semantic dependencies from issue prose. Treat `blockedBy` as visible graph evidence only, and re-run after each merge or closure.
+
+## Sweep mode
+
+Use the plan's `sweep` array to find open work that one decision resolves together. Run `issue-graph plan owner/repo --budget 1000 --format json` so older backlog items are in scope; the default budget covers only the newest 80 items.
+
+Each group is one of three kinds:
+
+- `competing`: an open issue with two or more open closing PRs, found from closing links whatever reconcile decided. `resolves` counts the issue plus every PR.
+- `stale`: an open PR whose modified or deleted files are all gone from the default branch, with the open issue it closes when there is one.
+- `overlap`: each open PR paired with the PR it shares the most weighted source files with, when they close no common issue. A file weighs less the more open PRs touch it, and `overlapScore` sums the shared weights. In repositories with a few large files, overlap is weak evidence; read both PRs before calling them duplicates.
+
+For each PR, `staleBase` is `true` when every file it modifies or deletes is gone from the default branch, `false` when some remain (listed in `missingOnBase`), and `null` when that could not be checked. Groups where every PR is stale sort first, then competing, stale, and overlap groups, each by larger `resolves`, higher `overlapScore`, and the smallest live change.
+
+Work the groups in order:
+
+1. **Verify before any claim.** A stale or competing group is a lead, not a verdict. Reproduce the issue's reported behavior on the current release and look for the commit that fixed it (`git log -S`, the handler on the default branch). Record the command and output.
+2. **Fixed on the default branch:** draft one short comment per item, naming the fixing PR or release and the check you ran, and thank each PR author. Hand the drafts to the human; do not post or close.
+3. **Not fixed:** inspect the group with `issue-graph graph <issue> <prs...>`, choose one implementation path, and credit every superseded contributor as a co-author.
+4. **Partially stale** (`missingOnBase` non-empty): the PR targets code that moved. Treat it as a design reference, not a mergeable patch.
+
+Re-run the plan after each merge or closure; groups change as work lands.
 
 ## Flags
 
