@@ -89,8 +89,7 @@ export function mountDashboardView(
   function syncSidebarFilters() {
     const search = document.getElementById("filter");
     if (search && search.value !== F.query) search.value = F.query;
-    const cleanup = document.querySelector("#cleanup-btn .cnt");
-    if (cleanup) cleanup.textContent = DATA.cleanup.filter((c, i) => !DONE.has(clId(c, i))).length;
+    syncSweepCount();
     for (const group of app.querySelectorAll(".grp")) {
       let count = 0;
       for (const item of group.querySelectorAll(".item")) {
@@ -598,7 +597,7 @@ export function mountDashboardView(
     else if (view === "swarm") swarmRender();
     else if (view === "rank") rankRender();
     else if (view === "impact") impactView(impactSel);
-    else if (view === "cleanup") cleanupView();
+    else if (view === "sweep") sweepView();
     else exploreView(sel?.startsWith("explore:") ? +sel.slice(8) : undefined);
   }
   function emptyFilters(message = "No items match these filters.") {
@@ -1071,11 +1070,12 @@ export function mountDashboardView(
         );
       })
       .join("");
-    const cleanupBtn = DATA.cleanup.length
-      ? '<button id="cleanup-btn" class="cleanup-pill"><span>Cleanup checklist</span><span class="cnt">' +
-        DATA.cleanup.filter((c, i) => !DONE.has(clId(c, i))).length +
-        "</span></button>"
-      : "";
+    const sweepBtn =
+      sweepGroups().length || DATA.cleanup.length
+        ? '<button id="sweep-btn" class="cleanup-pill"><span>Sweep</span><span class="cnt">' +
+          (sweepGroups().length + checklistPending()) +
+          "</span></button>"
+        : "";
     const total = mix.reduce((a, m) => a + m[2], 0) || 1;
     return (
       '<div class="side"><div class="side-top">' +
@@ -1114,7 +1114,7 @@ export function mountDashboardView(
       (hasView("rank") ? '<button class="view-btn" id="rank-view">Rank</button>' : "") +
       "</div>" +
       '<input class="filter" id="filter" placeholder="Filter by identifier, title, author" aria-label="Filter nodes"/>' +
-      cleanupBtn +
+      sweepBtn +
       "</div>" +
       '<div class="tree">' +
       groups +
@@ -1494,12 +1494,44 @@ export function mountDashboardView(
         : m,
     );
   }
-  function cleanupView() {
-    setView("cleanup");
-    const labels = groupLabels();
-    const rows = DATA.cleanup
+  function clRow(r, labels) {
+    const n = r.c.key && N[r.c.key];
+    const target = n
+      ? '<a class="rellink cl-key" data-key="' + esc(r.c.key) + '">' + esc(short(r.c.key)) + "</a>"
+      : '<span class="cl-key">' +
+        esc(r.c.key ? r.c.key.split("/").slice(1).join("/") : "") +
+        "</span>";
+    return (
+      '<label class="cl-row' +
+      (DONE.has(r.id) ? " done" : "") +
+      '"><input type="checkbox" data-cl-id="' +
+      esc(r.id) +
+      '"' +
+      (DONE.has(r.id) ? " checked" : "") +
+      "/>" +
+      '<span class="cl-body"><span class="cl-top">' +
+      (n ? '<i class="dot ' + kcls(n) + '"></i>' : "") +
+      target +
+      (n
+        ? '<span class="cl-title">' + esc(n.title) + "</span>"
+        : '<span class="cl-title">outside this graph</span>') +
+      "</span>" +
+      '<span class="cl-text">' +
+      refLinks(r.c.text) +
+      "</span></span>" +
+      '<span class="cl-grp">' +
+      esc(n ? labels[r.c.key] || "Ungrouped" : "External") +
+      "</span></label>"
+    );
+  }
+  function checklistRows() {
+    return DATA.cleanup
       .map((c, i) => ({ c, i, id: clId(c, i), a: clAction(c.text) }))
       .filter((r) => !r.c.key || !N[r.c.key] || matches(r.c.key));
+  }
+  function checklistHtml() {
+    const labels = groupLabels();
+    const rows = checklistRows();
     const done = rows.filter((r) => DONE.has(r.id)).length;
     const sections = CL_ACTIONS.map((a) => {
       const rs = rows.filter((r) => r.a[0] === a[0]);
@@ -1510,87 +1542,242 @@ export function mountDashboardView(
         " <span>" +
         rs.length +
         "</span></h2>" +
-        rs
-          .map((r) => {
-            const n = r.c.key && N[r.c.key];
-            const target = n
-              ? '<a class="rellink cl-key" data-key="' +
-                esc(r.c.key) +
-                '">' +
-                esc(short(r.c.key)) +
-                "</a>"
-              : '<span class="cl-key">' +
-                esc(r.c.key ? r.c.key.split("/").slice(1).join("/") : "") +
-                "</span>";
-            return (
-              '<label class="cl-row' +
-              (DONE.has(r.id) ? " done" : "") +
-              '" data-id="' +
-              esc(r.id) +
-              '">' +
-              '<input type="checkbox"' +
-              (DONE.has(r.id) ? " checked" : "") +
-              "/>" +
-              '<span class="cl-body"><span class="cl-top">' +
-              (n ? '<i class="dot ' + kcls(n) + '"></i>' : "") +
-              target +
-              (n
-                ? '<span class="cl-title">' + esc(n.title) + "</span>"
-                : '<span class="cl-title">outside this graph</span>') +
-              "</span>" +
-              '<span class="cl-text">' +
-              refLinks(r.c.text) +
-              "</span></span>" +
-              '<span class="cl-grp">' +
-              esc(n ? labels[r.c.key] || "Ungrouped" : "External") +
-              "</span></label>"
-            );
-          })
-          .join("") +
+        rs.map((r) => clRow(r, labels)).join("") +
         "</section>"
       );
     }).join("");
     const pct = rows.length ? Math.round((done / rows.length) * 100) : 0;
-    renderMain(
-      '<div class="insp cl">' +
-        '<div class="cl-head"><div><h1>Cleanup</h1><p class="muted">What to close, supersede, or retest, and who to credit. Check items off as you go; progress stays in this browser and nothing is posted to GitHub.</p></div>' +
-        '<button class="cl-swarm" id="cl-swarm">Show in Swarm</button></div>' +
-        '<div class="cl-progress"><div class="cl-bar"><span style="width:' +
-        pct +
-        '%"></span></div><span class="cl-count">' +
-        done +
-        " of " +
-        rows.length +
-        " done</span></div>" +
-        sections +
-        "</div>",
+    return (
+      '<div class="cl-progress"><div class="cl-bar"><span style="width:' +
+      pct +
+      '%"></span></div><span class="cl-count">' +
+      done +
+      " of " +
+      rows.length +
+      " done</span></div>" +
+      sections
     );
-    for (const r of app.querySelectorAll(".cl-row input"))
-      r.onchange = (e) => {
-        const id = e.target.closest(".cl-row").dataset.id;
+  }
+  function checklistPending() {
+    return DATA.cleanup.filter((c, i) => !DONE.has(clId(c, i))).length;
+  }
+  function wireChecklist(rerender) {
+    for (const box of app.querySelectorAll("input[data-cl-id]"))
+      box.onchange = (e) => {
+        const id = e.target.dataset.clId;
         if (e.target.checked) DONE.add(id);
         else DONE.delete(id);
         saveDone();
-        cleanupView();
+        syncSweepCount();
+        rerender();
       };
-    document.getElementById("cl-swarm").onclick = () => swarmView();
+  }
+  function syncSweepCount() {
+    const n = document.querySelector("#sweep-btn .cnt");
+    if (n) n.textContent = sweepGroups().length + checklistPending();
+  }
+  // Sweep: open work one decision resolves together, computed by `open`
+  // (issue-graph plan's sweep lane). Older saved runs carry none.
+  const sweepGroups = () => DATA.sweep || [];
+  const SWEEP_SECTIONS = [
+    [
+      "stale",
+      "Stale on base",
+      "Every PR edits files the default branch no longer has. Verify on the current release, then close with credit.",
+    ],
+    [
+      "competing",
+      "Competing fixes",
+      "Several open PRs close the same issue. One decision resolves all of them.",
+    ],
+    [
+      "overlap",
+      "Shared files",
+      "PRs changing the same rarely edited files without a shared issue. Read both before calling them duplicates.",
+    ],
+  ];
+  const CHECKLIST_TAB = [
+    "checklist",
+    "Checklist",
+    "What the clustering agent said to close, supersede, or retest, and who to credit. Progress stays in this browser.",
+  ];
+  let SWEEP_TAB = null;
+  const sweepSection = (group) => (group.allStale ? "stale" : group.kind);
+  function sweepKey(k) {
+    return N[k]
+      ? '<a class="rellink sw-key" data-key="' + esc(k) + '">' + esc(short(k)) + "</a>"
+      : '<span class="sw-key">' + esc(short(k)) + "</span>";
+  }
+  function sweepPr(pr) {
+    const n = N[pr.key];
+    const chips = [
+      pr.staleBase === true ? '<span class="sw-chip warn">stale base</span>' : "",
+      pr.staleBase !== true && pr.missingOnBase.length
+        ? '<span class="sw-chip warn" title="' +
+          esc(pr.missingOnBase.join(", ")) +
+          '">partly stale</span>'
+        : "",
+      pr.mergeable === "CONFLICTING" ? '<span class="sw-chip danger">conflicts</span>' : "",
+      pr.isDraft ? '<span class="sw-chip">draft</span>' : "",
+    ].join("");
+    return (
+      '<li class="sw-pr' +
+      (pr.staleBase === true ? " stale" : "") +
+      '"><i class="dot k-pr"></i>' +
+      sweepKey(pr.key) +
+      '<span class="sw-pr-title">' +
+      esc(n ? n.title : pr.title) +
+      "</span>" +
+      chips +
+      '<span class="sw-size">+' +
+      Number(pr.additions) +
+      "<em>/</em>\u2212" +
+      Number(pr.deletions) +
+      "</span></li>"
+    );
+  }
+  function sweepTodos(g) {
+    const keys = new Set([g.issue, ...g.pullRequests.map((pr) => pr.key)].filter(Boolean));
+    const rows = checklistRows().filter((r) => r.c.key && keys.has(r.c.key));
+    if (!rows.length) return "";
+    return (
+      '<div class="sw-todos">' +
+      rows
+        .map(
+          (r) =>
+            '<label class="sw-todo' +
+            (DONE.has(r.id) ? " done" : "") +
+            '"><input type="checkbox" data-cl-id="' +
+            esc(r.id) +
+            '"' +
+            (DONE.has(r.id) ? " checked" : "") +
+            '/><span class="sw-key">' +
+            esc(short(r.c.key)) +
+            "</span><span>" +
+            refLinks(r.c.text) +
+            "</span></label>",
+        )
+        .join("") +
+      "</div>"
+    );
+  }
+  const SWEEP_NEXT = {
+    verify: ["Verify", "Run the issue's repro on the current release before closing"],
+    choose: ["Choose one", "Pick one implementation and credit every author"],
+    compare: ["Compare", "Read both PRs to decide whether they overlap"],
+  };
+  function sweepCard(g, i) {
+    const next = g.next || (g.kind === "overlap" ? "compare" : g.allStale ? "verify" : "choose");
+    const issue = g.issue && N[g.issue];
+    const head = g.issue
+      ? '<div class="sw-issue">' +
+        (issue ? '<i class="dot ' + kcls(issue) + '"></i>' : "") +
+        sweepKey(g.issue) +
+        '<span class="sw-issue-title">' +
+        esc(issue ? issue.title : "Outside this graph") +
+        "</span></div>"
+      : '<div class="sw-issue muted">' +
+        (g.sharedFiles.length
+          ? "Shares <code>" +
+            esc(g.sharedFiles[0].split("/").pop()) +
+            "</code>" +
+            (g.sharedFiles.length > 1 ? " and " + (g.sharedFiles.length - 1) + " more" : "")
+          : "No open issue linked") +
+        "</div>";
+    return (
+      '<article class="sw-card" style="animation-delay:' +
+      Math.min(i, 12) * 24 +
+      'ms"><header class="sw-card-top">' +
+      head +
+      '<span class="sw-badges"><span class="sw-next sw-next-' +
+      esc(next) +
+      '" title="' +
+      esc(SWEEP_NEXT[next][1]) +
+      '">' +
+      esc(SWEEP_NEXT[next][0]) +
+      '</span><span class="sw-resolves" title="Open items one decision resolves"><b>' +
+      Number(g.resolves) +
+      "</b> " +
+      (g.resolves === 1 ? "item" : "items") +
+      '</span></span></header><ul class="sw-prs">' +
+      g.pullRequests.map(sweepPr).join("") +
+      "</ul>" +
+      sweepTodos(g) +
+      "</article>"
+    );
+  }
+  function sweepView(tab) {
+    setView("sweep");
     for (const b of app.querySelectorAll(".item")) b.classList.remove("sel");
-    const cb = document.getElementById("cleanup-btn");
-    if (cb) {
-      cb.classList.add("active");
-      const n = cb.querySelector(".cnt");
-      if (n) n.textContent = DATA.cleanup.filter((c, i) => !DONE.has(clId(c, i))).length;
+    const groups = sweepGroups();
+    const tabs = DATA.cleanup.length ? [...SWEEP_SECTIONS, CHECKLIST_TAB] : SWEEP_SECTIONS;
+    const counts = tabs.map(([id]) =>
+      id === "checklist" ? checklistPending() : groups.filter((g) => sweepSection(g) === id).length,
+    );
+    const has = (id) => {
+      const j = tabs.findIndex(([t]) => t === id);
+      return j >= 0 && (id === "checklist" ? DATA.cleanup.length > 0 : counts[j] > 0);
+    };
+    if (tab) SWEEP_TAB = tab;
+    if (!has(SWEEP_TAB)) SWEEP_TAB = (tabs.find(([id]) => has(id)) || tabs[0])[0];
+    const at = tabs.findIndex(([id]) => id === SWEEP_TAB);
+    const tiles = tabs
+      .map(
+        ([id, title], j) =>
+          '<button class="sw-tile' +
+          (id === SWEEP_TAB ? " active" : "") +
+          '" data-tab="' +
+          id +
+          '"' +
+          (has(id) ? "" : " disabled") +
+          '><span class="sw-tile-n">' +
+          counts[j] +
+          '</span><span class="sw-tile-l">' +
+          esc(title) +
+          (id === "checklist" ? " to do" : "") +
+          "</span></button>",
+      )
+      .join("");
+    let body;
+    let summary;
+    if (SWEEP_TAB === "checklist") {
+      body = '<div class="sw-checklist">' + checklistHtml() + "</div>";
+      summary = checklistPending() + " of " + checklistRows().length + " left";
+    } else {
+      const shown = groups.filter((g) => sweepSection(g) === SWEEP_TAB);
+      const resolves = shown.reduce((total, g) => total + Number(g.resolves), 0);
+      body = '<div class="sw-grid">' + shown.map(sweepCard).join("") + "</div>";
+      summary = shown.length + " groups \u00b7 " + resolves + " items";
     }
-    setHash("cleanup");
-    sel = "cleanup";
+    renderMain(
+      '<div class="view-in sw">' +
+        '<div class="swarm-head"><div><h1>Sweep</h1><div class="muted">Open work one decision can resolve together, and the checklist of what to close. Each group is a lead, not a verdict: reproduce it on the current release before closing anything. Nothing is posted to GitHub.</div></div></div>' +
+        '<div class="sw-tiles" style="grid-template-columns:repeat(' +
+        tabs.length +
+        ',minmax(0,1fr))" role="tablist" aria-label="Sweep groups">' +
+        tiles +
+        "</div>" +
+        '<div class="sw-sub"><span>' +
+        esc(tabs[at][2]) +
+        '</span><span class="sw-sum">' +
+        summary +
+        "</span></div>" +
+        body +
+        "</div>",
+    );
+    for (const b of app.querySelectorAll(".sw-tile"))
+      b.onclick = () => {
+        if (b.dataset.tab !== SWEEP_TAB) sweepView(b.dataset.tab);
+      };
+    wireChecklist(() => sweepView());
+    setHash("sweep:" + SWEEP_TAB);
+    sel = "sweep";
   }
   function select(k) {
     if (!N[sel]) RESULT_ROUTE = location.hash.slice(1) || "explore";
     setView("explore");
     sel = k;
     setHash(encodeURIComponent(k));
-    const cb = document.getElementById("cleanup-btn");
-    if (cb) cb.classList.remove("active");
     inspector(k);
   }
 
@@ -2005,8 +2192,6 @@ export function mountDashboardView(
   function exploreView(gi) {
     setView("explore");
     for (const b of app.querySelectorAll(".item")) b.classList.remove("sel");
-    const cb = document.getElementById("cleanup-btn");
-    if (cb) cb.classList.remove("active");
     if (gi != null && DATA.groups[gi]) return clusterView(+gi);
     const order = DATA.groups
       .map((g, i) => ({ g, i, st: clusterStats(g) }))
@@ -3067,6 +3252,8 @@ export function mountDashboardView(
     if (swarm) swarm.classList.toggle("active", view === "swarm");
     const rank = document.getElementById("rank-view");
     if (rank) rank.classList.toggle("active", view === "rank");
+    const sweep = document.getElementById("sweep-btn");
+    if (sweep) sweep.classList.toggle("active", view === "sweep");
   }
 
   function wire() {
@@ -3107,8 +3294,8 @@ export function mountDashboardView(
   }
   function wireSidebar() {
     wireProjectMenu();
-    const cb = document.getElementById("cleanup-btn");
-    if (cb) cb.onclick = cleanupView;
+    const sb = document.getElementById("sweep-btn");
+    if (sb) sb.onclick = () => sweepView();
     document.getElementById("explore-view").onclick = () => exploreView();
     const impact = document.getElementById("impact-view");
     if (impact) impact.onclick = () => impactView();
@@ -3170,7 +3357,8 @@ export function mountDashboardView(
       }
     })();
     if (h === lastHash) return;
-    if (h === "cleanup" && DATA.cleanup.length) cleanupView();
+    if (h.startsWith("sweep") && (sweepGroups().length || DATA.cleanup.length))
+      sweepView(h.split(":")[1]);
     else if (h === "explore") exploreView();
     else if (h.startsWith("explore:")) exploreView(+h.slice(8));
     else if (h === "impact") impactView(null);

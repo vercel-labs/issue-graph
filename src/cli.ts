@@ -16,7 +16,13 @@ import {
 import { modelDefaults, readConfig, resolveWeights } from "./config.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
-import { applyClusters, type ClustersConfig, dashboardModel, type Model } from "./html.js";
+import {
+  applyClusters,
+  type ClustersConfig,
+  carriedClusters,
+  dashboardModel,
+  type Model,
+} from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
 import { writeNextDashboard } from "./next-dashboard.js";
 import { fileOverlaps } from "./overlaps.js";
@@ -48,6 +54,7 @@ import {
   writeSnapshot,
 } from "./snapshot.js";
 import { runStatus } from "./status-cli.js";
+import { buildSweep, missingBasePaths, sweepBasePaths } from "./sweep.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
 import type { NodeKey, Seed } from "./types.js";
@@ -522,10 +529,12 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
           : "json"
         : args.format;
     if (args.command === "plan") {
+      const missing = await missingBasePaths(transport, sweepBasePaths(nodes));
       const plan = buildPlanReport(
         report,
         nodes,
         prioritize(nodes, new Date(), resolveWeights(readConfig(), "github", report.repo)),
+        buildSweep(nodes, missing),
       );
       console.log(
         format === "json"
@@ -744,7 +753,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (wantsHtml) {
     const clusters = args.clustersFile
       ? (JSON.parse(readFileSync(args.clustersFile, "utf8")) as ClustersConfig)
-      : agentClusters;
+      : (agentClusters ?? carriedClusters(readDashboardModel<Model>(repoName), nodes));
     const out =
       args.htmlOut ||
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
@@ -754,6 +763,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     } catch {
       process.stderr.write("Repository open totals unavailable; selector count will be unknown.\n");
     }
+    model.sweep = buildSweep(nodes, await missingBasePaths(transport, sweepBasePaths(nodes)));
     writeNextDashboard(out, [model], modelDefaults([model]));
     if (args.command !== "open" && args.command !== "cluster")
       process.stderr.write(`wrote ${out}\n`);

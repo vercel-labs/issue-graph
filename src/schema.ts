@@ -183,7 +183,7 @@ export const ISSUE_GRAPH_SCHEMA = {
       defaultFormat: { tty: "text", pipe: "json" },
       textFormat: "Monochrome human output; styling only on TTY without NO_COLOR, CI, or TERM=dumb",
       description:
-        "Turn a live repository reconciliation into a deterministic execution, investigation, and blocked queue.",
+        "Turn a live repository reconciliation into a deterministic execution, investigation, and blocked queue, plus sweep groups of work one decision resolves together.",
     },
     status: {
       githubMutations: false,

@@ -35,6 +35,11 @@ export interface PullRequestMeta {
   changedFiles: number;
   /** Repo-relative paths the PR touches (first 100). Drives overlap detection. */
   files: string[];
+  /**
+   * Paths the PR expects to exist on its base: modified, deleted, or renamed
+   * files, not added ones. Absent in captures made before it was collected.
+   */
+  baseFiles?: string[];
 }
 
 /** Discussion-heat signals, fetched in the same node query (no extra request). */

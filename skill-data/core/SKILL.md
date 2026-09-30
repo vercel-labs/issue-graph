@@ -31,6 +31,7 @@ If a command or asset is missing, report the CLI/skill mismatch and observed err
 | Inspect effective scoring defaults | `issue-graph config show --provider github --scope owner/repo --json` |
 | Backlog verification queue | `issue-graph reconcile owner/repo` |
 | Next backlog action | `issue-graph plan owner/repo` |
+| Find work one fix resolves together | `issue-graph plan owner/repo --budget 1000 --format json`, then read `sweep` |
 
 For counts, skip graph discovery. Resolve repositories and authors from the request and available context; never silently enumerate an organization or guess members. Status accepts repeated repositories and repeated/comma-separated authors, with case-insensitive matching. Ask only if scope remains unresolved.
 

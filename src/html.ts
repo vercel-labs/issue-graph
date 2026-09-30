@@ -11,6 +11,7 @@ import type {
 import { fileOverlaps } from "./overlaps.js";
 import { prioritize } from "./priority.js";
 import type { Weights } from "./scoring.js";
+import type { SweepGroup } from "./sweep.js";
 import type { GraphNode, NodeKey } from "./types.js";
 
 /** Optional semantic clustering supplied by the calling agent (`--clusters`). */
@@ -83,6 +84,8 @@ export interface Model {
   seeds: NodeKey[];
   groups: Group[];
   cleanup: CleanupItem[];
+  /** Sweep groups from `open`; absent in runs saved before it existed. */
+  sweep?: SweepGroup[];
   stats: Record<string, number>;
   nodes: Record<NodeKey, ClientNode>;
   coverage?: {
@@ -327,6 +330,30 @@ export function applyClusters(
     },
     unknown: [...unknown],
   };
+}
+
+/**
+ * Clusters from a previously saved run, for a new run that brings none of its
+ * own. Items still in the graph keep their cluster, new items land in
+ * Ungrouped, and items that left the graph drop out. Returns undefined when the
+ * previous run was not clustered.
+ */
+export function carriedClusters(
+  previous: Model | undefined,
+  nodes: Map<NodeKey, GraphNode>,
+): ClustersConfig | undefined {
+  if (previous?.grouping !== "themes") return undefined;
+  const clusters = previous.groups
+    .filter((group) => group.label !== "Ungrouped")
+    .map((group) => ({
+      label: group.label,
+      root_cause: group.subtitle,
+      members: group.members.filter((key) => nodes.has(key)).map((key) => ({ key })),
+    }))
+    .filter((cluster) => cluster.members.length);
+  if (!clusters.length) return undefined;
+  const cleanup = previous.cleanup.filter((item) => !item.key || nodes.has(item.key));
+  return { clusters, cleanup };
 }
 
 /** The explorer's data for one run, also what `dashboard` saves and reloads. */
