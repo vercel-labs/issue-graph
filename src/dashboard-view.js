@@ -599,6 +599,7 @@ export function mountDashboardView(
     else if (view === "rank") rankRender();
     else if (view === "impact") impactView(impactSel);
     else if (view === "cleanup") cleanupView();
+    else if (view === "sweep") sweepView();
     else exploreView(sel?.startsWith("explore:") ? +sel.slice(8) : undefined);
   }
   function emptyFilters(message = "No items match these filters.") {
@@ -1076,6 +1077,11 @@ export function mountDashboardView(
         DATA.cleanup.filter((c, i) => !DONE.has(clId(c, i))).length +
         "</span></button>"
       : "";
+    const sweepBtn = sweepGroups().length
+      ? '<button id="sweep-btn" class="cleanup-pill"><span>Sweep</span><span class="cnt">' +
+        sweepGroups().length +
+        "</span></button>"
+      : "";
     const total = mix.reduce((a, m) => a + m[2], 0) || 1;
     return (
       '<div class="side"><div class="side-top">' +
@@ -1115,6 +1121,7 @@ export function mountDashboardView(
       "</div>" +
       '<input class="filter" id="filter" placeholder="Filter by identifier, title, author" aria-label="Filter nodes"/>' +
       cleanupBtn +
+      sweepBtn +
       "</div>" +
       '<div class="tree">' +
       groups +
@@ -1583,6 +1590,151 @@ export function mountDashboardView(
     }
     setHash("cleanup");
     sel = "cleanup";
+  }
+  // Sweep: open work one decision resolves together, computed by `open`
+  // (issue-graph plan's sweep lane). Older saved runs carry none.
+  const sweepGroups = () => DATA.sweep || [];
+  const SWEEP_SECTIONS = [
+    [
+      "stale",
+      "Stale on base",
+      "Every PR edits files the default branch no longer has. Verify on the current release, then close with credit.",
+    ],
+    [
+      "competing",
+      "Competing fixes",
+      "Several open PRs close the same issue. One decision resolves all of them.",
+    ],
+    [
+      "overlap",
+      "Shared files",
+      "PRs changing the same rarely edited files without a shared issue. Read both before calling them duplicates.",
+    ],
+  ];
+  let SWEEP_TAB = null;
+  const sweepSection = (group) => (group.allStale ? "stale" : group.kind);
+  function sweepKey(k) {
+    return N[k]
+      ? '<a class="rellink sw-key" data-key="' + esc(k) + '">' + esc(short(k)) + "</a>"
+      : '<span class="sw-key">' + esc(short(k)) + "</span>";
+  }
+  function sweepPr(pr) {
+    const n = N[pr.key];
+    const chips = [
+      pr.staleBase === true ? '<span class="sw-chip warn">stale base</span>' : "",
+      pr.staleBase !== true && pr.missingOnBase.length
+        ? '<span class="sw-chip warn" title="' +
+          esc(pr.missingOnBase.join(", ")) +
+          '">partly stale</span>'
+        : "",
+      pr.mergeable === "CONFLICTING" ? '<span class="sw-chip danger">conflicts</span>' : "",
+      pr.isDraft ? '<span class="sw-chip">draft</span>' : "",
+    ].join("");
+    return (
+      '<li class="sw-pr' +
+      (pr.staleBase === true ? " stale" : "") +
+      '"><i class="dot k-pr"></i>' +
+      sweepKey(pr.key) +
+      '<span class="sw-pr-title">' +
+      esc(n ? n.title : pr.title) +
+      "</span>" +
+      chips +
+      '<span class="sw-size">+' +
+      pr.additions +
+      "<em>/</em>\u2212" +
+      pr.deletions +
+      "</span></li>"
+    );
+  }
+  function sweepCard(g, i) {
+    const issue = g.issue && N[g.issue];
+    const head = g.issue
+      ? '<div class="sw-issue">' +
+        (issue ? '<i class="dot ' + kcls(issue) + '"></i>' : "") +
+        sweepKey(g.issue) +
+        '<span class="sw-issue-title">' +
+        esc(issue ? issue.title : "Outside this graph") +
+        "</span></div>"
+      : '<div class="sw-issue muted">' +
+        (g.sharedFiles.length
+          ? "Shares <code>" +
+            esc(g.sharedFiles[0].split("/").pop()) +
+            "</code>" +
+            (g.sharedFiles.length > 1 ? " and " + (g.sharedFiles.length - 1) + " more" : "")
+          : "No open issue linked") +
+        "</div>";
+    return (
+      '<article class="sw-card" style="animation-delay:' +
+      Math.min(i, 12) * 24 +
+      'ms"><header class="sw-card-top">' +
+      head +
+      '<span class="sw-resolves" title="Open items one decision resolves"><b>' +
+      g.resolves +
+      "</b> " +
+      (g.resolves === 1 ? "item" : "items") +
+      '</span></header><ul class="sw-prs">' +
+      g.pullRequests.map(sweepPr).join("") +
+      "</ul></article>"
+    );
+  }
+  function sweepView(tab) {
+    setView("sweep");
+    for (const b of app.querySelectorAll(".item")) b.classList.remove("sel");
+    const cb = document.getElementById("cleanup-btn");
+    if (cb) cb.classList.remove("active");
+    const groups = sweepGroups();
+    const counts = SWEEP_SECTIONS.map(
+      ([id]) => groups.filter((g) => sweepSection(g) === id).length,
+    );
+    if (tab) SWEEP_TAB = tab;
+    if (!SWEEP_TAB || !counts[SWEEP_SECTIONS.findIndex(([id]) => id === SWEEP_TAB)])
+      SWEEP_TAB =
+        SWEEP_SECTIONS[
+          Math.max(
+            0,
+            counts.findIndex((c) => c > 0),
+          )
+        ][0];
+    const at = SWEEP_SECTIONS.findIndex(([id]) => id === SWEEP_TAB);
+    const shown = groups.filter((g) => sweepSection(g) === SWEEP_TAB);
+    const resolves = shown.reduce((total, g) => total + g.resolves, 0);
+    const tiles = SWEEP_SECTIONS.map(
+      ([id, title], j) =>
+        '<button class="sw-tile' +
+        (id === SWEEP_TAB ? " active" : "") +
+        '" data-tab="' +
+        id +
+        '"' +
+        (counts[j] ? "" : " disabled") +
+        '><span class="sw-tile-n">' +
+        counts[j] +
+        '</span><span class="sw-tile-l">' +
+        esc(title) +
+        "</span></button>",
+    ).join("");
+    renderMain(
+      '<div class="view-in sw">' +
+        '<div class="swarm-head"><div><h1>Sweep</h1><div class="muted">Open work one decision can resolve together. Each group is a lead, not a verdict: reproduce it on the current release before closing anything. Nothing is posted to GitHub.</div></div></div>' +
+        '<div class="sw-tiles" role="tablist" aria-label="Sweep groups">' +
+        tiles +
+        "</div>" +
+        '<div class="sw-sub"><span>' +
+        esc(SWEEP_SECTIONS[at][2]) +
+        '</span><span class="sw-sum">' +
+        shown.length +
+        " groups \u00b7 " +
+        resolves +
+        " items</span></div>" +
+        '<div class="sw-grid">' +
+        shown.map(sweepCard).join("") +
+        "</div></div>",
+    );
+    for (const b of app.querySelectorAll(".sw-tile"))
+      b.onclick = () => {
+        if (b.dataset.tab !== SWEEP_TAB) sweepView(b.dataset.tab);
+      };
+    setHash("sweep");
+    sel = "sweep";
   }
   function select(k) {
     if (!N[sel]) RESULT_ROUTE = location.hash.slice(1) || "explore";
@@ -3067,6 +3219,8 @@ export function mountDashboardView(
     if (swarm) swarm.classList.toggle("active", view === "swarm");
     const rank = document.getElementById("rank-view");
     if (rank) rank.classList.toggle("active", view === "rank");
+    const sweep = document.getElementById("sweep-btn");
+    if (sweep) sweep.classList.toggle("active", view === "sweep");
   }
 
   function wire() {
@@ -3109,6 +3263,8 @@ export function mountDashboardView(
     wireProjectMenu();
     const cb = document.getElementById("cleanup-btn");
     if (cb) cb.onclick = cleanupView;
+    const sb = document.getElementById("sweep-btn");
+    if (sb) sb.onclick = sweepView;
     document.getElementById("explore-view").onclick = () => exploreView();
     const impact = document.getElementById("impact-view");
     if (impact) impact.onclick = () => impactView();
@@ -3171,6 +3327,7 @@ export function mountDashboardView(
     })();
     if (h === lastHash) return;
     if (h === "cleanup" && DATA.cleanup.length) cleanupView();
+    else if (h === "sweep" && sweepGroups().length) sweepView();
     else if (h === "explore") exploreView();
     else if (h.startsWith("explore:")) exploreView(+h.slice(8));
     else if (h === "impact") impactView(null);

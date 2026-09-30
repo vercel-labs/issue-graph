@@ -11,6 +11,7 @@ import type {
 import { fileOverlaps } from "./overlaps.js";
 import { prioritize } from "./priority.js";
 import type { Weights } from "./scoring.js";
+import type { SweepGroup } from "./sweep.js";
 import type { GraphNode, NodeKey } from "./types.js";
 
 /** Optional semantic clustering supplied by the calling agent (`--clusters`). */
@@ -83,6 +84,8 @@ export interface Model {
   seeds: NodeKey[];
   groups: Group[];
   cleanup: CleanupItem[];
+  /** Sweep groups from `open`; absent in runs saved before it existed. */
+  sweep?: SweepGroup[];
   stats: Record<string, number>;
   nodes: Record<NodeKey, ClientNode>;
   coverage?: {

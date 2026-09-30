@@ -757,6 +757,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     } catch {
       process.stderr.write("Repository open totals unavailable; selector count will be unknown.\n");
     }
+    model.sweep = buildSweep(nodes, await missingBasePaths(transport, sweepBasePaths(nodes)));
     writeNextDashboard(out, [model], modelDefaults([model]));
     if (args.command !== "open" && args.command !== "cluster")
       process.stderr.write(`wrote ${out}\n`);
