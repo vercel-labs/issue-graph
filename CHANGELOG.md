@@ -1,6 +1,25 @@
 # Changelog
 
 <!-- release:start -->
+## 0.5.0
+
+### Features
+
+- `plan` returns a `sweep` lane of open work one decision resolves together: an issue with several open closing PRs, a PR whose modified files are all gone from the default branch, and each PR paired with the PR it shares the most rarely edited files with.
+- Each sweep group names its next step: `verify` when every PR is stale, `choose` for competing PRs, and `compare` for overlaps. Groups to verify come first.
+- The dashboard adds a Sweep view with stale, competing, and shared-file tabs. The cleanup checklist is now its Checklist tab, and checklist items also appear on the matching group cards.
+
+### Fixes
+
+- `open` keeps saved clusters and the cleanup list when a later run brings none: items still in the graph keep their cluster, new items land in Ungrouped, and items that left the graph drop out.
+- Saved dashboard models with malformed sweep groups are rejected on import.
+
+### Documentation
+
+- The bundled agent guide adds a sweep workflow that verifies each group on the current release before drafting close comments.
+
+<!-- release:end -->
+
 ## 0.4.1
 
 ### Fixes
@@ -13,8 +32,6 @@
 - Shorten the bundled agent guide while preserving coverage, privacy, scoring defaults, and exact dashboard links.
 - Document dashboard library APIs and align guides with current CLI behavior and public source access.
 - Refresh landing examples and enable site analytics.
-
-<!-- release:end -->
 
 ## 0.4.0
 
