@@ -16,7 +16,13 @@ import {
 import { modelDefaults, readConfig, resolveWeights } from "./config.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
-import { applyClusters, type ClustersConfig, dashboardModel, type Model } from "./html.js";
+import {
+  applyClusters,
+  type ClustersConfig,
+  carriedClusters,
+  dashboardModel,
+  type Model,
+} from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
 import { writeNextDashboard } from "./next-dashboard.js";
 import { fileOverlaps } from "./overlaps.js";
@@ -747,7 +753,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (wantsHtml) {
     const clusters = args.clustersFile
       ? (JSON.parse(readFileSync(args.clustersFile, "utf8")) as ClustersConfig)
-      : agentClusters;
+      : (agentClusters ?? carriedClusters(readDashboardModel<Model>(repoName), nodes));
     const out =
       args.htmlOut ||
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);

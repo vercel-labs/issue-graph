@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { applyClusters, dashboardModel, renderDashboard, renderHtml } from "./html.js";
+import {
+  applyClusters,
+  carriedClusters,
+  dashboardModel,
+  renderDashboard,
+  renderHtml,
+} from "./html.js";
 import type { GraphNode, NodeKey, PullRequestMeta } from "./types.js";
 
 const meta = (files: string[]): PullRequestMeta => ({
@@ -162,5 +168,45 @@ describe("applyClusters", () => {
       clusters: [{ label: "A", members: [{ key: "o/r#9" }] }],
     });
     expect(unknown).toEqual(["o/r#9"]);
+  });
+});
+
+describe("carriedClusters", () => {
+  test("keeps clusters for items still in the graph when a new run brings none", () => {
+    const previous = dashboardModel(
+      asMap([node("o/r#1"), node("o/r#2"), node("o/r#3")]),
+      [],
+      "o/r",
+      {
+        clusters: [
+          {
+            label: "Daemon",
+            root_cause: "sessions",
+            members: [{ key: "o/r#1" }, { key: "o/r#2" }],
+          },
+          { label: "Gone", members: [{ key: "o/r#3" }] },
+        ],
+        cleanup: [
+          { key: "o/r#3", text: "close" },
+          { key: "o/r#1", text: "retest" },
+        ],
+      },
+    );
+    const next = asMap([node("o/r#1"), node("o/r#4")]);
+    const carried = carriedClusters(previous, next);
+    const model = dashboardModel(next, [], "o/r", carried);
+
+    expect(model.grouping).toBe("themes");
+    expect(model.groups.map((group) => [group.label, group.members])).toEqual([
+      ["Daemon", ["o/r#1"]],
+      ["Ungrouped", ["o/r#4"]],
+    ]);
+    expect(model.cleanup).toEqual([{ key: "o/r#1", text: "retest" }]);
+  });
+
+  test("carries nothing from an unclustered run", () => {
+    const previous = dashboardModel(asMap([node("o/r#1")]), [], "o/r");
+    expect(carriedClusters(previous, asMap([node("o/r#1")]))).toBeUndefined();
+    expect(carriedClusters(undefined, asMap([node("o/r#1")]))).toBeUndefined();
   });
 });
