@@ -1630,9 +1630,9 @@ export function mountDashboardView(
       "</span>" +
       chips +
       '<span class="sw-size">+' +
-      pr.additions +
+      Number(pr.additions) +
       "<em>/</em>\u2212" +
-      pr.deletions +
+      Number(pr.deletions) +
       "</span></li>"
     );
   }
@@ -1696,7 +1696,7 @@ export function mountDashboardView(
       '">' +
       esc(SWEEP_NEXT[next][0]) +
       '</span><span class="sw-resolves" title="Open items one decision resolves"><b>' +
-      g.resolves +
+      Number(g.resolves) +
       "</b> " +
       (g.resolves === 1 ? "item" : "items") +
       '</span></span></header><ul class="sw-prs">' +
@@ -1745,7 +1745,7 @@ export function mountDashboardView(
       summary = checklistPending() + " of " + checklistRows().length + " left";
     } else {
       const shown = groups.filter((g) => sweepSection(g) === SWEEP_TAB);
-      const resolves = shown.reduce((total, g) => total + g.resolves, 0);
+      const resolves = shown.reduce((total, g) => total + Number(g.resolves), 0);
       body = '<div class="sw-grid">' + shown.map(sweepCard).join("") + "</div>";
       summary = shown.length + " groups \u00b7 " + resolves + " items";
     }

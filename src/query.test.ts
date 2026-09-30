@@ -555,4 +555,42 @@ describe("import validation", () => {
     m.nodes[key(1)].out = [{ to: "toString" as ClientNode["key"], via: "text" }];
     expect(() => parseModel(m)).toThrow("relationships");
   });
+  test("refuses sweep groups whose numbers or links are not plain values", () => {
+    const group = {
+      kind: "stale",
+      next: "verify",
+      issue: null,
+      sharedFiles: [],
+      overlapScore: null,
+      resolves: 1,
+      allStale: true,
+      smallestChange: null,
+      summary: "",
+      pullRequests: [
+        {
+          key: key(1),
+          title: "t",
+          url: "https://github.com/o/r/pull/1",
+          isDraft: false,
+          mergeable: "MERGEABLE",
+          additions: 1,
+          deletions: 0,
+          staleBase: true,
+          missingOnBase: [],
+        },
+      ],
+    };
+    const m = model();
+    m.sweep = [group] as unknown as NonNullable<typeof m.sweep>;
+    expect(() => parseModel(m)).not.toThrow();
+    for (const bad of [
+      { ...group, resolves: "<img src=x onerror=alert(1)>" },
+      { ...group, pullRequests: [{ ...group.pullRequests[0], additions: "<b>" }] },
+      { ...group, pullRequests: [{ ...group.pullRequests[0], url: "javascript:alert(1)" }] },
+      { ...group, next: "<script>" },
+    ]) {
+      m.sweep = [bad] as unknown as NonNullable<typeof m.sweep>;
+      expect(() => parseModel(m)).toThrow("sweep");
+    }
+  });
 });

@@ -156,5 +156,41 @@ export function parseModel(value: unknown): Model {
       !g.members.every((k) => typeof k === "string" && Object.hasOwn(m.nodes, k))
     )
       throw new Error("invalid captured cluster");
+  const count = (v: unknown) => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+  const optionalNumber = (v: unknown) =>
+    v === null || (typeof v === "number" && Number.isFinite(v));
+  if (
+    m.sweep !== undefined &&
+    (!Array.isArray(m.sweep) ||
+      m.sweep.some(
+        (g) =>
+          !g ||
+          !["competing", "stale", "overlap"].includes(g.kind) ||
+          (g.next !== undefined && !["verify", "choose", "compare"].includes(g.next)) ||
+          (g.issue !== null && (typeof g.issue !== "string" || unsafeKey(g.issue))) ||
+          !strings(g.sharedFiles) ||
+          !optionalNumber(g.overlapScore) ||
+          !count(g.resolves) ||
+          typeof g.allStale !== "boolean" ||
+          !optionalNumber(g.smallestChange) ||
+          typeof g.summary !== "string" ||
+          !Array.isArray(g.pullRequests) ||
+          g.pullRequests.some(
+            (pr) =>
+              !pr ||
+              typeof pr.key !== "string" ||
+              unsafeKey(pr.key) ||
+              typeof pr.title !== "string" ||
+              !safeUrl(pr.url) ||
+              typeof pr.isDraft !== "boolean" ||
+              typeof pr.mergeable !== "string" ||
+              !count(pr.additions) ||
+              !count(pr.deletions) ||
+              (pr.staleBase !== null && typeof pr.staleBase !== "boolean") ||
+              !strings(pr.missingOnBase),
+          ),
+      ))
+  )
+    throw new Error("invalid sweep groups");
   return m;
 }
