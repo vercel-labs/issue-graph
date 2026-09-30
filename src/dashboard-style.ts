@@ -288,7 +288,7 @@ svg .center{font-weight:600}
 .view-in:has(.filter-menu:not([hidden])){animation:none}
 @keyframes view-in{from{opacity:0;transform:translateY(4px)}}
 /* sweep: work one decision resolves */
-.sw-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:4px 0 14px}
+.sw-tiles{display:grid;gap:10px;margin:4px 0 14px}
 .sw-tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);color:var(--fg);font-family:var(--sans);text-align:left;cursor:pointer;transition:border-color 150ms,background 150ms,box-shadow 200ms,transform 200ms cubic-bezier(.2,.8,.2,1)}
 .sw-tile:hover:not(:disabled){border-color:var(--border2);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.06)}
 .sw-tile.active{border-color:var(--fg);box-shadow:0 0 0 1px var(--fg) inset}
@@ -319,7 +319,13 @@ a.sw-key{cursor:pointer;text-decoration:none}a.sw-key:hover{color:var(--accent);
 .sw-chip.danger{background:var(--danger-bg,var(--closed-bg));color:var(--danger-fg,var(--closed-fg))}
 .sw-size{flex-shrink:0;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:74px;text-align:right}
 .sw-size em{font-style:normal;opacity:.5;margin:0 1px}
-@media(max-width:820px){.sw-tiles{grid-template-columns:1fr}.sw-grid{grid-template-columns:1fr}}
+.sw-todos{display:flex;flex-direction:column;gap:6px;padding:10px 12px;margin-top:-2px;border-radius:10px;background:var(--warn-bg)}
+.sw-todo{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--fg);cursor:pointer;transition:opacity 200ms}
+.sw-todo input{margin:0;accent-color:var(--open-fg);transform:translateY(1px)}
+.sw-todo.done{opacity:.55}.sw-todo.done span:last-child{text-decoration:line-through;color:var(--muted)}
+.sw-checklist{animation:view-in 320ms cubic-bezier(.2,.8,.2,1) both}
+.sw-checklist .cl-progress{margin-top:0}
+@media(max-width:820px){.sw-tiles{grid-template-columns:1fr!important}.sw-grid{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.sw-card,.sw-tile{animation:none;transition:none}.sw-card:hover,.sw-tile:hover{transform:none}}
 .stagger>*{animation:view-in 360ms cubic-bezier(.2,.8,.2,1) both}
 /* explore: cluster map */
