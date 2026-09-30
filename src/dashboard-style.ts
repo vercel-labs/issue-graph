@@ -309,6 +309,11 @@ svg .center{font-weight:600}
 a.sw-key{cursor:pointer;text-decoration:none}a.sw-key:hover{color:var(--accent);text-decoration:underline}
 .sw-resolves{flex-shrink:0;font-size:12px;color:var(--open-fg);background:var(--open-bg);border-radius:9999px;padding:2px 9px;white-space:nowrap}
 .sw-resolves b{font-weight:600;font-variant-numeric:tabular-nums}
+.sw-badges{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.sw-next{font-size:12px;font-weight:500;border-radius:9999px;padding:2px 9px;white-space:nowrap;border:1px solid var(--border)}
+.sw-next-verify{color:var(--warn-fg);background:var(--warn-bg);border-color:transparent}
+.sw-next-choose{color:var(--merged-fg);background:var(--merged-bg);border-color:transparent}
+.sw-next-compare{color:var(--fg2);background:var(--bg2)}
 .sw-prs{list-style:none;margin:0;padding:10px 0 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
 .sw-pr{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px}
 .sw-pr .dot{flex-shrink:0}

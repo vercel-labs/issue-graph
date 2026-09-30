@@ -1661,7 +1661,13 @@ export function mountDashboardView(
       "</div>"
     );
   }
+  const SWEEP_NEXT = {
+    verify: ["Verify", "Run the issue's repro on the current release before closing"],
+    choose: ["Choose one", "Pick one implementation and credit every author"],
+    compare: ["Compare", "Read both PRs to decide whether they overlap"],
+  };
   function sweepCard(g, i) {
+    const next = g.next || (g.kind === "overlap" ? "compare" : g.allStale ? "verify" : "choose");
     const issue = g.issue && N[g.issue];
     const head = g.issue
       ? '<div class="sw-issue">' +
@@ -1683,11 +1689,17 @@ export function mountDashboardView(
       Math.min(i, 12) * 24 +
       'ms"><header class="sw-card-top">' +
       head +
-      '<span class="sw-resolves" title="Open items one decision resolves"><b>' +
+      '<span class="sw-badges"><span class="sw-next sw-next-' +
+      esc(next) +
+      '" title="' +
+      esc(SWEEP_NEXT[next][1]) +
+      '">' +
+      esc(SWEEP_NEXT[next][0]) +
+      '</span><span class="sw-resolves" title="Open items one decision resolves"><b>' +
       g.resolves +
       "</b> " +
       (g.resolves === 1 ? "item" : "items") +
-      '</span></header><ul class="sw-prs">' +
+      '</span></span></header><ul class="sw-prs">' +
       g.pullRequests.map(sweepPr).join("") +
       "</ul>" +
       sweepTodos(g) +

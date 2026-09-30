@@ -81,7 +81,9 @@ describe("buildSweep", () => {
 
     expect(groups.map((group) => group.issue)).toEqual(["o/r#10", "o/r#1"]);
     expect(groups[0].allStale).toBe(true);
+    expect(groups[0].next).toBe("verify");
     expect(groups[0].resolves).toBe(3);
+    expect(groups[1].next).toBe("choose");
     expect(groups[1].allStale).toBe(false);
     expect(groups[1].smallestChange).toBe(11);
   });
@@ -97,6 +99,7 @@ describe("buildSweep", () => {
 
     expect(groups).toHaveLength(1);
     expect(groups[0].kind).toBe("overlap");
+    expect(groups[0].next).toBe("compare");
     expect(groups[0].pullRequests.map((item) => item.key)).toEqual(["o/r#2", "o/r#3"]);
     expect(groups[0].sharedFiles).toEqual(["src/certs.ts"]);
     expect(groups[0].overlapScore).toBeGreaterThan(0);
@@ -228,6 +231,6 @@ describe("plan sweep lane", () => {
     expect(plan.sweep).toHaveLength(1);
     const text = renderPlan(plan);
     expect(text).toContain("## Sweep");
-    expect(text).toContain("o/r#1 + o/r#2, o/r#3 · resolves 3 · stale base");
+    expect(text).toContain("[verify] o/r#1 + o/r#2, o/r#3 · resolves 3 · stale base");
   });
 });

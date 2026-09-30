@@ -31,8 +31,19 @@ export interface SweepPullRequest {
   missingOnBase: string[];
 }
 
+/**
+ * What a group needs before anyone acts on it:
+ *
+ * - `verify`: run the issue's repro on the current release; every PR edits
+ *   files the base branch no longer has, so the fix may already be there;
+ * - `choose`: pick one implementation among open PRs that close one issue;
+ * - `compare`: read two PRs that share files to decide whether they overlap.
+ */
+export type SweepNext = "verify" | "choose" | "compare";
+
 export interface SweepGroup {
   kind: "competing" | "stale" | "overlap";
+  next: SweepNext;
   /** The open issue the PRs close, when there is one. */
   issue: NodeKey | null;
   pullRequests: SweepPullRequest[];
@@ -53,7 +64,7 @@ export interface SweepGroup {
   summary: string;
 }
 
-const KIND_ORDER: Record<SweepGroup["kind"], number> = { competing: 0, stale: 1, overlap: 2 };
+const NEXT_ORDER: Record<SweepNext, number> = { verify: 0, choose: 1, compare: 2 };
 
 function significantFiles(node: GraphNode): string[] {
   return (node.pr?.files ?? []).filter(isSignificant);
@@ -105,6 +116,7 @@ function finishGroup(
         : `${pullRequests.length} open PRs close ${issue}. One fix resolves ${pullRequests.length + 1} items.`;
   return {
     kind,
+    next: kind === "overlap" ? "compare" : allStale ? "verify" : "choose",
     issue,
     pullRequests,
     sharedFiles,
@@ -118,8 +130,7 @@ function finishGroup(
 
 function bySweepOrder(a: SweepGroup, b: SweepGroup): number {
   return (
-    Number(b.allStale) - Number(a.allStale) ||
-    KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+    NEXT_ORDER[a.next] - NEXT_ORDER[b.next] ||
     b.resolves - a.resolves ||
     (b.overlapScore ?? 0) - (a.overlapScore ?? 0) ||
     (a.smallestChange ?? Number.POSITIVE_INFINITY) -
@@ -285,7 +296,7 @@ export function renderSweep(groups: SweepGroup[], limit = 10): string[] {
   for (const [index, group] of groups.slice(0, limit).entries()) {
     const head = group.issue ? `${group.issue} + ` : "";
     out.push(
-      `${index + 1}. ${head}${group.pullRequests.map((pr) => pr.key).join(", ")} · resolves ${group.resolves}${group.allStale ? " · stale base" : ""}`,
+      `${index + 1}. [${group.next}] ${head}${group.pullRequests.map((pr) => pr.key).join(", ")} · resolves ${group.resolves}${group.allStale ? " · stale base" : ""}`,
       `   - ${group.summary}`,
     );
     for (const pr of group.pullRequests) {

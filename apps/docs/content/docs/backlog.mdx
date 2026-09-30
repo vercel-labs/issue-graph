@@ -79,6 +79,8 @@ The plan's `sweep` groups list open work that one decision can resolve together:
 
 Each PR reports `staleBase`: whether every file it modifies or deletes is gone from the default branch. Groups where every PR is stale come first, because they usually need verification on the current release, not new code. Use `--budget 1000` so older backlog items are included.
 
+Each group names its `next` step: `verify` (run the issue's repro on the current release), `choose` (pick one implementation), or `compare` (read both PRs). Groups to verify come first.
+
 A group is a lead, not a verdict. Reproduce the issue on the current release before closing anything.
 
 Plan saves no snapshots. Use `--format json` for structured output; HTML export is available in graph mode. See [Command reference](/docs/reference) for output formats.

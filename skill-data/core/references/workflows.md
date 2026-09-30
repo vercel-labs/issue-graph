@@ -229,6 +229,8 @@ Each group is one of three kinds:
 
 For each PR, `staleBase` is `true` when every file it modifies or deletes is gone from the default branch, `false` when some remain (listed in `missingOnBase`), and `null` when that could not be checked. Groups where every PR is stale sort first, then competing, stale, and overlap groups, each by larger `resolves`, higher `overlapScore`, and the smallest live change.
 
+Each group also carries `next`, the step it needs before anyone acts: `verify` (every PR is stale, so run the issue's repro on the current release), `choose` (pick one implementation among competing PRs), or `compare` (read both PRs of an overlap). Groups sort `verify` first. `verify` is empirical: run it. `choose` and `compare` call for judgment, so do them after the verifiable groups are settled.
+
 Work the groups in order:
 
 1. **Verify before any claim.** A stale or competing group is a lead, not a verdict. Reproduce the issue's reported behavior on the current release and look for the commit that fixed it (`git log -S`, the handler on the default branch). Record the command and output.
