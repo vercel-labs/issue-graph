@@ -442,6 +442,46 @@ assert.match(publicSkill.body, /^---\nname: issue-graph\n/);
 assert.equal(publicSkill.body, skill.body);
 assert.match(publicSkill.body, /issue-graph skills get core/);
 checks += 2;
+const bridge = await request("/api/mcp?webmcp-script", { accept: "*/*" });
+assert.equal(bridge.response.status, 200);
+assert.match(bridge.response.headers.get("content-type") ?? "", /javascript/);
+assert.match(bridge.body, /registerTool/);
+async function rpc(method: string, params: Record<string, unknown>) {
+  const response = await fetch(new URL("/api/mcp", origin), {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  const message = JSON.parse(
+    response.headers.get("content-type")?.includes("text/event-stream")
+      ? (text
+          .split(/\r?\n/)
+          .find((line) => line.startsWith("data:"))
+          ?.slice(5) ?? "")
+      : text,
+  );
+  assert.equal(message.error, undefined);
+  return message.result;
+}
+const { tools } = await rpc("tools/list", {});
+assert.deepEqual(
+  tools.map((tool: { name: string }) => tool.name),
+  ["search_docs"],
+);
+const found = await rpc("tools/call", {
+  name: "search_docs",
+  arguments: { query: "competing PRs", locale: "en" },
+});
+assert.notEqual(found.isError, true);
+const matches = found.content
+  .filter((item: { type: string }) => item.type === "text")
+  .flatMap((item: { text: string }) => JSON.parse(item.text));
+assert.ok(
+  matches.some((item: { url: string }) => item.url === "/docs/backlog#compare-competing-prs"),
+);
+checks += 3;
 console.log(
   `PASS: ${checks} route checks against ${origin.origin}${preview ? " (preview noindex)" : ""}`,
 );
