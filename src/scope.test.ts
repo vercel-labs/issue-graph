@@ -33,6 +33,13 @@ describe("parseScope", () => {
 
   test("names unsupported providers instead of guessing", () => {
     expect(() => parseScope("linear:ENG")).toThrow(/provider 'linear' is not supported yet/);
+    expect(parseScope("youtrack:ENG")).toEqual({ kind: "repo", provider: "youtrack", repo: "ENG" });
+    expect(parseScope("youtrack:ENG#12")).toEqual({
+      kind: "item",
+      provider: "youtrack",
+      repo: "ENG",
+      number: 12,
+    });
     expect(() => parseScope("not a scope")).toThrow(/cannot read/);
   });
 });

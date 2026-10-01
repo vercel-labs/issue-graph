@@ -2,10 +2,19 @@ import { writeFile } from "node:fs/promises";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { nextSteps, parseArgs, runCli, statusArgs, UsageError } from "./cli.js";
-import { listSnapshots, writeSnapshot } from "./snapshot.js";
+import { runAgent } from "./cluster.js";
+import { writeNextDashboard } from "./next-dashboard.js";
+import { listSnapshots, writeDashboardModel, writeSnapshot } from "./snapshot.js";
 import { shellTransport } from "./transports/shell.js";
+import { collectYouTrack } from "./youtrack.js";
 
 vi.mock("./transports/shell.js", () => ({ shellTransport: vi.fn() }));
+vi.mock("./cluster.js", async (original) => ({
+  ...(await original<typeof import("./cluster.js")>()),
+  runAgent: vi.fn(),
+}));
+vi.mock("./next-dashboard.js", () => ({ writeNextDashboard: vi.fn() }));
+vi.mock("./youtrack.js", () => ({ collectYouTrack: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ mkdir: vi.fn(), writeFile: vi.fn() }));
 vi.mock("./snapshot.js", async (original) => ({
   ...(await original<typeof import("./snapshot.js")>()),
@@ -216,6 +225,119 @@ describe("offline CLI output dispatch", () => {
     else Reflect.deleteProperty(process.stdout, "columns");
   });
 
+  test("opens a YouTrack model without creating a GitHub transport", async () => {
+    const model = {
+      provider: {
+        id: "youtrack",
+        name: "YouTrack",
+        logo: "",
+        repoUrl: "https://youtrack.example/projects/{repo}",
+        signals: [],
+      },
+      repo: "youtrack:youtrack.example/ENG",
+      seeds: [],
+      groups: [],
+      cleanup: [],
+      stats: { nodes: 0, openIssues: 0 },
+      nodes: {},
+    };
+    vi.mocked(collectYouTrack).mockResolvedValueOnce(model);
+    await runCli(["open", "youtrack:ENG", "--no-open", "--no-save"]);
+    expect(collectYouTrack).toHaveBeenCalledWith("ENG", { state: "open", maxNodes: 1000 });
+    expect(shellTransport).not.toHaveBeenCalled();
+    expect(writeNextDashboard).toHaveBeenCalledWith(expect.any(String), [model], expect.anything());
+  });
+
+  test("opens a focused YouTrack issue scope", async () => {
+    const model = {
+      id: "youtrack:youtrack.example/ENG/ENG-7",
+      provider: { id: "youtrack", name: "YouTrack", logo: "", repoUrl: "", signals: [] },
+      repo: "youtrack:youtrack.example/ENG",
+      seeds: [],
+      groups: [],
+      cleanup: [],
+      stats: { nodes: 0, openIssues: 0 },
+      nodes: {},
+    };
+    vi.mocked(collectYouTrack).mockResolvedValueOnce(model);
+
+    await runCli(["open", "youtrack:ENG#7", "--no-open"]);
+
+    expect(collectYouTrack).toHaveBeenCalledWith("ENG", {
+      state: "open",
+      maxNodes: 80,
+      issueId: "ENG-7",
+      maxDepth: 2,
+    });
+    expect(shellTransport).not.toHaveBeenCalled();
+    expect(writeNextDashboard).toHaveBeenCalledWith(expect.any(String), [model], expect.anything());
+    expect(writeDashboardModel).toHaveBeenCalledWith(model.id, model);
+  });
+
+  test("clusters a focused YouTrack issue graph with the selected agent", async () => {
+    const key = "youtrack:youtrack.example/ENG/ENG-7";
+    const model = {
+      id: key,
+      provider: { id: "youtrack", name: "YouTrack", logo: "", repoUrl: "", signals: [] },
+      repo: "youtrack:youtrack.example/ENG",
+      seeds: [key],
+      groups: [],
+      cleanup: [],
+      stats: { nodes: 1, openIssues: 1 },
+      nodes: {
+        [key]: {
+          repo: "youtrack:youtrack.example/ENG",
+          key,
+          num: 7,
+          identifier: "ENG-7",
+          kind: "Issue" as const,
+          state: "OPEN",
+          title: "Support comments on drafts",
+          url: "https://youtrack.example/issue/ENG-7",
+          depth: 0,
+          seed: true,
+          flags: [],
+          mentionedBy: [],
+          external: [],
+          out: [{ to: key, via: "relates to" }],
+          in: [],
+          overlaps: [],
+        },
+      },
+    };
+    vi.mocked(collectYouTrack).mockResolvedValueOnce(model);
+    vi.mocked(runAgent).mockReturnValueOnce(
+      JSON.stringify({
+        clusters: [{ label: "Draft comments", root_cause: "REST support", members: [{ key }] }],
+      }),
+    );
+
+    await runCli([
+      "open",
+      "youtrack:ENG#7",
+      "--agent",
+      "codex",
+      "--agent-model",
+      "gpt-6-luna",
+      "--agent-reasoning-effort",
+      "high",
+      "--no-open",
+    ]);
+
+    expect(runAgent).toHaveBeenCalledWith(
+      "codex",
+      expect.stringContaining("Support comments on drafts"),
+      { model: "gpt-6-luna", reasoningEffort: "high" },
+    );
+    expect(writeDashboardModel).toHaveBeenCalledWith(
+      model.id,
+      expect.objectContaining({
+        grouping: "themes",
+        groups: [expect.objectContaining({ label: "Draft comments", members: [key] })],
+      }),
+    );
+  });
+
   test("graph preserves Markdown/legacy JSON, exports files, and styles only human TTY", async () => {
     const markdown = await invoke(["1"]);
     expect(markdown).toMatch(/^# Reference graph: o\/r#1/);
@@ -397,13 +519,25 @@ describe("command API", () => {
       cluster: true,
     });
     expect(parseArgs(["open", "--agent", "none"]).clusterRun).toBe("");
+    expect(
+      parseArgs(["open", "--agent", "codex", "--agent-reasoning-effort", "max"])
+        .agentReasoningEffort,
+    ).toBe("max");
     expect(parseArgs(["open", "--no-open"]).openMode).toBe("no");
     expect(parseArgs(["open", "--no-save"]).noSnapshot).toBe(true);
     expect(() => parseArgs(["open", "--agent", "gpt"])).toThrow(/claude, codex, or none/);
+    expect(() => parseArgs(["open", "--agent-model", "gpt-6-luna"])).toThrow(
+      /require --agent codex/,
+    );
+    expect(() =>
+      parseArgs(["open", "--agent", "codex", "--agent-reasoning-effort", "ultra"]),
+    ).toThrow(/none, low, medium, high, xhigh, or max/);
   });
 
   test("scopes name the provider, and unsupported ones fail clearly", () => {
     expect(parseArgs(["open", "github:o/r"]).repo).toBe("o/r");
+    expect(parseArgs(["open", "youtrack:ENG"]).provider).toBe("youtrack");
+    expect(parseArgs(["open", "youtrack:ENG"]).repo).toBe("ENG");
     expect(() => parseArgs(["open", "linear:ENG"])).toThrow(/not supported yet/);
     expect(() => parseArgs(["open", "a/b", "c/d"])).toThrow(/one repository per run/);
   });

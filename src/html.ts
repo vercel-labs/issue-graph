@@ -193,6 +193,7 @@ function buildModel(
     clientNodes[n.key] = {
       key: n.key,
       num: n.number,
+      identifier: n.identifier,
       repo: `${n.owner}/${n.repo}`,
       kind: n.kind,
       state: n.state,
@@ -228,7 +229,13 @@ function buildModel(
             }
           : undefined;
       })(),
-      out: n.edges.map((e) => ({ to: e.to, via: e.via, by: e.by, at: e.at })),
+      out: n.edges.map((e) => ({
+        to: e.to,
+        via: e.via,
+        by: e.by,
+        at: e.at,
+        undirected: e.undirected,
+      })),
       in: inbound.get(n.key) ?? [],
       overlaps: overlapsBy.get(n.key) ?? [],
     };
@@ -258,7 +265,7 @@ function buildModel(
       const hub = members.slice().sort((a, b) => b.edges.length - a.edges.length)[0];
       return {
         label: `Component ${i + 1}`,
-        subtitle: hub ? `hub ${shortKey(hub.key)} — ${hub.title}` : "",
+        subtitle: hub ? `hub ${hub.identifier ?? shortKey(hub.key)} — ${hub.title}` : "",
         members: members.map((m) => m.key),
       };
     });
@@ -363,9 +370,14 @@ export function dashboardModel(
   repo: string,
   clustersConfig?: ClustersConfig,
   notCrawled = 0,
+  provider?: ProviderDescriptor,
 ): Model {
   const { clusters, cleanup } = normalizeClusters(clustersConfig);
-  return { ...buildModel(nodes, seedKeys, repo, clusters, cleanup), notCrawled };
+  return {
+    ...buildModel(nodes, seedKeys, repo, clusters, cleanup),
+    ...(provider ? { provider } : {}),
+    notCrawled,
+  };
 }
 
 export function renderHtml(

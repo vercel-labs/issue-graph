@@ -5,12 +5,14 @@ export type Kind = "Issue" | "PullRequest" | "Unknown";
 export type NodeKey = string;
 
 /** How one node came to reference another. */
-export type Via = "text" | "cross-ref" | "connected" | "closes";
+export type Via = "text" | "cross-ref" | "connected" | "closes" | (string & {});
 
 /** A directed reference from one node to another, with attribution. */
 export interface Edge {
   to: NodeKey;
   via: Via;
+  /** The source marks this relationship as symmetric. */
+  undirected?: boolean;
   /** Account that created the reference (comment/timeline actor, or PR author). */
   by?: string;
   /** ISO timestamp of the reference, when the source provides one. */
@@ -57,6 +59,8 @@ export interface HeatMeta {
 /** A crawled issue or PR and everything it points to. */
 export interface GraphNode {
   key: NodeKey;
+  /** Provider-readable identifier, such as a YouTrack issue ID. */
+  identifier?: string;
   owner: string;
   repo: string;
   number: number;
@@ -68,7 +72,7 @@ export interface GraphNode {
   /** BFS distance from the nearest seed. */
   depth: number;
   edges: Edge[];
-  /** Non-GitHub URLs mentioned, with noise (loopback/example/CI) filtered out. */
+  /** Related URLs shown in node details without creating a separate graph node. */
   externalLinks: string[];
   fetched: boolean;
   /** Login that opened the node. */
