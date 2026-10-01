@@ -5,7 +5,13 @@ import { InstallSelector } from "@/components/install-selector";
 import { renderTerminalCommand } from "@/components/terminal-output";
 import { landingDescription, landingTitle, workflows } from "@/lib/landing-content";
 import { pageMetadata } from "@/lib/page-metadata";
-import { plannedInstallCommand, siteDescription, siteName, siteUrl } from "@/lib/site";
+import {
+  plannedInstallCommand,
+  repositoryUrl,
+  siteDescription,
+  siteName,
+  siteUrl,
+} from "@/lib/site";
 import "@/components/landing.css";
 
 export const metadata = pageMetadata("/", landingTitle, siteDescription);
@@ -13,10 +19,25 @@ export const metadata = pageMetadata("/", landingTitle, siteDescription);
 export default function Home() {
   const structuredData = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: siteName,
-    url: siteUrl,
-    description: siteDescription,
+    "@graph": [
+      {
+        "@type": "WebSite",
+        name: siteName,
+        url: siteUrl,
+        description: siteDescription,
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: siteName,
+        url: siteUrl,
+        description: siteDescription,
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Node.js 20+",
+        license: "https://www.apache.org/licenses/LICENSE-2.0",
+        sameAs: [repositoryUrl, "https://www.npmjs.com/package/issue-graph"],
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      },
+    ],
   };
 
   return (

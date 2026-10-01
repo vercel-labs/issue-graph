@@ -50,7 +50,7 @@ describe("documentation content contract", () => {
 
   test("names the docs entry Overview", async () => {
     const intro = await read("content/docs/index.mdx");
-    expect(intro).toMatch(/^title: Overview$/m);
+    expect(intro).toMatch(/^navTitle: Overview$/m);
   });
 
   test("documents published npm-first installation and preserves access boundaries", async () => {

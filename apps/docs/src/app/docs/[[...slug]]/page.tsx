@@ -6,7 +6,7 @@ import { docsPath, isSafePathSegments, markdownPath } from "@/lib/docs-paths";
 import { config } from "@/lib/geistdocs/config";
 import { geistdocsSource } from "@/lib/geistdocs/source";
 import { pageMetadata } from "@/lib/page-metadata";
-import { siteDescription } from "@/lib/site";
+import { canonicalUrl, siteDescription, siteName } from "@/lib/site";
 
 type PageProps = { params: Promise<{ slug?: string[] }> };
 
@@ -34,7 +34,46 @@ const docsPage = createDocsPage({
 
 export default async function Page({ params }: PageProps) {
   const validated = await getPage(params);
-  return <docsPage.Page params={Promise.resolve(validated.params)} />;
+  const { page } = validated;
+  const url = canonicalUrl(docsPath(page.slugs));
+  // The Geistdocs frontmatter schema keeps navTitle, but PageData does not type it.
+  const { navTitle } = page.data as { navTitle?: string };
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        headline: page.data.title,
+        description: page.data.description ?? siteDescription,
+        url,
+        isPartOf: { "@type": "WebSite", name: siteName, url: canonicalUrl("/") },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Docs", item: canonicalUrl("/docs") },
+          ...(page.slugs.length
+            ? [
+                {
+                  "@type": "ListItem",
+                  position: 2,
+                  name: navTitle ?? page.data.title,
+                  item: url,
+                },
+              ]
+            : []),
+        ],
+      },
+    ],
+  };
+  return (
+    <>
+      <script type="application/ld+json">
+        {JSON.stringify(structuredData).replace(/</g, "\\u003c")}
+      </script>
+      <docsPage.Page params={Promise.resolve(validated.params)} />
+    </>
+  );
 }
 
 export async function generateMetadata({ params }: PageProps) {
