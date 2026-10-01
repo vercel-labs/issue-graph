@@ -229,7 +229,7 @@ describe("documentation content contract", () => {
     expect(pkg.name).toBe("@issue-graph/docs");
     expect(pkg.private).toBe(true);
     for (const [name, version] of Object.entries({
-      "@vercel/geistdocs": "2.4.1",
+      "@vercel/geistdocs": "2.7.5",
       "@vercel/agent-readability": "0.7.0",
       next: "16.3.5",
       react: "19.3.0",
