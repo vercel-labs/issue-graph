@@ -75,6 +75,10 @@ export function render(
       );
     }
     for (const x of n.externalLinks) out.push(`    - external → ${x}`);
+    if (n.subIssueTotal)
+      out.push(
+        `    - sub-issues: read ${n.subIssues?.length ?? 0} of ${n.subIssueTotal} (per-node limit)`,
+      );
   }
 
   const uncrawled = new Set<NodeKey>();

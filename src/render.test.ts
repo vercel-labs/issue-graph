@@ -96,6 +96,13 @@ describe("render", () => {
     expect(out).toContain("- o/r#3");
   });
 
+  test("says when a parent's sub-issue list was cut off", () => {
+    const nodes = new Map([
+      ["o/r#1", node("o/r#1", { depth: 0, subIssues: ["o/r#2"], subIssueTotal: 60 })],
+    ]);
+    expect(render(nodes, ["o/r#1"], false)).toContain("sub-issues: read 1 of 60 (per-node limit)");
+  });
+
   test("shows PR triage summary and derived flags", () => {
     const nodes = new Map([
       [

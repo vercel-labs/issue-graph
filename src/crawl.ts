@@ -72,9 +72,7 @@ export async function crawl(
       nodes.set(cur.key, node);
       if (cur.depth >= maxDepth) continue;
 
-      // sub-issues are reached from their parent as well as through their own
-      // child -> parent edge, so they count toward the hub guard too
-      const targets = new Set([...node.edges.map((e) => e.to), ...(node.subIssues ?? [])]);
+      const targets = crawlTargets(node);
 
       // hub guard: fetch a high-degree non-seed node but do not expand it
       if (!seedKeys.has(cur.key) && targets.size > hubThreshold) {
@@ -99,6 +97,15 @@ export async function crawl(
 
   linkSubIssues(nodes);
   return { nodes, cappedOut };
+}
+
+/**
+ * Every node the crawl expands into from this one, which is also what the hub
+ * guard counts. Sub-issues are reached from their parent as well as through
+ * their own child -> parent edge.
+ */
+export function crawlTargets(node: GraphNode): Set<NodeKey> {
+  return new Set([...node.edges.map((e) => e.to), ...(node.subIssues ?? [])]);
 }
 
 /**

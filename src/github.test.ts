@@ -186,9 +186,27 @@ describe("sub-issues", () => {
     expect(node.edges).toEqual([{ to: "other/x#5", via: "sub-issue" }]);
   });
 
+  test("a parent with more sub-issues than the page records the total", () => {
+    const parse = (totalCount: number) =>
+      parseNodeResponse(
+        {
+          __typename: "Issue",
+          title: "epic",
+          state: "OPEN",
+          subIssues: { totalCount, nodes: [ref(2), ref(3)] },
+        },
+        "o",
+        "r",
+        1,
+        0,
+      );
+    expect(parse(75).subIssueTotal).toBe(75);
+    expect(parse(2).subIssueTotal).toBeUndefined();
+  });
+
   test("the node query asks for the parent and a bounded page of sub-issues", () => {
     expect(NODE_QUERY).toContain("parent{ number repository{owner{login} name} }");
-    expect(NODE_QUERY).toContain("subIssues(first:50)");
+    expect(NODE_QUERY).toContain("subIssues(first:50){ totalCount");
   });
 });
 

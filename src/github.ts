@@ -61,7 +61,7 @@ export const NODE_QUERY = `query($owner:String!,$repo:String!,$n:Int!){
         participants(first:1){ totalCount }
         comments(first:100){ totalCount nodes{ body author{login} } }
         parent{ number repository{owner{login} name} }
-        subIssues(first:50){ nodes{ number repository{owner{login} name} } }
+        subIssues(first:50){ totalCount nodes{ number repository{owner{login} name} } }
         timelineItems(first:100, itemTypes:[CROSS_REFERENCED_EVENT,CONNECTED_EVENT]){ nodes{ __typename
           ... on CrossReferencedEvent{ createdAt actor{login} source{ __typename ... on Issue{number repository{owner{login} name}} ... on PullRequest{number repository{owner{login} name}} } }
           ... on ConnectedEvent{ createdAt actor{login} subject{ __typename ... on Issue{number repository{owner{login} name}} ... on PullRequest{number repository{owner{login} name}} } }
@@ -113,7 +113,7 @@ export interface RawNodeItem {
   /** Issue-only: the issue this one is a sub-issue of. */
   parent?: RefNode | null;
   /** Issue-only: this issue's direct sub-issues (first 50). */
-  subIssues?: { nodes?: RefNode[] };
+  subIssues?: { totalCount?: number; nodes?: RefNode[] };
   timelineItems?: {
     nodes?: Array<{
       createdAt?: string;
@@ -226,6 +226,8 @@ export function parseNodeResponse(
     .map(refKey)
     .filter((k): k is NodeKey => !!k && k !== node.key);
   if (subIssues.length) node.subIssues = [...new Set(subIssues)];
+  const subIssueTotal = item.subIssues?.totalCount ?? 0;
+  if (subIssueTotal > (item.subIssues?.nodes?.length ?? 0)) node.subIssueTotal = subIssueTotal;
   for (const tl of item.timelineItems?.nodes ?? []) {
     if (tl.source) addEdge(refKey(tl.source), "cross-ref", tl.actor?.login, tl.createdAt);
     if (tl.subject) addEdge(refKey(tl.subject), "connected", tl.actor?.login, tl.createdAt);

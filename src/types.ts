@@ -100,6 +100,11 @@ export interface GraphNode {
    * from the parent.
    */
   subIssues?: NodeKey[];
+  /**
+   * Set only when the parent has more sub-issues than the query read, so the
+   * report can say the list is incomplete.
+   */
+  subIssueTotal?: number;
 }
 
 /** A single seed to start crawling from. */

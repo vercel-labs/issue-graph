@@ -42,9 +42,9 @@ The report flags competing PRs, shared changed files, possible superseded work, 
 | `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it above this reference count |
 | `--concurrency N` | `4` | Concurrent node requests, from 1 to 32 |
 
-Cross-repository references are fetched one hop. Explicit seeds are exempt from the hub guard; use the report's suggested re-seed command to inspect a hub.
+Cross-repository references are fetched one hop. The hub guard counts a node's references and its sub-issues together, so an epic with more than 12 sub-issues is fetched but not expanded. Explicit seeds are exempt from the hub guard; use the report's suggested re-seed command to inspect a hub.
 
-Each node query reads up to 100 comments, 100 timeline items, 100 PR files, 50 closing references, and 50 sub-issues. These connections are not fully paginated. Search-based seed discovery is limited by the node budget and GitHub's 1000-result search ceiling.
+Each node query reads up to 100 comments, 100 timeline items, 100 PR files, 50 closing references, and 50 sub-issues. These connections are not fully paginated. A parent with more sub-issues than that gets a `subIssueTotal` in JSON and a "read N of M" line in the report. Search-based seed discovery is limited by the node budget and GitHub's 1000-result search ceiling.
 
 Check `cappedOut`, unfetched nodes, and unexpanded hubs when interpreting the graph. Increasing the node cap leaves the per-node limits unchanged.
 

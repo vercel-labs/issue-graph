@@ -1,6 +1,6 @@
 import { setTimeout } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
-import { components, crawl } from "./crawl.js";
+import { components, crawl, crawlTargets } from "./crawl.js";
 import type { FetchNode } from "./github.js";
 import type { Edge, GraphNode, NodeKey } from "./types.js";
 
@@ -127,6 +127,8 @@ describe("crawl", () => {
     );
     expect(nodes.get("o/r#2")?.hub).toBe(true);
     expect(nodes.has("o/r#100")).toBe(false);
+    const hub = nodes.get("o/r#2");
+    expect(hub && crawlTargets(hub).size).toBe(5);
   });
 
   test("fetches a cross-repo sub-issue one hop but does not expand it", async () => {

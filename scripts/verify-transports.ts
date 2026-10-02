@@ -50,6 +50,7 @@ function normalize(nodes: Map<string, GraphNode>) {
       files: n.pr?.files?.slice().sort(),
       claimsClose: n.claimsClose?.slice().sort(),
       subIssues: n.subIssues?.slice().sort(),
+      subIssueTotal: n.subIssueTotal,
     }));
 }
 

@@ -14,7 +14,7 @@ import {
   runAgent,
 } from "./cluster.js";
 import { modelDefaults, readConfig, resolveWeights } from "./config.js";
-import { components, crawl } from "./crawl.js";
+import { components, crawl, crawlTargets } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
 import {
   applyClusters,
@@ -577,7 +577,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (hubs.length) {
     md += "\n## Hubs not expanded — re-seed to explore\n\n";
     for (const h of hubs) {
-      md += `- ${h.key} (${h.edges.length} refs) → \`issue-graph graph ${h.owner}/${h.repo}#${h.number} --depth 1\`\n`;
+      md += `- ${h.key} (${crawlTargets(h).size} refs) → \`issue-graph graph ${h.owner}/${h.repo}#${h.number} --depth 1\`\n`;
     }
   }
 
