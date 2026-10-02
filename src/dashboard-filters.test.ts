@@ -272,6 +272,44 @@ test("the shipped view functions share filters while retaining complete relation
   });
 });
 
+test("the shipped view labels sub-issue links from each end and keeps them out of solutions", () => {
+  const m = model([
+    item(1, 100, { in: [{ from: key(2), via: "sub-issue" }] }),
+    item(2, 80, { out: [{ to: key(1), via: "sub-issue" }] }),
+  ]);
+  const html = renderDashboard([m]);
+  const script = html.slice(html.lastIndexOf("<script>") + 8, html.lastIndexOf("</script>"));
+  const result = runInNewContext(
+    script.replace(
+      'app.className = "";',
+      `
+    F={state:'all',kind:'all',heatMode:'all'};computeFilters();
+    return ({
+      parent:egoSvg(N['${key(1)}']),
+      child:egoSvg(N['${key(2)}']),
+      linkedPRs:[...blastRadius('${key(1)}').prs],
+    });`,
+    ),
+    {
+      document: {
+        getElementById: (id: string) =>
+          id === "data" ? { textContent: JSON.stringify({ projects: [m] }) } : {},
+      },
+      location: { href: "https://example.invalid/view.html", search: "" },
+      URL,
+      URLSearchParams,
+      AbortController,
+      window: { addEventListener() {} },
+      localStorage: { getItem: () => null },
+    },
+  );
+  expect(result.parent).toContain("parent of #2");
+  expect(result.child).toContain("sub-issue of #1");
+  expect(result.linkedPRs).toEqual([]);
+  const filters = createDashboardFilterEngine().evaluate(m, { solution: "with" }, score);
+  expect([...filters.matches]).toEqual([]);
+});
+
 test("combinations agree with an independent intersection of captured item sets", () => {
   const m = model([item(1, 100), item(2, 80), item(3, 80, { state: "CLOSED" }), pr(4)]);
   const all = [1, 2, 3, 4];

@@ -43,6 +43,7 @@ describe("display helpers", () => {
     expect(kindTag("PullRequest")).toBe("PR");
     expect(viaTag("cross-ref")).toBe("cross-ref");
     expect(viaTag("text")).toBe("mentions");
+    expect(viaTag("sub-issue")).toBe("sub-issue of");
   });
 });
 
@@ -82,6 +83,24 @@ describe("render", () => {
       ["o/r#1", node("o/r#1", { depth: 0, edges: [{ to: "o/r#99", via: "text" }] })],
     ]);
     expect(render(nodes, ["o/r#1"], false)).toContain("beyond depth");
+  });
+
+  test("lists sub-issues that were not crawled as beyond depth", () => {
+    const nodes = new Map([
+      ["o/r#1", node("o/r#1", { depth: 0, hub: true, subIssues: ["o/r#2", "o/r#3"] })],
+      ["o/r#2", node("o/r#2", { edges: [{ to: "o/r#1", via: "sub-issue" }] })],
+    ]);
+    const out = render(nodes, ["o/r#1"], false);
+    expect(out).toContain("sub-issue of → o/r#1");
+    expect(out).toContain("Beyond depth limit (1 refs not crawled)");
+    expect(out).toContain("- o/r#3");
+  });
+
+  test("says when a parent's sub-issue list was cut off", () => {
+    const nodes = new Map([
+      ["o/r#1", node("o/r#1", { depth: 0, subIssues: ["o/r#2"], subIssueTotal: 60 })],
+    ]);
+    expect(render(nodes, ["o/r#1"], false)).toContain("sub-issues: read 1 of 60 (per-node limit)");
   });
 
   test("shows PR triage summary and derived flags", () => {

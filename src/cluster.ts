@@ -32,7 +32,7 @@ export function clusterPrompt(repo: string, payload: ClusterNode[]): string {
     .join("\n");
   return [
     `You are triaging the GitHub reference graph of ${repo}. Below are the open (and seed) nodes reachable from the seed(s).`,
-    "Each node lists its edges in [brackets] (closes/mentions/cross-ref/connected → target).",
+    "Each node lists its edges in [brackets] (closes/mentions/cross-ref/connected/sub-issue → target; sub-issue points from a child to its parent issue).",
     "Group them into ROOT-CAUSE CLUSTERS: sets that share one underlying defect or theme.",
     "Cluster by the edge structure and the defect it implies — shared closing targets, mutual references, a common subsystem — NOT by title-keyword overlap.",
     "",

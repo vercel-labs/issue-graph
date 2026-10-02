@@ -4,8 +4,11 @@ export type Kind = "Issue" | "PullRequest" | "Unknown";
 /** Canonical node identity: `${owner}/${repo}#${number}`. */
 export type NodeKey = string;
 
-/** How one node came to reference another. */
-export type Via = "text" | "cross-ref" | "connected" | "closes";
+/**
+ * How one node came to reference another. `sub-issue` points from a sub-issue
+ * to its parent issue; it is a hierarchy link, never a closing link.
+ */
+export type Via = "text" | "cross-ref" | "connected" | "closes" | "sub-issue";
 
 /** A directed reference from one node to another, with attribution. */
 export interface Edge {
@@ -91,6 +94,17 @@ export interface GraphNode {
    * links to catch the silent "says it fixes X but won't auto-close" gotcha.
    */
   claimsClose?: NodeKey[];
+  /**
+   * Issue-only: direct sub-issues (first 50). The link itself is recorded as a
+   * `sub-issue` edge on the child; this list lets the crawl reach children
+   * from the parent.
+   */
+  subIssues?: NodeKey[];
+  /**
+   * Set only when the parent has more sub-issues than the query read, so the
+   * report can say the list is incomplete.
+   */
+  subIssueTotal?: number;
 }
 
 /** A single seed to start crawling from. */

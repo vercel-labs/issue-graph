@@ -72,15 +72,17 @@ export async function crawl(
       nodes.set(cur.key, node);
       if (cur.depth >= maxDepth) continue;
 
+      const targets = crawlTargets(node);
+
       // hub guard: fetch a high-degree non-seed node but do not expand it
-      if (!seedKeys.has(cur.key) && node.edges.length > hubThreshold) {
+      if (!seedKeys.has(cur.key) && targets.size > hubThreshold) {
         node.hub = true;
         continue;
       }
 
-      for (const edge of node.edges) {
-        const m = edge.to.match(/^([\w.-]+)\/([\w.-]+)#(\d+)$/);
-        if (!m || nodes.has(edge.to)) continue;
+      for (const to of targets) {
+        const m = to.match(/^([\w.-]+)\/([\w.-]+)#(\d+)$/);
+        if (!m || nodes.has(to)) continue;
         const [, o, r, n] = m;
         next.push({
           owner: o,
@@ -93,7 +95,33 @@ export async function crawl(
     frontier = next;
   }
 
+  linkSubIssues(nodes);
   return { nodes, cappedOut };
+}
+
+/**
+ * Every node the crawl expands into from this one, which is also what the hub
+ * guard counts. Sub-issues are reached from their parent as well as through
+ * their own child -> parent edge.
+ */
+export function crawlTargets(node: GraphNode): Set<NodeKey> {
+  return new Set([...node.edges.map((e) => e.to), ...(node.subIssues ?? [])]);
+}
+
+/**
+ * Make sure every parent/sub-issue pair seen from either end is one
+ * `sub-issue` edge on the child. A fetched child already reports its parent;
+ * this covers a child whose own fetch failed. An existing edge from the child
+ * to the parent is left alone, so a link is never recorded twice.
+ */
+function linkSubIssues(nodes: Map<NodeKey, GraphNode>): void {
+  for (const parent of nodes.values()) {
+    for (const childKey of parent.subIssues ?? []) {
+      const child = nodes.get(childKey);
+      if (!child || child.edges.some((e) => e.to === parent.key)) continue;
+      child.edges.push({ to: parent.key, via: "sub-issue" });
+    }
+  }
 }
 
 /** Undirected connected components over the crawled nodes, largest first. */

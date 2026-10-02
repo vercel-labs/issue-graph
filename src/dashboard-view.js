@@ -624,6 +624,10 @@ export function mountDashboardView(
       [po] = DATA.repo.split("/");
     return (o === po ? name : r) + "#" + n;
   };
+  // relationship labels read from the item being viewed: outgoing, then incoming
+  const outLabel = (via) => (via === "sub-issue" ? "sub-issue of" : via);
+  const inLabel = (via) =>
+    via === "closes" ? "closed-by" : via === "sub-issue" ? "parent of" : via;
   function statsOf() {
     // headline counts cover the project's own repo; referenced items are reported as linked
     const all = Object.values(N),
@@ -1127,8 +1131,8 @@ export function mountDashboardView(
     const push = (k, via) => {
       if (N[k] && !nb.find((x) => x.k === k)) nb.push({ k, via });
     };
-    for (const e of n.out) push(e.to, e.via);
-    for (const e of n.in) push(e.from, e.via === "closes" ? "closed-by" : e.via);
+    for (const e of n.out) push(e.to, outLabel(e.via));
+    for (const e of n.in) push(e.from, inLabel(e.via));
     for (const o of n.overlaps) push(o.with, "overlaps");
     const cap = nb.slice(0, 12),
       W = 560,
@@ -1426,12 +1430,12 @@ export function mountDashboardView(
         relList("overlaps (shared files)", ovl, (x) => x) +
         relList(
           "Relationships from this item",
-          otherOut.map((e) => ({ k: e.to, via: e.via })),
+          otherOut.map((e) => ({ k: e.to, via: outLabel(e.via) })),
           rel,
         ) +
         relList(
           "Relationships to this item",
-          otherIn.map((e) => ({ k: e.from, via: e.via })),
+          otherIn.map((e) => ({ k: e.from, via: inLabel(e.via) })),
           rel,
         ) +
         ment +
@@ -2272,7 +2276,12 @@ export function mountDashboardView(
     keys.forEach((k) => {
       N[k].out.forEach((e) => {
         if (idx.has(e.to) && e.to !== k && (!e.undirected || k < e.to))
-          links.push([k, e.to, e.via, e.undirected === false || e.via === "closes"]);
+          links.push([
+            k,
+            e.to,
+            e.via,
+            e.undirected === false || e.via === "closes" || e.via === "sub-issue",
+          ]);
       });
     });
     keys.forEach((k) => {
@@ -2364,7 +2373,7 @@ export function mountDashboardView(
           ";animation-delay:" +
           (200 + i * 30) +
           'ms"><title>' +
-          esc(short(s) + " " + via + " " + short(t)) +
+          esc(short(s) + " " + outLabel(via) + " " + short(t)) +
           "</title></line>"
         );
       })

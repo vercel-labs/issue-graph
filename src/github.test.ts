@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   labelSeeds,
   makeFetchNode,
+  NODE_QUERY,
   openBacklogSeeds,
   parseNodeResponse,
   type RawNodeItem,
@@ -115,6 +116,97 @@ describe("parseNodeResponse", () => {
     const node = parseNodeResponse(undefined, "o", "r", 1, 0);
     expect(node.state).toBe("NOT_FOUND");
     expect(node.fetched).toBe(false);
+  });
+});
+
+describe("sub-issues", () => {
+  const ref = (number: number, owner = "o", name = "r") => ({
+    number,
+    repository: { owner: { login: owner }, name },
+  });
+
+  test("a sub-issue points at its parent, even with no mention in the text", () => {
+    const node = parseNodeResponse(
+      { __typename: "Issue", title: "child", state: "OPEN", body: "", parent: ref(7848) },
+      "o",
+      "r",
+      8343,
+      0,
+    );
+    expect(node.edges).toEqual([{ to: "o/r#7848", via: "sub-issue" }]);
+    expect(node.subIssues).toBeUndefined();
+  });
+
+  test("a parent lists its sub-issues for the crawl without claiming edges to them", () => {
+    const node = parseNodeResponse(
+      {
+        __typename: "Issue",
+        title: "parent",
+        state: "OPEN",
+        body: "",
+        parent: null,
+        subIssues: { nodes: [ref(2), ref(3), ref(2), ref(1), ref(4, "other", "x")] },
+      },
+      "o",
+      "r",
+      1,
+      0,
+    );
+    expect(node.subIssues).toEqual(["o/r#2", "o/r#3", "other/x#4"]);
+    expect(node.edges).toEqual([]);
+  });
+
+  test("the sub-issue link wins over a text mention or cross-reference of the same parent", () => {
+    const node = parseNodeResponse(
+      {
+        __typename: "Issue",
+        title: "child",
+        state: "OPEN",
+        body: "part of #7848",
+        author: { login: "alice" },
+        parent: ref(7848),
+        timelineItems: { nodes: [{ actor: { login: "bob" }, source: ref(7848) }] },
+      },
+      "o",
+      "r",
+      8343,
+      0,
+    );
+    expect(node.edges).toEqual([{ to: "o/r#7848", via: "sub-issue" }]);
+  });
+
+  test("a cross-repo parent keeps its own repository in the key", () => {
+    const node = parseNodeResponse(
+      { __typename: "Issue", title: "child", state: "OPEN", parent: ref(5, "other", "x") },
+      "o",
+      "r",
+      8,
+      0,
+    );
+    expect(node.edges).toEqual([{ to: "other/x#5", via: "sub-issue" }]);
+  });
+
+  test("a parent with more sub-issues than the page records the total", () => {
+    const parse = (totalCount: number) =>
+      parseNodeResponse(
+        {
+          __typename: "Issue",
+          title: "epic",
+          state: "OPEN",
+          subIssues: { totalCount, nodes: [ref(2), ref(3)] },
+        },
+        "o",
+        "r",
+        1,
+        0,
+      );
+    expect(parse(75).subIssueTotal).toBe(75);
+    expect(parse(2).subIssueTotal).toBeUndefined();
+  });
+
+  test("the node query asks for the parent and a bounded page of sub-issues", () => {
+    expect(NODE_QUERY).toContain("parent{ number repository{owner{login} name} }");
+    expect(NODE_QUERY).toContain("subIssues(first:50){ totalCount");
   });
 });
 

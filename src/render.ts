@@ -23,7 +23,13 @@ export const kindTag = (k: string): string =>
   k === "PullRequest" ? "PR" : k === "Issue" ? "issue" : k;
 
 export const viaTag = (v: Via | string): string =>
-  ({ closes: "closes", "cross-ref": "cross-ref", connected: "linked", text: "mentions" })[v] ?? v;
+  ({
+    closes: "closes",
+    "cross-ref": "cross-ref",
+    connected: "linked",
+    text: "mentions",
+    "sub-issue": "sub-issue of",
+  })[v] ?? v;
 
 /** Render the graph body: header, components (multi-seed), nodes, beyond-depth, orphan checklist. */
 export function render(
@@ -69,11 +75,17 @@ export function render(
       );
     }
     for (const x of n.externalLinks) out.push(`    - external → ${x}`);
+    if (n.subIssueTotal)
+      out.push(
+        `    - sub-issues: read ${n.subIssues?.length ?? 0} of ${n.subIssueTotal} (per-node limit)`,
+      );
   }
 
   const uncrawled = new Set<NodeKey>();
-  for (const n of nodes.values())
+  for (const n of nodes.values()) {
     for (const e of n.edges) if (!nodes.has(e.to)) uncrawled.add(e.to);
+    for (const k of n.subIssues ?? []) if (!nodes.has(k)) uncrawled.add(k);
+  }
   if (uncrawled.size) {
     out.push(`\n## Beyond depth limit (${uncrawled.size} refs not crawled)\n`);
     for (const k of [...uncrawled].sort()) out.push(`- ${k}`);

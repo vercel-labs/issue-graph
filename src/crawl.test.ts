@@ -1,14 +1,20 @@
 import { setTimeout } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
-import { components, crawl } from "./crawl.js";
+import { components, crawl, crawlTargets } from "./crawl.js";
 import type { FetchNode } from "./github.js";
 import type { Edge, GraphNode, NodeKey } from "./types.js";
 
 /** Build an offline FetchNode from a fixture of key -> outgoing edge targets. */
-function fakeFetch(graph: Record<NodeKey, Array<Partial<Edge> & { to: NodeKey }>>): FetchNode {
+function fakeFetch(
+  graph: Record<NodeKey, Array<Partial<Edge> & { to: NodeKey }>>,
+  subIssues: Record<NodeKey, NodeKey[]> = {},
+  failed: NodeKey[] = [],
+): FetchNode {
   return async (owner, repo, number, depth) => {
     const key = `${owner}/${repo}#${number}`;
-    const edges: Edge[] = (graph[key] ?? []).map((e) => ({ via: "text", ...e }));
+    const edges: Edge[] = failed.includes(key)
+      ? []
+      : (graph[key] ?? []).map((e) => ({ via: "text", ...e }));
     return {
       key,
       owner,
@@ -22,6 +28,8 @@ function fakeFetch(graph: Record<NodeKey, Array<Partial<Edge> & { to: NodeKey }>
       edges,
       externalLinks: [],
       fetched: true,
+      ...(subIssues[key] ? { subIssues: subIssues[key] } : {}),
+      ...(failed.includes(key) ? { state: "FETCH_ERROR", fetched: false } : {}),
     } satisfies GraphNode;
   };
 }
@@ -79,6 +87,58 @@ describe("crawl", () => {
     const { nodes } = await crawl([{ owner: "o", repo: "r", number: 1 }], opts(), fetch);
     expect(nodes.has("other/x#9")).toBe(true); // fetched
     expect(nodes.has("other/x#10")).toBe(false); // not expanded
+  });
+
+  test("reaches sub-issues from the parent and records each link once, on the child", async () => {
+    const fetch = fakeFetch(
+      {
+        "o/r#2": [{ to: "o/r#1", via: "sub-issue" }],
+        "o/r#3": [{ to: "o/r#1", via: "sub-issue" }],
+      },
+      { "o/r#1": ["o/r#2", "o/r#3"] },
+    );
+    const { nodes } = await crawl([{ owner: "o", repo: "r", number: 1 }], opts(), fetch);
+    expect([...nodes.keys()].sort()).toEqual(["o/r#1", "o/r#2", "o/r#3"]);
+    expect(nodes.get("o/r#1")?.edges).toEqual([]);
+    expect(nodes.get("o/r#2")?.edges).toEqual([{ to: "o/r#1", via: "sub-issue" }]);
+    expect(nodes.get("o/r#3")?.edges).toEqual([{ to: "o/r#1", via: "sub-issue" }]);
+  });
+
+  test("reaches the parent from a sub-issue seed", async () => {
+    const fetch = fakeFetch({ "o/r#8343": [{ to: "o/r#7848", via: "sub-issue" }] });
+    const { nodes } = await crawl([{ owner: "o", repo: "r", number: 8343 }], opts(), fetch);
+    expect(nodes.has("o/r#7848")).toBe(true);
+    expect(components(nodes)).toHaveLength(1);
+  });
+
+  test("adds the link for a sub-issue whose own fetch failed", async () => {
+    const fetch = fakeFetch({}, { "o/r#1": ["o/r#2"] }, ["o/r#2"]);
+    const { nodes } = await crawl([{ owner: "o", repo: "r", number: 1 }], opts(), fetch);
+    expect(nodes.get("o/r#2")?.edges).toEqual([{ to: "o/r#1", via: "sub-issue" }]);
+  });
+
+  test("counts sub-issues toward the hub guard", async () => {
+    const children = Array.from({ length: 5 }, (_, i) => `o/r#${100 + i}`);
+    const fetch = fakeFetch({ "o/r#1": [{ to: "o/r#2" }] }, { "o/r#2": children });
+    const { nodes } = await crawl(
+      [{ owner: "o", repo: "r", number: 1 }],
+      opts({ hubThreshold: 3 }),
+      fetch,
+    );
+    expect(nodes.get("o/r#2")?.hub).toBe(true);
+    expect(nodes.has("o/r#100")).toBe(false);
+    const hub = nodes.get("o/r#2");
+    expect(hub && crawlTargets(hub).size).toBe(5);
+  });
+
+  test("fetches a cross-repo sub-issue one hop but does not expand it", async () => {
+    const fetch = fakeFetch(
+      { "other/x#9": [{ to: "o/r#1", via: "sub-issue" }, { to: "other/x#10" }] },
+      { "o/r#1": ["other/x#9"] },
+    );
+    const { nodes } = await crawl([{ owner: "o", repo: "r", number: 1 }], opts(), fetch);
+    expect(nodes.has("other/x#9")).toBe(true);
+    expect(nodes.has("other/x#10")).toBe(false);
   });
 
   test("bounds node requests in flight", async () => {

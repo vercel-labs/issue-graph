@@ -256,7 +256,7 @@ Re-run the plan after each merge or closure; groups change as work lands.
 
 ## How it reads the graph
 
-- **Two edge sources.** Text mentions (body + comments) and structural links (timeline cross-references, connected events, closing refs) via GraphQL. Structural links catch attached PRs that never appear in the body text, the reason a text grep alone misses orphans.
+- **Two edge sources.** Text mentions (body + comments) and structural links (timeline cross-references, connected events, closing refs, sub-issue parents) via GraphQL. Structural links catch attached PRs that never appear in the body text, the reason a text grep alone misses orphans. A `sub-issue` edge points from a sub-issue to its parent; the crawl also follows a parent to its sub-issues. It is hierarchy only: it never counts as a closing link, a solution, or an inbound reference for Heat.
 - **PR triage metadata.** Each PR node carries `review`, draft/mergeable state, `+adds/-dels across Nf`, `updated <date>` (staleness), and the file paths it touches, all in the one node query, no extra requests.
 - **Heat signals.** Every node also carries comment count, distinct participants, reactions, and createdAt in the same query, the inputs to `issue-graph rank`.
 - **File-overlap detection.** Open PRs whose changed-file sets intersect are paired as possible duplicates/conflicts; a shared closing issue promotes the pair to a likely duplicate.
@@ -264,7 +264,7 @@ Re-run the plan after each merge or closure; groups change as work lands.
 - **Attribution.** Each node carries its author and who mentioned it; each edge carries the actor and date.
 - **State is fetched live per node** (OPEN/CLOSED/MERGED), never trusted from a cross-reference event, which can be stale.
 - **Snapshot + diff.** Graph runs compare the same seed list; keep seed order consistent. Reconcile runs compare the repository even when its open seed set changes, including a transition to zero open items; incomplete reconciliation coverage suppresses unsafe new or resolved claims. Graph/reconcile save under `~/.issue-graph/` unless `--no-save` is set, and may still read prior history with that flag. Status saves only with `--save`; plan never saves snapshots. `ISSUE_GRAPH_HOME` overrides the shared state root, including config, captures, query history, saved dashboards and graph/status/reconcile history.
-- **Bounded coverage.** Graph queries read up to 100 comments, 100 timeline items, 100 PR files, and 50 closing references per node without fully paginating those connections. Search-based seeds also face the node budget and 1000-result ceiling. Increasing `--budget` cannot remove every limit. A zero exit from graph/reconcile/plan alone does not certify complete coverage.
+- **Bounded coverage.** Graph queries read up to 100 comments, 100 timeline items, 100 PR files, 50 closing references, and 50 sub-issues per node without fully paginating those connections. A parent past the sub-issue limit carries `subIssueTotal` and a "read N of M" line. The hub guard counts sub-issues with references, so a large epic is fetched but not expanded. Search-based seeds also face the node budget and 1000-result ceiling. Increasing `--budget` cannot remove every limit. A zero exit from graph/reconcile/plan alone does not certify complete coverage.
 
 ## Guardrails
 
