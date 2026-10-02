@@ -42,10 +42,12 @@ export function prioritize(
   now: Date,
   weights: Weights = scoring.defaults,
 ): PriorityRow[] {
-  // distinct referencing nodes per target
+  // distinct referencing nodes per target; a sub-issue link is hierarchy, not
+  // a reference, so a parent with many children does not gain heat from them
   const inbound = new Map<NodeKey, number>();
   for (const n of nodes.values())
-    for (const e of n.edges) inbound.set(e.to, (inbound.get(e.to) ?? 0) + 1);
+    for (const e of n.edges)
+      if (e.via !== "sub-issue") inbound.set(e.to, (inbound.get(e.to) ?? 0) + 1);
 
   const rows: PriorityRow[] = [];
   for (const n of nodes.values()) {

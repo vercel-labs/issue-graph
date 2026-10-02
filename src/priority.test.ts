@@ -70,6 +70,15 @@ describe("prioritize", () => {
     expect(target?.key).toBe(prioritize(nodes, NOW)[0].key); // inbound heat wins
   });
 
+  test("sub-issues do not add inbound heat to their parent", () => {
+    const nodes = asMap([
+      node("o/r#1"),
+      node("o/r#2", {}, { edges: [{ to: "o/r#1", via: "sub-issue" }] }),
+      node("o/r#3", {}, { edges: [mentions("o/r#1")] }),
+    ]);
+    expect(prioritize(nodes, NOW).find((r) => r.key === "o/r#1")?.inboundRefs).toBe(1);
+  });
+
   test("computes whole days open and caps the age boost", () => {
     const nodes = asMap([
       node("o/r#1", { createdAt: "2026-07-06T00:00:00Z" }),

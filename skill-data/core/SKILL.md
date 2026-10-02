@@ -78,6 +78,7 @@ After reporting results, offer a useful next command from the printed next steps
 - Status exit 1 means incomplete evidence or runtime failure; exit 2 means invalid usage. Complete sibling repositories remain useful. A zero exit from graph/reconcile/plan alone does not certify coverage.
 - Timestamps describe a collection window. A vanished PR is MERGED/CLOSED only after an explicit lookup. Incomplete captures cannot prove additions or transitions. Preserve reconstructed provenance and unknowns; do not backfill historical facts or attribute reviewer actions without evidence.
 - Report failed nodes, node caps, unexpanded hubs, and per-node API limits. Cross-repository references are fetched one hop. Use printed hub re-seed commands to investigate omissions.
+- A `sub-issue` edge (child to parent) is hierarchy, not a closing link or solution; do not cite it as a fix.
 - Superseded, competing, shared-file overlap, and missing closing-link flags identify inspection candidates. Verify implementation, scope, and current behavior before recommending closure. `reviewFirst` orders inspection; `blockedBy` uses visible links.
 
 ## Output and storage

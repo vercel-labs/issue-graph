@@ -163,6 +163,20 @@ describe("classify", () => {
     expect(nodes.get("o/r#1117")?.verdict).toBe("OPEN PR — untriaged");
   });
 
+  test("a sub-issue link is not a closing link", () => {
+    const subIssueOf = (to: NodeKey): Edge => ({ to, via: "sub-issue" });
+    const nodes = asMap([
+      node("o/r#7848", { state: "CLOSED" }),
+      node("o/r#8343", { kind: "PullRequest", state: "MERGED", edges: [subIssueOf("o/r#7848")] }),
+      node("o/r#8344", { kind: "PullRequest", state: "OPEN", edges: [subIssueOf("o/r#7848")] }),
+      node("o/r#8345", { kind: "PullRequest", state: "OPEN", edges: [subIssueOf("o/r#7848")] }),
+    ]);
+    classify(nodes);
+    expect(nodes.get("o/r#8344")?.verdict).toBe("OPEN PR — untriaged");
+    expect(nodes.get("o/r#8344")?.flags).toBeUndefined();
+    expect(nodes.get("o/r#8345")?.flags).toBeUndefined();
+  });
+
   test("depth-0 nodes are marked as seeds", () => {
     const nodes = asMap([node("o/r#1", { depth: 0 })]);
     classify(nodes);

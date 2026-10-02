@@ -49,6 +49,7 @@ function normalize(nodes: Map<string, GraphNode>) {
       edges: [...n.edges].sort((a, b) => a.to.localeCompare(b.to)).map((e) => `${e.via} ${e.to}`),
       files: n.pr?.files?.slice().sort(),
       claimsClose: n.claimsClose?.slice().sort(),
+      subIssues: n.subIssues?.slice().sort(),
     }));
 }
 

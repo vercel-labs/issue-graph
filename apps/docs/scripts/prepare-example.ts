@@ -85,7 +85,7 @@ export function prepareExample(graph: Export, stdout: string, capture: Capture) 
   assert(nodes.some((node) => node.kind === "PullRequest"));
   const allEdges = graph.nodes.flatMap((node) =>
     node.edges.map((edge) => {
-      assert(["text", "cross-ref", "connected", "closes"].includes(edge.via));
+      assert(["text", "cross-ref", "connected", "closes", "sub-issue"].includes(edge.via));
       return { from: node.key, to: edge.to, via: edge.via };
     }),
   );
