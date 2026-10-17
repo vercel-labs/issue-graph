@@ -95,7 +95,7 @@ Status reports unknown counts as `?` or `null`. Check coverage before using tota
 
 ## Linear
 
-Set `LINEAR_API_KEY` with read access, or `LINEAR_ACCESS_TOKEN` for OAuth. Use exactly one.
+Connect once with `issue-graph linear login`, which approves read-only access in the browser through Linear's MCP server, with no API key or admin needed. `LINEAR_API_KEY` with Read access, or `LINEAR_ACCESS_TOKEN`, also works and takes precedence.
 
 ```bash
 issue-graph linear https://linear.app/your-workspace/issue/ENG-123/example --depth 1 --max-nodes 20 --json

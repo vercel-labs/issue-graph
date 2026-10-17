@@ -27,8 +27,10 @@ export const ISSUE_GRAPH_SCHEMA = {
       ],
       outputSchemaVersion: 1,
       formats: ["markdown", "json", "html"],
-      authentication: "Exactly one of LINEAR_API_KEY or LINEAR_ACCESS_TOKEN",
-      transport: "fetch to api.linear.app/graphql; fixed read-only GraphQL queries",
+      authentication:
+        "LINEAR_API_KEY or LINEAR_ACCESS_TOKEN (GraphQL), else the `linear login` session (Linear MCP, read-only)",
+      transport:
+        "fetch to api.linear.app/graphql, or tools on mcp.linear.app/mcp/readonly after linear login",
       required: ["issue URL, identifier, or UUID; alternatively --project UUID"],
       projectCapture: {
         scope: "non-archived project issues across all teams, including disconnected issues",

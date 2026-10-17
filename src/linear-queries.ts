@@ -72,6 +72,8 @@ export const LINEAR_PROJECT_QUERY = `query IssueGraphProject($id: String!, $afte
 }`;
 
 export interface LinearReader {
+  /** How the data was read, recorded as the report's source. */
+  label?: string;
   workspace(): Promise<unknown>;
   issue(id: string, page: LinearPage): Promise<unknown>;
   projectOpenIssues?(id: string, after?: string): Promise<unknown>;

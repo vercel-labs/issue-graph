@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { fixtureReader, issue, page } from "../tests/linear-fixtures.js";
-import { runLinear } from "./linear-cli.js";
+import { linearSetupGuide, runLinear } from "./linear-cli.js";
 import type { LinearReader } from "./linear-queries.js";
 
 async function invoke(args: string[], factory = (): LinearReader => fixtureReader()) {
@@ -122,4 +122,13 @@ test("runtime failure is distinct from usage and Markdown states the scope", asy
   });
   expect(result).toEqual({ code: 1, stdout: "", stderr: "Missing local credential\n" });
   expect((await invoke(["ENG-1"])).stdout).toContain("Text mentions are not collected");
+});
+
+test("without credentials the command explains how to connect instead of failing bare", async () => {
+  const result = await invoke(["ENG-1"], () => {
+    throw new Error(linearSetupGuide());
+  });
+  expect(result.code).toBe(1);
+  expect(result.stderr).toContain("issue-graph linear login");
+  expect(result.stderr).toContain("LINEAR_API_KEY");
 });

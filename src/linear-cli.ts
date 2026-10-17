@@ -10,6 +10,7 @@ import type { LinearReader } from "./linear-queries.js";
 import { parseWorkClusters, workClusterPrompt } from "./work-clusters.js";
 
 export const LINEAR_USAGE = `usage: issue-graph linear <issue-url|identifier|uuid> [options]
+       issue-graph linear login | logout | status
 
 Read explicit Linear issue relationships, hierarchy, and attachment links.
 
@@ -28,7 +29,8 @@ Read explicit Linear issue relationships, hierarchy, and attachment links.
   --clusters PATH       apply proposed themes from JSON to --html or --open
   -h, --help            show help without authentication or network
 
-Set exactly one of LINEAR_API_KEY or LINEAR_ACCESS_TOKEN.
+Connect once with \`issue-graph linear login\` (browser, read-only, no API key needed),
+or set exactly one of LINEAR_API_KEY or LINEAR_ACCESS_TOKEN. Environment keys win.
 Only queries are sent. Local files are written only with --html or --open.
 Text mentions are not collected; attachment targets are not fetched.
 Exit codes: 0 complete within scope, 1 partial or failed, 2 invalid usage.`;
@@ -137,6 +139,7 @@ export async function runLinear(
     const report = project
       ? await buildLinearProject(source, project, options)
       : await buildLinearGraph(source, seed as string, options);
+    if (source.label) report.readSource = source.label;
     if (htmlPath || open) {
       if (!io.dashboard) throw new Error("HTML output is unavailable in this caller");
       await io.dashboard(report, { path: htmlPath, open, save, clusters });
@@ -156,4 +159,30 @@ export async function runLinear(
     io.stderr(`${error instanceof Error ? error.message : "Linear read failed"}\n`);
     return 1;
   }
+}
+
+export type LinearCredential =
+  | { kind: "api-key" | "access-token"; variable: string }
+  | { kind: "session"; location: string }
+  | { kind: "none" };
+
+/** What to do when Linear is not connected; printed instead of a bare error. */
+export function linearSetupGuide(): string {
+  return `Linear is not connected.
+
+  Recommended:  issue-graph linear login
+                Opens Linear in your browser to approve read-only access through
+                Linear's MCP server. No API key or workspace admin needed.
+
+  Or:           export LINEAR_API_KEY=lin_api_...   (a personal key with Read access)
+                export LINEAR_ACCESS_TOKEN=...       (an OAuth app token)
+
+Check with: issue-graph auth status
+`;
+}
+
+export function linearCredentialLine(credential: LinearCredential): string {
+  if (credential.kind === "session") return `signed in via Linear MCP (${credential.location})`;
+  if (credential.kind === "none") return "not connected";
+  return `using ${credential.variable}`;
 }

@@ -280,9 +280,9 @@ Re-run the plan after each merge or closure; groups change as work lands.
 
 ## Linear captures
 
-Use `issue-graph linear --help` before a Linear workflow. Configure exactly one of
-`LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` locally. The fixed SDK transport reads the
-connected workspace; it does not mutate Linear issues.
+Use `issue-graph linear --help` before a Linear workflow. Run `issue-graph linear status`
+first; if Linear is not connected, ask the user to run `issue-graph linear login` or to set
+`LINEAR_API_KEY`. Both read the connected workspace and never mutate Linear issues.
 
 - `issue-graph linear ENG-123 --workspace example --json` reads a bounded neighborhood.
 - `issue-graph linear --project UUID --html project.html` reads non-archived project issues

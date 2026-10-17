@@ -5,7 +5,17 @@ description: Read explicit issue relationships with workspace-scoped identity an
 
 Start with one Linear issue to see its blockers, related work, parent and sub-issues, and attachment links.
 
-Set exactly one of `LINEAR_API_KEY` with read access or `LINEAR_ACCESS_TOKEN` for OAuth in your environment. The command sends fixed read-only GraphQL queries to `api.linear.app` and no mutations.
+## Connect Linear
+
+Connect once in the browser. No API key or workspace admin is needed:
+
+```bash
+issue-graph linear login
+```
+
+It approves read-only access through Linear's MCP server (OAuth with PKCE) and saves the session in the macOS Keychain, or a `0600` file under `~/.issue-graph/credentials` elsewhere. `issue-graph linear status` and `issue-graph auth status` show what is connected; `issue-graph linear logout` removes the session.
+
+If your workspace allows personal API keys, `LINEAR_API_KEY` with Read access works too, as does `LINEAR_ACCESS_TOKEN` from an OAuth app. Environment keys take precedence over the session. Both paths send read-only requests and produce the same report, checked the same way; the report records which source it used.
 
 ```bash
 issue-graph linear https://linear.app/your-workspace/issue/ENG-123/example --depth 1 --max-nodes 20

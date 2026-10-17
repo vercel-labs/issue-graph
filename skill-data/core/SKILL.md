@@ -38,7 +38,7 @@ For counts, skip graph discovery. Resolve repositories and authors from the requ
 
 Live collection supports GitHub. `open`, `rank`, and `cluster` accept a repository or items. `graph` needs items or `--label`. Items can be numbers, `owner/repo#123`, or URLs; bare numbers use `--repo` or the checkout's GitHub remote. Inspect an issue's graph before starting work and credit existing contributors.
 
-Use the dedicated `linear` command for Linear, with exactly one of `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` configured locally. Read `issue-graph linear --help` for its flags and limits.
+Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Read `issue-graph linear --help` for its flags and limits.
 
 ## Query saved data
 
