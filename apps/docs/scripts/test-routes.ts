@@ -54,11 +54,7 @@ function staticTerminal(html: string) {
   assert.equal((terminal.match(/role="tablist"/g) ?? []).length, 1, "One terminal tablist");
   const tabs = terminal.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
   const panels = terminal.split(/(?=<div\b[^>]*role="tabpanel")/).slice(1);
-  const commands = [
-    "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
-    "issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects",
-    "issue-graph plan --repo vercel-labs/wterm",
-  ];
+  const commands = terminalExampleCatalog.map((example) => example.command);
   const escaped = (value: string) =>
     renderToStaticMarkup(createElement("span", null, value)).replace(/<\/?span>/g, "");
   assert.equal(tabs.length, 3, "Three terminal tabs");
@@ -138,6 +134,9 @@ function staticTerminal(html: string) {
       contains(status.capture);
       contains(`Coverage ${status.coverage}`);
       for (const caveat of status.caveats.split("\n")) contains(caveat);
+    } else if (example.id === "dashboard") {
+      contains(example.output);
+      assert.ok(panel.includes("View full dashboard screenshot"));
     } else {
       const rows = terminalPresentation(example.output, example.id);
       assert.ok(rows, `Captured ${example.id} is recognized`);
@@ -179,16 +178,14 @@ function staticTerminal(html: string) {
     }
   }
   assert.equal(ids.size, 6, "Unique tab and panel identifiers");
-  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate Graph takeaway");
+  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate capture takeaway");
   assert.match(terminal, /aria-live="polite"/);
-  assert.match(terminal, /\? means unknown, not zero\./);
-  assert.match(terminal, /Flags overlap review states\./);
+  assert.match(terminal, /Heat measures discussion, not severity\./);
   assert.doesNotMatch(
     terminal,
     /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
   );
-  assert.match(terminal, /Approval does not imply merge readiness\./);
-  assert.match(terminal, /Validate repository-specific behavior before mutating GitHub\./);
+
   assert.doesNotMatch(terminal, /Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
   assert.doesNotMatch(
     terminal,
@@ -309,7 +306,7 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
       assert.ok(markdown.body.includes(example.summary));
       assert.ok(markdown.body.includes(example.output));
     }
-    assert.match(markdown.body, /This displayed excerpt omits other captured nodes/);
+    assert.match(markdown.body, /Selected JSON fields from a public CLI capture/);
     assert.doesNotMatch(markdown.body, /All fetched nodes are shown/);
   }
   const after = await request(path);
@@ -445,6 +442,46 @@ assert.match(publicSkill.body, /^---\nname: issue-graph\n/);
 assert.equal(publicSkill.body, skill.body);
 assert.match(publicSkill.body, /issue-graph skills get core/);
 checks += 2;
+const bridge = await request("/api/mcp?webmcp-script", { accept: "*/*" });
+assert.equal(bridge.response.status, 200);
+assert.match(bridge.response.headers.get("content-type") ?? "", /javascript/);
+assert.match(bridge.body, /registerTool/);
+async function rpc(method: string, params: Record<string, unknown>) {
+  const response = await fetch(new URL("/api/mcp", origin), {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  const message = JSON.parse(
+    response.headers.get("content-type")?.includes("text/event-stream")
+      ? (text
+          .split(/\r?\n/)
+          .find((line) => line.startsWith("data:"))
+          ?.slice(5) ?? "")
+      : text,
+  );
+  assert.equal(message.error, undefined);
+  return message.result;
+}
+const { tools } = await rpc("tools/list", {});
+assert.deepEqual(
+  tools.map((tool: { name: string }) => tool.name),
+  ["search_docs"],
+);
+const found = await rpc("tools/call", {
+  name: "search_docs",
+  arguments: { query: "competing PRs", locale: "en" },
+});
+assert.notEqual(found.isError, true);
+const matches = found.content
+  .filter((item: { type: string }) => item.type === "text")
+  .flatMap((item: { text: string }) => JSON.parse(item.text));
+assert.ok(
+  matches.some((item: { url: string }) => item.url === "/docs/backlog#compare-competing-prs"),
+);
+checks += 3;
 console.log(
   `PASS: ${checks} route checks against ${origin.origin}${preview ? " (preview noindex)" : ""}`,
 );

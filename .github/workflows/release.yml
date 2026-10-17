@@ -1,6 +1,8 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -12,7 +14,7 @@ on:
         required: true
         type: string
       publish:
-        description: Publish after verification and Release environment approval
+        description: Publish after verification
         required: true
         type: boolean
         default: false
@@ -25,14 +27,37 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_SHA: ${{ inputs.expected_sha }}
+  EXPECTED_SHA: ${{ inputs.expected_sha || github.sha }}
   EXPECTED_VERSION: ${{ inputs.expected_version }}
 
 jobs:
-  build:
+  plan:
     if: github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      needed: ${{ steps.plan.outputs.needed }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Check whether the main version needs publication
+        id: plan
+        run: node scripts/release.ts plan
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.needed == 'true'
+    runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      EXPECTED_VERSION: ${{ needs.plan.outputs.version }}
     outputs:
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
       filename: ${{ steps.record.outputs.filename }}
@@ -71,7 +96,7 @@ jobs:
           overwrite: false
 
   consumers:
-    needs: build
+    needs: [plan, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -82,6 +107,7 @@ jobs:
       matrix:
         node: [20, 22, 24]
     env:
+      EXPECTED_VERSION: ${{ needs.plan.outputs.version }}
       EXPECTED_TARBALL_SHA256: ${{ needs.build.outputs.sha256 }}
       TARBALL_FILENAME: ${{ needs.build.outputs.filename }}
     steps:
@@ -108,16 +134,17 @@ jobs:
         run: pnpm exec tsx scripts/release.ts verify "$RUNNER_TEMP/release"
 
   publish:
-    needs: [build, consumers]
-    if: inputs.publish == true && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'
+    needs: [plan, build, consumers]
+    if: (github.event_name == 'push' || inputs.publish == true) && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment: Release
     permissions:
       contents: read
       actions: read
       id-token: write
     env:
+      EXPECTED_VERSION: ${{ needs.plan.outputs.version }}
       EXPECTED_TARBALL_SHA256: ${{ needs.build.outputs.sha256 }}
       TARBALL_FILENAME: ${{ needs.build.outputs.filename }}
     steps:
@@ -135,11 +162,11 @@ jobs:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: ${{ runner.temp }}/release
           merge-multiple: true
-      - name: Recheck approval identity and registry immediately before publishing
-        run: |
-          node scripts/release.ts preflight
-          node scripts/release.ts verify "$RUNNER_TEMP/release"
+      - name: Recheck archive and registry, or verify an already published archive
+        id: preflight
+        run: node scripts/release.ts prepare-publish "$RUNNER_TEMP/release"
       - name: Publish the tested archive through OIDC without hooks
+        if: steps.preflight.outputs.publish == 'true'
         env:
           NODE_AUTH_TOKEN: ""
           NPM_TOKEN: ""
@@ -161,12 +188,14 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    needs: publish
-    if: inputs.publish == true && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'
+    needs: [plan, publish]
+    if: (github.event_name == 'push' || inputs.publish == true) && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
+    env:
+      EXPECTED_VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:

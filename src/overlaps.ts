@@ -8,7 +8,7 @@ import type { GraphNode, NodeKey } from "./types.js";
 const INCIDENTAL =
   /(?:^|\/)(?:README|CHANGELOG|LICENSE|CONTRIBUTING)[^/]*$|\.mdx?$|(?:^|\/)(?:[^/]+\.lock|package-lock\.json|pnpm-lock\.yaml)$/i;
 
-const isSignificant = (file: string): boolean => !INCIDENTAL.test(file);
+export const isSignificant = (file: string): boolean => !INCIDENTAL.test(file);
 
 /** Two open PRs that touch at least one significant (source) file in common. */
 export interface Overlap {

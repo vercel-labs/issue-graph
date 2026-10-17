@@ -69,17 +69,21 @@ export function validateReleaseContext(
   env: NodeJS.ProcessEnv,
   manifest: PackageIdentity,
 ): { name: string; version: string; commit: string } {
-  assert.equal(env.GITHUB_EVENT_NAME, "workflow_dispatch", "release must be manually dispatched");
+  assert.ok(
+    env.GITHUB_EVENT_NAME === "push" || env.GITHUB_EVENT_NAME === "workflow_dispatch",
+    "release requires a main push or manual dispatch",
+  );
   assert.equal(env.GITHUB_REPOSITORY, "vercel-labs/issue-graph", "release requires canonical repo");
   assert.equal(env.GITHUB_REF, "refs/heads/main", "release requires main");
   assert.match(env.EXPECTED_SHA ?? "", /^[a-f0-9]{40}$/, "expected SHA must be a full commit SHA");
-  assert.equal(env.GITHUB_SHA, env.EXPECTED_SHA, "dispatch SHA differs from expected SHA");
-  assert.match(
-    env.EXPECTED_VERSION ?? "",
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/,
-    "expected version must be stable semver",
-  );
-  assertPackageIdentity(manifest, { name: "issue-graph", version: env.EXPECTED_VERSION as string });
+  assert.equal(env.EXPECTED_SHA?.length, 40, "expected SHA must be a full commit SHA");
+  assert.equal(env.GITHUB_SHA, env.EXPECTED_SHA, "event SHA differs from expected SHA");
+  const version =
+    env.GITHUB_EVENT_NAME === "push" && !env.EXPECTED_VERSION
+      ? manifest.version
+      : env.EXPECTED_VERSION;
+  stableVersionParts(version, "expected version");
+  assertPackageIdentity(manifest, { name: "issue-graph", version: version as string });
   return { name: manifest.name, version: manifest.version, commit: env.EXPECTED_SHA as string };
 }
 
@@ -90,10 +94,10 @@ function stableVersionParts(value: unknown, label: string): bigint[] {
   return match.slice(1).map((part) => BigInt(part));
 }
 
-export async function assertUnpublished(
+export async function publicationNeeded(
   identity: PackageIdentity,
   request: typeof fetch = fetch,
-): Promise<void> {
+): Promise<boolean> {
   const response = await request(
     `https://registry.npmjs.org/${encodeURIComponent(identity.name)}`,
     {
@@ -112,15 +116,23 @@ export async function assertUnpublished(
     "registry response lacks versions",
   );
   assert.ok(Object.keys(packument.versions).length > 0, "registry response has no version history");
-  assert.ok(
-    !Object.hasOwn(packument.versions, identity.version),
-    `${identity.name}@${identity.version} already exists`,
-  );
   const tags = packument["dist-tags"];
   assert.ok(tags && typeof tags === "object" && !Array.isArray(tags), "registry lacks dist-tags");
   const latest = stableVersionParts(tags.latest, "registry dist-tags.latest");
   const target = stableVersionParts(identity.version, "target version");
   const differing = target.findIndex((part, index) => part !== latest[index]);
+  if (Object.hasOwn(packument.versions, identity.version)) {
+    assertPackageIdentity(packument.versions[identity.version], identity);
+    assert.ok(
+      Object.hasOwn(packument.versions, tags.latest),
+      "registry latest is missing from versions",
+    );
+    assert.ok(
+      differing === -1 || target[differing] < latest[differing],
+      "published version is ahead of registry latest",
+    );
+    return false;
+  }
   assert.ok(
     differing >= 0 && target[differing] > latest[differing],
     `target ${identity.version} must be newer than registry latest ${tags.latest}`,
@@ -128,6 +140,17 @@ export async function assertUnpublished(
   assert.ok(
     Object.hasOwn(packument.versions, tags.latest),
     "registry latest is missing from versions",
+  );
+  return true;
+}
+
+export async function assertUnpublished(
+  identity: PackageIdentity,
+  request: typeof fetch = fetch,
+): Promise<void> {
+  assert.ok(
+    await publicationNeeded(identity, request),
+    `${identity.name}@${identity.version} already exists`,
   );
 }
 
@@ -201,7 +224,7 @@ export async function verifyPublished(
   const integrity = `sha512-${createHash("sha512").update(approved).digest("base64")}`;
   const versionUrl = `https://registry.npmjs.org/${encodeURIComponent(identity.name)}/${encodeURIComponent(identity.version)}`;
   try {
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < 12; attempt++) {
       try {
         const metadata = JSON.parse(
           (await boundedBody(await registryResponse(versionUrl, request), 1024 * 1024)).toString(
@@ -226,11 +249,11 @@ export async function verifyPublished(
         return;
       } catch (error) {
         if (!(error instanceof RegistryPropagationError)) throw error;
-        if (attempt === 4)
-          throw new Error("registry verification did not propagate after 5 attempts", {
+        if (attempt === 11)
+          throw new Error("registry verification did not propagate after 12 attempts", {
             cause: error,
           });
-        await wait(1000 * 2 ** attempt);
+        await wait(Math.min(1000 * 2 ** attempt, 30_000));
       }
     }
   } finally {
@@ -238,16 +261,40 @@ export async function verifyPublished(
   }
 }
 
+export async function preparePublication(
+  identity: PackageIdentity,
+  input: TarballInput,
+  request: typeof fetch = fetch,
+): Promise<boolean> {
+  assertChecksum(input.tarball, input.sha256);
+  const needed = await publicationNeeded(identity, request);
+  if (!needed) await verifyPublished(identity, input, request);
+  return needed;
+}
+
 async function main(): Promise<void> {
   const [command, directory] = process.argv.slice(2);
   assert.ok(
-    ["preflight", "record", "verify", "verify-published"].includes(command),
-    "expected preflight, record, verify, or verify-published",
+    ["plan", "preflight", "record", "verify", "prepare-publish", "verify-published"].includes(
+      command,
+    ),
+    "expected plan, preflight, record, verify, prepare-publish, or verify-published",
   );
   const manifest = JSON.parse(readFileSync("package.json", "utf8"));
   const identity = validateReleaseContext(process.env, manifest);
   const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   assert.equal(head, identity.commit, "checkout does not match approved SHA");
+  if (command === "plan") {
+    const needed = await publicationNeeded(identity);
+    assert.ok(process.env.GITHUB_OUTPUT, "GITHUB_OUTPUT is required");
+    appendFileSync(process.env.GITHUB_OUTPUT, `needed=${needed}\nversion=${identity.version}\n`);
+    console.log(
+      needed
+        ? `Release pending: ${identity.name}@${identity.version} at ${head}`
+        : `Skipping published ${identity.name}@${identity.version}. To recover an incomplete release, rerun failed jobs in its original workflow run.`,
+    );
+    return;
+  }
   if (command === "preflight") {
     await assertUnpublished(identity);
     console.log(`Release preflight passed: ${identity.name}@${identity.version} at ${head}`);
@@ -284,6 +331,12 @@ async function main(): Promise<void> {
     assert.equal(readFileSync(join(directory, "SHA256SUMS"), "utf8"), `${digest}  ${filename}\n`);
     verifyArchive(tarball, identity, digest);
     console.log(`Verified retained ${filename}: ${digest}`);
+    if (command === "prepare-publish") {
+      const needed = await preparePublication(identity, { tarball, sha256: digest });
+      assert.ok(process.env.GITHUB_OUTPUT, "GITHUB_OUTPUT is required");
+      appendFileSync(process.env.GITHUB_OUTPUT, `publish=${needed}\n`);
+      console.log(needed ? "Archive is ready to publish" : "Exact archive is already published");
+    }
     if (command === "verify-published") {
       await verifyPublished(identity, { tarball, sha256: digest });
       console.log(

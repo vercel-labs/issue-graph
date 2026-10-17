@@ -11,6 +11,7 @@ import {
 import { dashboardModel, renderDashboard } from "./html.js";
 import { buildLinearGraph } from "./linear.js";
 import { linearDashboardModel } from "./linear-html.js";
+import { parseModel } from "./model-validation.js";
 
 test("keeps blocker direction and deduplicates relationships read from both endpoints", async () => {
   const root = issue(1);
@@ -149,7 +150,8 @@ test("renders mixed providers without altering their saved models or hiding Line
   expect(embedded.projects).toEqual(JSON.parse(JSON.stringify(before)));
   expect(models).toEqual(before);
   expect(linear.id).not.toBe(github.id ?? github.repo);
-  expect(html).toContain("function setProject(repo)");
+  // The Next.js dashboard loads saved models through this validator.
+  expect(() => parseModel(structuredClone(linear))).not.toThrow();
 });
 
 test("successful empty connections and scope exclusions do not produce warnings", async () => {

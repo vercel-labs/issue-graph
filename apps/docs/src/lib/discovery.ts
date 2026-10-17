@@ -7,7 +7,7 @@ export function documentationPages() {
 }
 
 export function releaseNotice(): string {
-  return "Install with npm install -g issue-graph@latest, or try npx issue-graph@latest --help. Requires Node.js 20+ and GitHub CLI authentication.";
+  return "Install with npm install -g issue-graph@latest, or try npx issue-graph@latest --help. Requires Node.js 20+. Live GitHub queries use GitHub CLI authentication; saved queries and config work offline.";
 }
 
 export function llmsIndex(): string {

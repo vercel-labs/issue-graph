@@ -1,6 +1,6 @@
 ---
 name: issue-graph
-description: Read-only context for issues, pull requests, and backlogs. Use to trace related work, check review queues and PR counts, prioritize follow-ups, or compare snapshots.
+description: Read-only context for issues, pull requests, and backlogs. Use to trace related work, check PR counts, prioritize follow-ups, filter saved captures, open exact dashboard views, replay triage queries, or compare snapshots.
 ---
 
 # issue-graph

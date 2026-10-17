@@ -124,7 +124,7 @@ describe("launch feedback", () => {
     expect(html).not.toMatch(
       /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
     );
-    expect(html).toContain("Approval does not imply merge readiness.");
+    expect(html).toContain("Heat measures discussion, not severity.");
     expect(html).not.toMatch(/Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
     expect(html).not.toMatch(/stdoutSha256|excerptSha256|receiptFile|lineRanges|captureStartedAt/);
     expect(html).not.toContain("not a live feed");

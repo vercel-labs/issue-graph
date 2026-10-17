@@ -13,21 +13,24 @@ import {
   renderClusters,
   runAgent,
 } from "./cluster.js";
+import { modelDefaults, readConfig, resolveWeights } from "./config.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
 import {
   applyClusters,
   type ClustersConfig,
+  carriedClusters,
   dashboardModel,
   type Model,
-  renderDashboard,
 } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
 import { runLinear } from "./linear-cli.js";
 import { linearDashboardModel } from "./linear-html.js";
+import { writeNextDashboard } from "./next-dashboard.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
 import { prioritize, renderPriority } from "./priority.js";
+import { runQueryCli } from "./query-cli.js";
 import { buildReconcileReport, renderReconcile } from "./reconcile.js";
 import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
@@ -53,6 +56,7 @@ import {
   writeSnapshot,
 } from "./snapshot.js";
 import { runStatus } from "./status-cli.js";
+import { buildSweep, missingBasePaths, sweepBasePaths } from "./sweep.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
 import type { NodeKey, Seed } from "./types.js";
@@ -66,6 +70,8 @@ commands
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
   rank [repo]              what to fix first, by discussion heat
+  query [provider:scope]   filter saved captures and open the exact view (--help for filters)
+  config show | set       global, provider and project defaults (--help for weights)
   cluster [repo]           the task for your agent to group open work by root cause
   cluster [repo] --apply F apply the agent's answer (a file, or - for stdin) to the dashboard
   reconcile [repo]         open-backlog verification queue
@@ -74,7 +80,7 @@ commands
   dashboard                every saved run in one explorer, with a project switcher
   runs [list | rm <repo>]  saved runs behind the dashboard
   auth [status]            provider sign-in state
-  schema                   JSON contract for reconcile, plan, and status
+  schema                   JSON command contract, formats, limits, and local writes
   skills [list | get core] bundled agent guides
 
 scope
@@ -83,7 +89,7 @@ scope
   123  #123  owner/repo#123  <issue or PR URL>   one or more items
 
 options
-  --label L                only items with this label
+  --label L                seed from open issues with this label
   --state open|all         which items a repository scope covers (default open)
   --format F               human, markdown, or json (default: human in a terminal, else markdown)
   -o, --out PATH           also write a file; .json for the graph, .html for the explorer
@@ -94,7 +100,7 @@ options
   -h, --help               show this
 
 advanced
-  --budget N               stop after N items (default 80, or 1000 for a whole repository)
+  --budget N               stop after N items (80; 1000 for unfiltered open/rank/cluster repos)
   --depth N                same-repository reference depth (default 2)
   --hub-threshold N        fetch but do not expand an item with more references (default 12)
   --concurrency N          GitHub requests in flight (default 4, max 32)
@@ -410,6 +416,7 @@ async function writeOutput(file: string, content: string): Promise<void> {
 }
 
 export async function runCli(argv = process.argv.slice(2)): Promise<void> {
+  if (["query", "config"].includes(argv[0])) return runQueryCli(argv, openInBrowser);
   if (!argv.length) {
     // a person inside a GitHub repository gets its dashboard; scripts and CI keep the usage
     if (interactive() && inferRepo()) argv = ["open"];
@@ -456,7 +463,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
           const out =
             options.path ||
             join(tmpdir(), `issue-graph-linear-${report.workspace.id}-${Date.now()}.html`);
-          await writeOutput(out, renderDashboard([model]));
+          writeNextDashboard(out, [model], modelDefaults([model]));
           process.stderr.write(`wrote ${out}\n`);
           if (options.save)
             process.stderr.write(`dashboard run saved: ${writeDashboardModel(model.id, model)}\n`);
@@ -479,11 +486,11 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     const models = readDashboardModels<Model>();
     if (!models.length) {
       throw new UsageError(
-        "no saved runs yet: run a graph with --open or --html first (without --no-snapshot)",
+        "no saved runs yet: run issue-graph open owner/repo first (without --no-save)",
       );
     }
     const out = args.htmlOut || join(tmpdir(), `issue-graph-dashboard-${Date.now()}.html`);
-    await writeOutput(out, renderDashboard(models));
+    writeNextDashboard(out, models, modelDefaults(models));
     process.stderr.write(`wrote ${out} (${models.map((m) => m.label ?? m.repo).join(", ")})\n`);
     if (args.openMode === "yes" || (args.openMode === "auto" && interactive())) openInBrowser(out);
     return;
@@ -554,7 +561,13 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
           : "json"
         : args.format;
     if (args.command === "plan") {
-      const plan = buildPlanReport(report, nodes, prioritize(nodes, new Date()));
+      const missing = await missingBasePaths(transport, sweepBasePaths(nodes));
+      const plan = buildPlanReport(
+        report,
+        nodes,
+        prioritize(nodes, new Date(), resolveWeights(readConfig(), "github", report.repo)),
+        buildSweep(nodes, missing),
+      );
       console.log(
         format === "json"
           ? JSON.stringify(plan, null, 2)
@@ -579,8 +592,9 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   }
   let md = render(nodes, seedKeys, multi);
 
-  const priorities = prioritize(nodes, new Date());
-  if (args.prioritize) md += renderPriority(priorities);
+  const weights = resolveWeights(readConfig(), "github", `${primary.owner}/${primary.repo}`);
+  const priorities = prioritize(nodes, new Date(), weights);
+  if (args.prioritize) md += renderPriority(priorities, weights);
 
   if (cappedOut.size) {
     md += `\n## Not crawled (node cap ${args.maxNodes} reached): ${cappedOut.size}\n\n`;
@@ -643,8 +657,11 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (args.command === "graph") printGraph(md + nextSteps(args, primary.owner, primary.repo));
   else if (args.command === "rank") {
     if (args.format === "json")
-      console.log(JSON.stringify({ repo: repoName, priorities }, null, 2));
-    else printGraph(renderPriority(priorities) + nextSteps(args, primary.owner, primary.repo));
+      console.log(JSON.stringify({ repo: repoName, weights, priorities }, null, 2));
+    else
+      printGraph(
+        renderPriority(priorities, weights) + nextSteps(args, primary.owner, primary.repo),
+      );
   } else {
     // open and cluster summarize; the full report stays one command away
     const linked = nodes.size - own.length;
@@ -768,7 +785,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (wantsHtml) {
     const clusters = args.clustersFile
       ? (JSON.parse(readFileSync(args.clustersFile, "utf8")) as ClustersConfig)
-      : agentClusters;
+      : (agentClusters ?? carriedClusters(readDashboardModel<Model>(repoName), nodes));
     const out =
       args.htmlOut ||
       join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
@@ -778,7 +795,8 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     } catch {
       process.stderr.write("Repository open totals unavailable; selector count will be unknown.\n");
     }
-    await writeOutput(out, renderDashboard([model]));
+    model.sweep = buildSweep(nodes, await missingBasePaths(transport, sweepBasePaths(nodes)));
+    writeNextDashboard(out, [model], modelDefaults([model]));
     if (args.command !== "open" && args.command !== "cluster")
       process.stderr.write(`wrote ${out}\n`);
     // keep the latest run per repository so `issue-graph dashboard` can switch between them
@@ -833,7 +851,7 @@ async function runApply(a: Args): Promise<void> {
   writeDashboardModel(repo, next);
   const out =
     a.htmlOut || join(tmpdir(), `issue-graph-${repo.replace("/", "-")}-${Date.now()}.html`);
-  await writeOutput(out, renderDashboard([next]));
+  writeNextDashboard(out, [next], modelDefaults([next]));
   const opened = a.openMode === "yes" || (a.openMode === "auto" && interactive());
   if (opened) openInBrowser(out);
   const machine = a.format === "json" || (a.format === "auto" && !process.stdout.isTTY);
@@ -990,7 +1008,7 @@ function openInBrowser(file: string): void {
     process.platform === "darwin"
       ? ["open", [file]]
       : process.platform === "win32"
-        ? ["cmd", ["/c", "start", "", file]]
+        ? ["rundll32.exe", ["url.dll,FileProtocolHandler", file]]
         : ["xdg-open", [file]];
   try {
     spawn(cmd, argv, { detached: true, stdio: "ignore" })

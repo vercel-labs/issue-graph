@@ -91,8 +91,8 @@ describe("public well-known skill", () => {
     expect(core).toContain("issue-graph status");
     expect(core).toContain("For counts, skip graph discovery");
     expect(core).toContain("Keep GitHub read-only");
-    expect(core).toContain("Any mutation needs a separately explicitly authorized workflow");
-    expect(core).toContain("CLI read-only access is not freedom from local writes");
+    expect(core).toContain("Any GitHub change needs separate, explicit authorization");
+    expect(core).toContain("Read-only GitHub commands can write local files");
     expect(core).toContain("Status saves only with `--save`, when the user wants local history");
     expect(core).toContain("--no-snapshot");
     expect(core).toContain(

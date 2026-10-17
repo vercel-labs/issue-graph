@@ -4,6 +4,7 @@ export interface TerminalExample {
   summary: string;
   command: string;
   output: string;
+  image?: { src: string; alt: string; width: number; height: number };
 }
 
 export interface TerminalDemoProps {

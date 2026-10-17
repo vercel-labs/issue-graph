@@ -1,7 +1,8 @@
 ---
-title: Overview
-description: Find related issues, check pull request status, and plan backlog reviews from your terminal.
-lastModified: 2026-09-23
+title: Map related issues and pull requests
+navTitle: Overview
+description: Trace related issues and pull requests from your terminal, check review status, find existing fixes, and choose what to review next.
+lastModified: 2026-09-27
 ---
 
 `issue-graph` is a CLI for tracing related GitHub issues and pull requests. Use it to find existing fixes, check review status, and choose what to review next.
@@ -20,7 +21,7 @@ You can also try the [npm package](https://www.npmjs.com/package/issue-graph) wi
 ## Trace an issue
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
 ```
 
 The result shows linked issues and PRs, their current states, and possible follow-ups. Use an issue URL or replace the repository and number with your own.
@@ -31,10 +32,16 @@ See [Get started](/docs/get-started) for a walkthrough and example output.
 
 | Task | Command | Guide |
 | --- | --- | --- |
-| Trace linked issues and PRs | `issue-graph <issue-or-pr>` | [Graph](/docs/graph) |
+| Capture a backlog and open its dashboard | `issue-graph open owner/repo` | [Dashboard and saved queries](/docs/dashboard) |
+| Trace linked issues and PRs | `issue-graph graph <issue-or-pr>` | [Graph](/docs/graph) |
+| Rank a live backlog by Heat | `issue-graph rank owner/repo` | [Graph](/docs/graph) |
+| Group related work with your agent | `issue-graph cluster owner/repo` | [Agents and skills](/docs/agents) |
+| Filter saved work and open its exact view | `issue-graph query provider:scope --open` | [Dashboard and saved queries](/docs/dashboard) |
 | Count PRs by author and review state | `issue-graph status` | [Status and history](/docs/status) |
 | Find backlog items to verify | `issue-graph reconcile` | [Reconcile and plan](/docs/backlog) |
 | Choose the next review or investigation | `issue-graph plan` | [Reconcile and plan](/docs/backlog) |
+
+Use `config` for scoring defaults, `dashboard` and `runs` for saved models, and `auth status` for sign-in state. See the [Command reference](/docs/reference) for all commands.
 
 ## Use with agents and applications
 

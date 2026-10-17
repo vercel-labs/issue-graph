@@ -5,7 +5,13 @@ import { InstallSelector } from "@/components/install-selector";
 import { renderTerminalCommand } from "@/components/terminal-output";
 import { landingDescription, landingTitle, workflows } from "@/lib/landing-content";
 import { pageMetadata } from "@/lib/page-metadata";
-import { plannedInstallCommand, siteDescription, siteName, siteUrl } from "@/lib/site";
+import {
+  plannedInstallCommand,
+  repositoryUrl,
+  siteDescription,
+  siteName,
+  siteUrl,
+} from "@/lib/site";
 import "@/components/landing.css";
 
 export const metadata = pageMetadata("/", landingTitle, siteDescription);
@@ -13,10 +19,25 @@ export const metadata = pageMetadata("/", landingTitle, siteDescription);
 export default function Home() {
   const structuredData = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: siteName,
-    url: siteUrl,
-    description: siteDescription,
+    "@graph": [
+      {
+        "@type": "WebSite",
+        name: siteName,
+        url: siteUrl,
+        description: siteDescription,
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: siteName,
+        url: siteUrl,
+        description: siteDescription,
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Node.js 20+",
+        license: "https://www.apache.org/licenses/LICENSE-2.0",
+        sameAs: [repositoryUrl, "https://www.npmjs.com/package/issue-graph"],
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      },
+    ],
   };
 
   return (
@@ -45,10 +66,10 @@ export default function Home() {
 
       <section className="ig-workflows" aria-labelledby="workflow-title">
         <div className="ig-section-intro">
-          <h2 id="workflow-title">Inspect a task or an entire backlog</h2>
+          <h2 id="workflow-title">From backlog to your next task</h2>
           <p>
-            Trace references, check PR status, or plan your next review. Each command supports
-            structured output for scripts and agents.
+            Capture once, filter from the CLI, and open the same result in the dashboard. Structured
+            output keeps your agent and your browser on the same work.
           </p>
         </div>
         <div className="ig-workflow-grid">
@@ -72,8 +93,8 @@ export default function Home() {
         <div className="ig-agent-copy">
           <h2 id="agent-title">Use issue-graph with your coding agent</h2>
           <p>
-            Install the skill to let your agent trace related work, check PR status, and review a
-            backlog before making changes.
+            Install the skill to let your agent inspect related work, propose clusters, and return a
+            filtered dashboard link before making changes.
           </p>
           <Link href="/docs/agents" className="ig-text-link">
             Read the agent workflow <span aria-hidden="true">↗</span>
@@ -87,7 +108,8 @@ export default function Home() {
           <div>
             <span className="ig-contract-label">Inspect</span>
             <p>
-              Your agent reads the JSON results and follows links to the relevant issues and PRs.
+              Your agent filters saved captures, ranks open work, and returns the exact dashboard
+              view.
             </p>
           </div>
           <div>

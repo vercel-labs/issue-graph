@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import { docsSlugs } from "../src/lib/docs-paths";
+import { exampleCommand, exampleRerunCommand } from "../src/lib/site";
 
 const contentRoot = new URL("../content/docs/", import.meta.url);
 const appRoot = new URL("../", import.meta.url);
@@ -49,7 +50,7 @@ describe("documentation content contract", () => {
 
   test("names the docs entry Overview", async () => {
     const intro = await read("content/docs/index.mdx");
-    expect(intro).toMatch(/^title: Overview$/m);
+    expect(intro).toMatch(/^navTitle: Overview$/m);
   });
 
   test("documents published npm-first installation and preserves access boundaries", async () => {
@@ -76,7 +77,8 @@ describe("documentation content contract", () => {
     expect(library).not.toContain("file:../issue-graph");
     expect(reference).toContain("npx issue-graph@latest");
     expect(start).toContain("supported by your installed release");
-    expect(security).toContain("INTERNAL");
+    expect(security).toContain("source repository and npm package are public");
+    expect(security).toContain("Captures can still contain private repository data");
     expect(security.toLowerCase()).toContain("snapshot");
     const files = (await readdir(contentRoot)).filter((name) => name.endsWith(".mdx"));
     for (const file of files) {
@@ -115,8 +117,9 @@ describe("documentation content contract", () => {
       read("content/docs/graph.mdx"),
       read("../../README.md"),
     ]);
+    expect(example.command).toBe(exampleCommand);
     for (const page of pages) {
-      expect(page).toContain(example.command);
+      expect(page).toContain(exampleRerunCommand);
       expect(page).not.toContain("issue-graph 427");
     }
     for (const page of pages.slice(1)) {
@@ -152,7 +155,7 @@ describe("documentation content contract", () => {
     expect(still.readUInt32BE(20)).toBe(1560);
   });
 
-  test("root guidance separates published installation from future release authorization", async () => {
+  test("root guidance documents published installation and automatic releases", async () => {
     const [readme, contributing] = await Promise.all([
       read("../../README.md"),
       read("../../CONTRIBUTING.md"),
@@ -161,12 +164,20 @@ describe("documentation content contract", () => {
       expect(page).toContain("npm install --global issue-graph@latest");
       expect(page).toContain("npm install issue-graph@latest");
       expect(page).toContain("npx issue-graph@latest --help");
-      expect(page).toContain("INTERNAL");
       expect(page).not.toMatch(/publication is (?:still )?pending|pending publication/i);
     }
     expect(contributing).not.toMatch(/expected_version=\d+\.\d+\.\d+/);
     expect(contributing).toContain('expected_version="$EXPECTED_VERSION"');
-    expect(contributing).toContain("Release environment approval");
+    expect(contributing).toContain("starts `.github/workflows/release.yml` automatically");
+    expect(contributing).toContain("Already-published versions skip the build and publication");
+    expect(contributing).toContain("Do not configure required reviewers or a wait timer");
+    expect(contributing).toContain("-F publish=false");
+    expect(contributing).toContain(
+      'gh run rerun "$RUN_ID" --repo vercel-labs/issue-graph --failed',
+    );
+    expect(contributing).toContain("without another `npm publish`");
+    expect(contributing).not.toContain("Release environment approval");
+    expect(contributing).not.toContain("INTERNAL");
   });
 
   test("uses canonical skill discovery and CLI-bundled guidance without release stories", async () => {
@@ -200,7 +211,7 @@ describe("documentation content contract", () => {
     }
   });
 
-  test("enables the native GitHub navbar link without changing source access", async () => {
+  test("enables source links for the public repository", async () => {
     const [config, site] = await Promise.all([
       read("src/lib/geistdocs/config.tsx"),
       read("src/lib/site.ts"),
@@ -210,7 +221,7 @@ describe("documentation content contract", () => {
     expect(config).toContain('repo: "issue-graph"');
     expect(config).not.toContain("...(repositoryIsPublic");
     expect(config).toContain("editSource: repositoryIsPublic");
-    expect(site).toContain("repositoryIsPublic = false");
+    expect(site).toContain("repositoryIsPublic = true");
   });
 
   test("pins the public runtime and uses no initializer or private provider", async () => {
@@ -218,7 +229,7 @@ describe("documentation content contract", () => {
     expect(pkg.name).toBe("@issue-graph/docs");
     expect(pkg.private).toBe(true);
     for (const [name, version] of Object.entries({
-      "@vercel/geistdocs": "2.4.1",
+      "@vercel/geistdocs": "2.7.5",
       "@vercel/agent-readability": "0.7.0",
       next: "16.3.5",
       react: "19.3.0",

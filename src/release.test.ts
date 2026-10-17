@@ -20,6 +20,8 @@ import {
   assertPackageIdentity,
   assertUnpublished,
   parseTarballInput,
+  preparePublication,
+  publicationNeeded,
   selectTarball,
   sha256,
   validateReleaseContext,
@@ -73,18 +75,44 @@ describe("release context", () => {
     expect(validateReleaseContext(context, identity)).toEqual({ ...identity, commit });
   });
 
+  test("resolves the version from the manifest on main pushes", () => {
+    expect(
+      validateReleaseContext(
+        { ...context, GITHUB_EVENT_NAME: "push", EXPECTED_VERSION: "" },
+        identity,
+      ),
+    ).toEqual({ ...identity, commit });
+  });
+
   test.each([
-    ["GITHUB_EVENT_NAME", "push"],
+    ["GITHUB_EVENT_NAME", "pull_request"],
+    ["GITHUB_EVENT_NAME", "pull_request_target"],
+    ["GITHUB_EVENT_NAME", "workflow_run"],
     ["GITHUB_REPOSITORY", "fork/issue-graph"],
     ["GITHUB_REF", "refs/heads/feature"],
     ["GITHUB_REF", "refs/tags/v0.2.0"],
     ["EXPECTED_SHA", "abc123"],
+    ["EXPECTED_SHA", `${commit}\n`],
     ["GITHUB_SHA", "b".repeat(40)],
     ["EXPECTED_VERSION", "0.2.1"],
     ["EXPECTED_VERSION", "v0.2.0"],
+    ["EXPECTED_VERSION", ""],
+    ["EXPECTED_VERSION", "0.2.0\n"],
     ["EXPECTED_VERSION", "0.2.0; echo unsafe"],
   ])("rejects %s=%s", (key, value) => {
     expect(() => validateReleaseContext({ ...context, [key]: value }, identity)).toThrow();
+  });
+
+  test.each([
+    { GITHUB_REPOSITORY: "fork/issue-graph" },
+    { GITHUB_REF: "refs/heads/feature" },
+    { GITHUB_REF: "refs/tags/v0.2.0" },
+    { GITHUB_SHA: "b".repeat(40) },
+    { EXPECTED_VERSION: "0.2.1" },
+  ])("rejects invalid automatic release context %j", (override) => {
+    expect(() =>
+      validateReleaseContext({ ...context, GITHUB_EVENT_NAME: "push", ...override }, identity),
+    ).toThrow();
   });
 
   test("rejects the previous scoped package name", () => {
@@ -117,8 +145,8 @@ describe("fail-closed registry check", () => {
       new Response(
         JSON.stringify({
           name: "issue-graph",
-          versions: { "0.2.0": {} },
-          "dist-tags": { latest: "0.1.0" },
+          versions: { "0.2.0": identity, "0.3.0": {} },
+          "dist-tags": { latest: "0.3.0" },
         }),
       ),
     );
@@ -230,6 +258,91 @@ describe("fail-closed registry check", () => {
   test("propagates network failures rather than treating them as unpublished", async () => {
     const request = vi.fn<typeof fetch>().mockRejectedValue(new Error("network unavailable"));
     await expect(assertUnpublished(identity, request)).rejects.toThrow(/network unavailable/);
+  });
+});
+
+describe("automatic release planning and retry", () => {
+  function packument(latest = identity.version) {
+    return {
+      name: identity.name,
+      versions: { [identity.version]: identity, [latest]: { ...identity, version: latest } },
+      "dist-tags": { latest },
+    };
+  }
+
+  test.each(["0.2.0", "0.3.0"])("skips an existing version when latest is %s", async (latest) => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify(packument(latest))));
+    expect(await publicationNeeded(identity, request)).toBe(false);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  test("rejects a published version ahead of latest", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify(packument("0.1.0"))));
+    await expect(publicationNeeded(identity, request)).rejects.toThrow(/ahead of registry latest/);
+  });
+
+  test.each([
+    { name: "other", version: identity.version },
+    { ...identity, version: "0.1.0" },
+    null,
+  ])("rejects inconsistent published identity %j", async (published) => {
+    const metadata = packument();
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ...metadata, versions: { [identity.version]: published } })),
+      );
+    await expect(publicationNeeded(identity, request)).rejects.toThrow();
+  });
+
+  test("allows publishing a verified archive only when its version is absent", async () => {
+    const tarball = archive();
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          name: identity.name,
+          versions: { "0.1.0": {} },
+          "dist-tags": { latest: "0.1.0" },
+        }),
+      ),
+    );
+    expect(await preparePublication(identity, { tarball, sha256: sha256(tarball) }, request)).toBe(
+      true,
+    );
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    false,
+    true,
+  ])("retries after npm accepted the archive, changed bytes: %s", async (changed) => {
+    const tarball = archive();
+    const bytes = readFileSync(tarball);
+    const published = Buffer.from(bytes);
+    if (changed) published[0] ^= 1;
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify(packument())))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...identity,
+            dist: {
+              integrity: `sha512-${createHash("sha512").update(published).digest("base64")}`,
+              tarball: "https://registry.npmjs.org/issue-graph/-/issue-graph-0.2.0.tgz",
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(new Response(new Uint8Array(published)));
+    const result = preparePublication(identity, { tarball, sha256: sha256(tarball) }, request);
+    if (changed) await expect(result).rejects.toThrow(/SHA-512/);
+    else await expect(result).resolves.toBe(false);
+    expect(readFileSync(tarball)).toEqual(bytes);
   });
 });
 
@@ -436,17 +549,44 @@ describe("read-only published archive verification", () => {
     expect(wait.mock.calls).toEqual([[1000]]);
   });
 
-  test("stops after five propagation attempts and never changes the retained archive", async () => {
+  test("stops after twelve propagation attempts and never changes the retained archive", async () => {
     const { bytes, input, wait } = fixture();
     const request = vi
       .fn<typeof fetch>()
       .mockImplementation(async () => new Response("not ready", { status: 404 }));
     await expect(verifyPublished(identity, input, request, wait)).rejects.toThrow(
-      /after 5 attempts/,
+      /after 12 attempts/,
     );
-    expect(request).toHaveBeenCalledTimes(5);
-    expect(wait.mock.calls).toEqual([[1000], [2000], [4000], [8000]]);
+    expect(request).toHaveBeenCalledTimes(12);
+    expect(wait.mock.calls).toEqual([
+      [1000],
+      [2000],
+      [4000],
+      [8000],
+      [16000],
+      [30000],
+      [30000],
+      [30000],
+      [30000],
+      [30000],
+      [30000],
+    ]);
     expect(readFileSync(input.tarball)).toEqual(bytes);
+  });
+
+  test("allows registry propagation beyond the previous fifteen-second window", async () => {
+    const { bytes, input, metadata, wait } = fixture();
+    let attempts = 0;
+    const request = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      if (String(url).endsWith(".tgz")) return new Response(new Uint8Array(bytes));
+      attempts++;
+      return attempts <= 8
+        ? new Response("processing", { status: 404 })
+        : new Response(JSON.stringify(metadata));
+    });
+    await verifyPublished(identity, input, request, wait);
+    expect(attempts).toBe(9);
+    expect(wait.mock.calls.reduce((sum, [delay]) => sum + delay, 0)).toBe(121_000);
   });
 
   test("fails closed on network errors", async () => {
@@ -626,16 +766,96 @@ describe("retained artifact metadata", () => {
       EXPECTED_TARBALL_SHA256: sha256(tarball),
       GITHUB_OUTPUT: join(temporary(), "outputs"),
     };
-    const run = (command: string, overrides: NodeJS.ProcessEnv = {}) =>
-      spawnSync(process.execPath, ["--import", "tsx", "scripts/release.ts", command, dir], {
-        cwd: root,
-        env: { ...env, ...overrides },
-        encoding: "utf8",
-      });
+    const run = (command: string, overrides: NodeJS.ProcessEnv = {}, imports: string[] = []) =>
+      spawnSync(
+        process.execPath,
+        ["--import", "tsx", ...imports, "scripts/release.ts", command, dir],
+        {
+          cwd: root,
+          env: { ...env, ...overrides },
+          encoding: "utf8",
+        },
+      );
     const result = run("record");
     expect(result.status, result.stderr).toBe(0);
     return { dir, tarball, env, run };
   }
+
+  function registryMock(
+    tarball: string,
+    state: "absent" | "published" | "changed" | "unavailable",
+  ) {
+    const bytes = readFileSync(tarball);
+    const packument = {
+      name: sourceIdentity.name,
+      versions: state === "absent" ? { "0.0.1": {} } : { [sourceIdentity.version]: sourceIdentity },
+      "dist-tags": { latest: state === "absent" ? "0.0.1" : sourceIdentity.version },
+    };
+    const metadata = {
+      ...sourceIdentity,
+      dist: {
+        integrity: `sha512-${createHash("sha512").update(bytes).digest("base64")}`,
+        tarball: `https://registry.npmjs.org/issue-graph/-/${filename}`,
+      },
+    };
+    const mock = join(temporary(), "registry.mjs");
+    writeFileSync(
+      mock,
+      `
+      const packument = ${JSON.stringify(packument)};
+      const metadata = ${JSON.stringify(metadata)};
+      const state = ${JSON.stringify(state)};
+      const bytes = Buffer.from(${JSON.stringify(bytes.toString("base64"))}, "base64");
+      if (state === "changed") bytes[0] ^= 1;
+      globalThis.fetch = async (url) => {
+        if (state === "unavailable") return new Response("unavailable", { status: 503 });
+        if (url === "https://registry.npmjs.org/issue-graph") return Response.json(packument);
+        if (url === "https://registry.npmjs.org/issue-graph/" + metadata.version) return Response.json(metadata);
+        if (url === metadata.dist.tarball) return new Response(bytes);
+        throw new Error("unexpected registry URL: " + url);
+      };
+    `,
+    );
+    return ["--import", mock];
+  }
+
+  test.each([
+    "absent",
+    "published",
+    "unavailable",
+  ] as const)("plans a real push process against a %s registry", (state) => {
+    const { tarball, env, run } = recorded();
+    writeFileSync(env.GITHUB_OUTPUT, "");
+    const result = run(
+      "plan",
+      { GITHUB_EVENT_NAME: "push", EXPECTED_VERSION: "" },
+      registryMock(tarball, state),
+    );
+    expect(result.status, result.stderr).toBe(state === "unavailable" ? 1 : 0);
+    expect(readFileSync(env.GITHUB_OUTPUT, "utf8")).toBe(
+      state === "unavailable"
+        ? ""
+        : `needed=${state === "absent"}\nversion=${sourceIdentity.version}\n`,
+    );
+  });
+
+  test.each([
+    "absent",
+    "published",
+    "changed",
+    "unavailable",
+  ] as const)("prepares the retained archive through the workflow command: %s", (state) => {
+    const { tarball, env, run } = recorded();
+    writeFileSync(env.GITHUB_OUTPUT, "");
+    const before = readFileSync(tarball);
+    const result = run("prepare-publish", {}, registryMock(tarball, state));
+    const allowed = state === "absent" || state === "published";
+    expect(result.status, result.stderr).toBe(allowed ? 0 : 1);
+    expect(readFileSync(env.GITHUB_OUTPUT, "utf8")).toBe(
+      allowed ? `publish=${state === "absent"}\n` : "",
+    );
+    expect(readFileSync(tarball)).toEqual(before);
+  });
 
   test("records source identity and digest, then verifies without changing the archive", () => {
     const { dir, tarball, env, run } = recorded();
@@ -682,37 +902,55 @@ describe("retained artifact metadata", () => {
   });
 });
 
-describe("manual release workflow contract", () => {
+describe("automatic release workflow contract", () => {
   const source = readFileSync(join(root, ".github/workflows/release.yml"), "utf8");
   const workflow = parse(source);
 
-  test("has only manual triggers, serial releases, and no default write permission", () => {
-    expect(Object.keys(workflow.on)).toEqual(["workflow_dispatch"]);
+  test("runs on main pushes or explicit dispatch, serially with no default write permission", () => {
+    expect(Object.keys(workflow.on)).toEqual(["push", "workflow_dispatch"]);
+    expect(workflow.on.push).toEqual({ branches: ["main"] });
     expect(workflow.on.workflow_dispatch.inputs.expected_sha.required).toBe(true);
     expect(workflow.on.workflow_dispatch.inputs.expected_version.required).toBe(true);
     expect(workflow.on.workflow_dispatch.inputs.expected_version).not.toHaveProperty("default");
     expect(workflow.on.workflow_dispatch.inputs.publish).toEqual({
-      description: "Publish after verification and Release environment approval",
+      description: "Publish after verification",
       required: true,
       type: "boolean",
       default: false,
     });
     expect(workflow.permissions).toEqual({ contents: "read" });
     expect(workflow.concurrency["cancel-in-progress"]).toBe(false);
+    expect(workflow.env.EXPECTED_SHA).toBe(`\${{ inputs.expected_sha || github.sha }}`);
+  });
+
+  test("skips published versions before building and passes the resolved version to every job", () => {
+    expect(workflow.jobs.plan.steps.find((step: { id?: string }) => step.id === "plan").run).toBe(
+      "node scripts/release.ts plan",
+    );
+    expect(workflow.jobs.plan.outputs).toEqual({
+      needed: `\${{ steps.plan.outputs.needed }}`,
+      version: `\${{ steps.plan.outputs.version }}`,
+    });
+    expect(workflow.jobs.build.needs).toBe("plan");
+    expect(workflow.jobs.build.if).toBe("needs.plan.outputs.needed == 'true'");
+    expect(workflow.jobs.consumers.needs).toEqual(["plan", "build"]);
+    for (const name of ["build", "consumers", "publish", "github-release"]) {
+      expect(workflow.jobs[name].env.EXPECTED_VERSION).toBe(`\${{ needs.plan.outputs.version }}`);
+    }
   });
 
   test("publishes only after all consumers in the protected environment", () => {
     expect(workflow.jobs.consumers.strategy.matrix.node).toEqual([20, 22, 24]);
-    expect(workflow.jobs.publish.needs).toEqual(["build", "consumers"]);
+    expect(workflow.jobs.publish.needs).toEqual(["plan", "build", "consumers"]);
     expect(workflow.jobs.publish.environment).toBe("Release");
-    expect(workflow.jobs.build.if).toBe(
+    expect(workflow.jobs.plan.if).toBe(
       "github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'",
     );
     expect(workflow.jobs.publish.if).toBe(
-      "inputs.publish == true && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'",
+      "(github.event_name == 'push' || inputs.publish == true) && github.repository == 'vercel-labs/issue-graph' && github.ref == 'refs/heads/main'",
     );
     expect(workflow.jobs.consumers.if).toBeUndefined();
-    expect(workflow.jobs["github-release"].needs).toBe("publish");
+    expect(workflow.jobs["github-release"].needs).toEqual(["plan", "publish"]);
     expect(workflow.jobs["github-release"].if).toBe(workflow.jobs.publish.if);
     for (const job of Object.values(workflow.jobs) as {
       steps: { uses?: string; with?: Record<string, unknown> }[];
@@ -734,6 +972,7 @@ describe("manual release workflow contract", () => {
   test.each([
     "missing",
     "matching",
+    "already-released",
     "mismatched",
     "lookup-error",
   ])("checks the tag commit before creating a release: %s", (scenario) => {
@@ -751,7 +990,7 @@ describe("manual release workflow contract", () => {
               [ "$*" = "api --method POST repos/$GITHUB_REPOSITORY/git/refs -f ref=refs/tags/v$EXPECTED_VERSION -f sha=$EXPECTED_SHA" ] ;;
             "api repos/$GITHUB_REPOSITORY/commits/refs/tags/v$EXPECTED_VERSION")
               if [ "$SCENARIO" = mismatched ]; then echo wrong-commit; else echo "$EXPECTED_SHA"; fi ;;
-            "release view") return 1 ;;
+            "release view") [ "$SCENARIO" = already-released ] ;;
             "release create")
               case "$*" in *--verify-tag*) echo RELEASE_CREATED ;; *) return 1 ;; esac ;;
             *) return 1 ;;
@@ -763,8 +1002,20 @@ describe("manual release workflow contract", () => {
       encoding: "utf8",
     });
     const allowed = scenario === "missing" || scenario === "matching";
-    expect(result.status).toBe(allowed ? 0 : 1);
+    expect(result.status).toBe(allowed || scenario === "already-released" ? 0 : 1);
     expect(result.stdout.includes("RELEASE_CREATED")).toBe(allowed);
+  });
+
+  test("rechecks retained bytes before retry and never republishes an existing archive", () => {
+    const steps = workflow.jobs.publish.steps;
+    const preflight = steps.findIndex((step: { id?: string }) => step.id === "preflight");
+    const publish = steps.findIndex((step: { run?: string }) => step.run?.includes("npm publish"));
+    expect(preflight).toBeGreaterThanOrEqual(0);
+    expect(publish).toBeGreaterThan(preflight);
+    expect(steps[preflight].run).toBe(
+      'node scripts/release.ts prepare-publish "$RUNNER_TEMP/release"',
+    );
+    expect(steps[publish].if).toBe("steps.preflight.outputs.publish == 'true'");
   });
 
   test("downloads the same immutable artifact ID for testing and publishing", () => {

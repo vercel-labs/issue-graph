@@ -1,6 +1,4 @@
-import graph from "./example-graph.json";
-import plan from "./example-plan.json";
-import status from "./example-status.json";
+import capture from "./example-workflow.json";
 import { plainTerminalText, type TerminalExample } from "./terminal-demo";
 
 export interface TerminalLineRange {
@@ -21,6 +19,7 @@ export interface TerminalExampleSource {
   command: string;
   output: string;
   selection: TerminalSelection;
+  image?: { src: string; alt: string; width: number; height: number };
 }
 
 export function selectTerminalLines(text: string, ranges: readonly TerminalLineRange[]): string {
@@ -68,43 +67,45 @@ export function summarizePlanOutput(output: string): string {
 
 export const terminalExampleCatalog = [
   {
-    id: "graph",
-    label: "Graph",
-    summary: summarizeGraphNodes(graph.nodes),
-    command: graph.command,
-    output: graph.terminalOutput,
+    id: "open",
+    label: "Capture",
+    summary: "80 open items captured within an explicit budget",
+    command: capture.open.command,
+    output: capture.open.terminalOutput,
     selection: {
-      source: "example-graph.json.terminalOutput",
+      source: "example-workflow.json.open.terminalOutput",
       lineNumbering: "1-based inclusive",
-      lineRanges: [
-        { startLine: 1, endLine: 3 },
-        { startLine: 9, endLine: 10 },
-        { startLine: 14, endLine: 20 },
-      ],
+      lineRanges: [{ startLine: 1, endLine: capture.open.terminalOutput.split("\n").length }],
     },
   },
   {
-    id: "status",
-    label: "PR status",
-    summary: summarizeStatusOutput(status.terminalOutput),
-    command: status.command,
-    output: status.terminalOutput,
+    id: "query",
+    label: "Prioritize",
+    summary: "10 issues in the top 25% by Heat · first two shown",
+    command: capture.query.command,
+    output: capture.query.terminalOutput,
     selection: {
-      source: "example-status.json.terminalOutput",
+      source: "example-workflow.json.query.terminalOutput",
       lineNumbering: "1-based inclusive",
-      lineRanges: [{ startLine: 1, endLine: 13 }],
+      lineRanges: [{ startLine: 1, endLine: capture.query.terminalOutput.split("\n").length }],
     },
   },
   {
-    id: "plan",
-    label: "Backlog",
-    summary: summarizePlanOutput(plan.terminalOutput),
-    command: plan.command,
-    output: plan.terminalOutput,
+    id: "dashboard",
+    label: "Dashboard",
+    summary: "Open the same ranking, filters, and weights in your browser",
+    command: capture.dashboard.command,
+    output: capture.dashboard.terminalOutput,
     selection: {
-      source: "example-plan.json.terminalOutput",
+      source: "example-workflow.json.dashboard.terminalOutput",
       lineNumbering: "1-based inclusive",
-      lineRanges: [{ startLine: 1, endLine: 16 }],
+      lineRanges: [{ startLine: 1, endLine: capture.dashboard.terminalOutput.split("\n").length }],
+    },
+    image: {
+      src: "/dashboard-rank.png",
+      alt: "Captured portless Rank dashboard with three active filters, adjustable weights, and issue #313 first at 33.2 Heat.",
+      width: 1100,
+      height: 690,
     },
   },
 ] as const satisfies readonly TerminalExampleSource[];
@@ -116,5 +117,6 @@ export function toTerminalExample(example: TerminalExampleSource): TerminalExamp
     summary: example.summary,
     command: example.command,
     output: plainTerminalText(selectTerminalLines(example.output, example.selection.lineRanges)),
+    ...(example.image ? { image: example.image } : {}),
   };
 }

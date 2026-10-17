@@ -1,15 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalDemoProps } from "@/lib/terminal-demo";
 import { renderTerminalCommand, TerminalPresentation } from "./terminal-output";
 import "./terminal-demo.css";
-
-const displayCommands: Record<string, string> = {
-  graph: "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
-  status: "issue-graph status --repo vercel-labs/portless --author ctate,Railly --view projects",
-  plan: "issue-graph plan --repo vercel-labs/wterm",
-};
 
 export function TerminalDemo({ examples }: TerminalDemoProps) {
   const instanceId = useId();
@@ -137,9 +132,18 @@ export function TerminalDemo({ examples }: TerminalDemoProps) {
           >
             <div className="ig-demo-command">
               <span className="ig-demo-prompt">$ </span>
-              {renderTerminalCommand(displayCommands[example.id] ?? example.command)}
+              {renderTerminalCommand(example.command)}
             </div>
             <TerminalPresentation output={example.output} exampleId={example.id} />
+            {example.image ? (
+              <a
+                href={example.image.src}
+                className="ig-demo-preview"
+                aria-label="View full dashboard screenshot"
+              >
+                <Image {...example.image} sizes="(max-width: 640px) 90vw, 554px" />
+              </a>
+            ) : null}
           </div>
         ))}
       </div>

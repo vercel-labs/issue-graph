@@ -1,0 +1,22 @@
+{
+  "repository": "vercel-labs/portless",
+  "repositoryVisibility": "PUBLIC",
+  "visibilityCheckedAt": "2026-09-27T19:21:16.008Z",
+  "captureStartedAt": "2026-09-27T19:21:16.008Z",
+  "capturedAt": "2026-09-27T19:21:37.165Z",
+  "cliVersion": "0.4.0",
+  "source": "Selected fields from CLI JSON output",
+  "coverageNote": "Budget: 80 items. The capture contains 80 open items and omits 40 referenced items. It is not a complete repository inventory. Heat ranks discussion signals, not severity. Queries read this saved capture without fetching GitHub.",
+  "open": {
+    "command": "issue-graph open vercel-labs/portless --budget 80 --format json --no-open",
+    "terminalOutput": "{\n  \"repo\": \"vercel-labs/portless\",\n  \"saved\": true,\n  \"open\": 80,\n  \"linked\": 0,\n  \"notCrawled\": 40,\n  \"next\": \"issue-graph cluster vercel-labs/portless\"\n}"
+  },
+  "query": {
+    "command": "issue-graph query github:vercel-labs/portless --state open --kind Issue --heat-top 25 --view rank --json --no-open",
+    "terminalOutput": "{\n  \"counts\": {\n    \"captured\": 80,\n    \"matched\": 10,\n    \"visible\": 10,\n    \"ranked\": 10\n  },\n  \"heat\": {\n    \"threshold\": 8.3,\n    \"baselineCount\": 40\n  },\n  \"items\": [\n    {\n      \"key\": \"vercel-labs/portless#313\",\n      \"title\": \"Cloudflare tunnel support\",\n      \"score\": 33.2\n    },\n    {\n      \"key\": \"vercel-labs/portless#326\",\n      \"title\": \"Add --no-worktree support when running apps with explicit names\",\n      \"score\": 26.6\n    }\n  ]\n}"
+  },
+  "dashboard": {
+    "command": "issue-graph query github:vercel-labs/portless --state open --kind Issue --heat-top 25 --view rank --json --open",
+    "terminalOutput": "{\n  \"opened\": true\n}"
+  }
+}

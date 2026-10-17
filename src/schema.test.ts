@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vitest";
+import { runNode } from "../tests/node-process.js";
+import { parseArgs } from "./cli.js";
 import { ISSUE_GRAPH_SCHEMA } from "./schema.js";
 
 describe("ISSUE_GRAPH_SCHEMA", () => {
   test("separates GitHub mutations from local writes", () => {
     expect(ISSUE_GRAPH_SCHEMA.commands.reconcile.githubMutations).toBe(false);
     expect(ISSUE_GRAPH_SCHEMA.commands.reconcile.localWrites).toEqual([
-      "~/.issue-graph snapshots unless --no-snapshot is set",
+      "ISSUE_GRAPH_HOME snapshots unless --no-save is set",
     ]);
     expect(ISSUE_GRAPH_SCHEMA.commands.plan.localWrites).toEqual([]);
     expect(ISSUE_GRAPH_SCHEMA.commands.plan.formats).toEqual(["json", "markdown", "text"]);
@@ -56,5 +58,34 @@ describe("ISSUE_GRAPH_SCHEMA", () => {
     expect(ISSUE_GRAPH_SCHEMA.crawl.concurrency).toEqual({ default: 4, minimum: 1, maximum: 32 });
     expect(ISSUE_GRAPH_SCHEMA.crawl.maxNodes.maximum).toBe(1000);
     expect(ISSUE_GRAPH_SCHEMA.crawl.searchPageSize).toBe(100);
+  });
+
+  test("covers every command advertised by CLI help", async () => {
+    const [help, schema] = await Promise.all([
+      runNode(["src/bin.ts", "--help"]),
+      runNode(["src/bin.ts", "schema"]),
+    ]);
+    expect(help.code).toBe(0);
+    expect(schema.code).toBe(0);
+    const emitted = JSON.parse(schema.stdout);
+    expect(emitted).toEqual(ISSUE_GRAPH_SCHEMA);
+    const commands = help.stdout.split("\ncommands\n")[1]?.split("\nscope\n")[0] ?? "";
+    const names = [...commands.matchAll(/^ {2}([a-z]+)\s/gm)].map((match) => match[1]);
+    expect([...new Set(names)].sort()).toEqual(Object.keys(emitted.commands).sort());
+  });
+
+  test("documents the defaults selected by the argument parser", () => {
+    const limits = ISSUE_GRAPH_SCHEMA.crawl.maxNodes;
+    for (const command of ["open", "rank", "cluster"]) {
+      expect(parseArgs([command, "owner/repo"]).maxNodes).toBe(limits.repositoryDefault);
+      expect(parseArgs([command, "owner/repo", "--label", "bug"]).maxNodes).toBe(limits.default);
+      expect(parseArgs([command, "owner/repo#1"]).maxNodes).toBe(limits.default);
+    }
+    for (const command of ["graph", "reconcile", "plan"]) {
+      expect(parseArgs([command, "owner/repo#1"]).maxNodes).toBe(limits.default);
+    }
+    expect(parseArgs(["reconcile", "owner/repo", "--format", "human"]).format).toBe(
+      ISSUE_GRAPH_SCHEMA.commands.reconcile.formatAliases.human,
+    );
   });
 });

@@ -189,7 +189,7 @@ describe("public launch proof", () => {
 
   test("integrates the captured command and published package with site constants", () => {
     expect.soft(graph.command).toBe(exampleCommand);
-    expect(repositoryIsPublic).toBe(false);
+    expect(repositoryIsPublic).toBe(true);
     for (const workflow of workflows) {
       expect(workflow.command.startsWith("issue-graph ")).toBe(true);
       expect(workflow.href.startsWith("/docs/")).toBe(true);
