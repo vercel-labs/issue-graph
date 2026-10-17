@@ -90,9 +90,5 @@
     "vite": "7.3.6",
     "vitest": "4.1.11",
     "yaml": "2.9.1"
-  },
-  "dependencies": {
-    "@linear/sdk": "96.0.0",
-    "graphql": "16.14.2"
   }
 }

@@ -267,6 +267,7 @@ export async function countLinearProjectOpen(
   let pages = 0;
   let complete = false;
   let overlap = false;
+  let reason: string | undefined;
   try {
     for (; pages < maxPages; pages++) {
       const project = object(object(await reader.projectOpenIssues(projectId, after)).project);
@@ -295,16 +296,25 @@ export async function countLinearProjectOpen(
       }
       if (!info.hasNextPage) {
         complete = !overlap;
+        if (overlap) reason = "issues moved between pages during the read";
         break;
       }
       after = text(info.endCursor);
       if (cursors.has(after)) throw new LinearReadError("REPEATED_CURSOR");
       cursors.add(after);
     }
-  } catch {
+    if (!complete && !reason) reason = `stopped at the ${maxPages}-page count limit`;
+  } catch (error) {
     if (!ids.size && !pages) return undefined;
+    reason = `read failed after ${pages} page(s): ${error instanceof LinearReadError ? error.code : "unknown error"}`;
   }
-  return { value: ids.size, issues: ids.size, complete, observedAt: new Date().toISOString() };
+  return {
+    value: ids.size,
+    issues: ids.size,
+    complete,
+    observedAt: new Date().toISOString(),
+    ...(reason && { reason }),
+  };
 }
 
 async function readNode(
@@ -334,7 +344,12 @@ async function readNode(
     try {
       item = object(object(await reader.issue(id, { size: 50, cursors, include })).issue);
       const found = ref(item, authority);
-      if ((UUID.test(id) && found.id !== id) || (original && found.id !== original.id))
+      // Seeds by UUID or identifier must come back as that issue, and later pages as the first one.
+      if (
+        (UUID.test(id) && found.id !== id) ||
+        (IDENTIFIER.test(id) && text(item.identifier).toUpperCase() !== id.toUpperCase()) ||
+        (original && found.id !== original.id)
+      )
         throw new LinearReadError("IDENTITY_MISMATCH");
     } catch (error) {
       if (!original) throw error;

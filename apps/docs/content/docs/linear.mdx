@@ -5,7 +5,7 @@ description: Read explicit issue relationships with workspace-scoped identity an
 
 Start with one Linear issue to see its blockers, related work, parent and sub-issues, and attachment links.
 
-Set exactly one of `LINEAR_API_KEY` with read access or `LINEAR_ACCESS_TOKEN` for OAuth in your environment. The command uses the pinned Linear SDK and sends queries only.
+Set exactly one of `LINEAR_API_KEY` with read access or `LINEAR_ACCESS_TOKEN` for OAuth in your environment. The command sends fixed read-only GraphQL queries to `api.linear.app` and no mutations.
 
 ```bash
 issue-graph linear https://linear.app/your-workspace/issue/ENG-123/example --depth 1 --max-nodes 20
@@ -47,15 +47,19 @@ issue-graph linear --project <project-uuid> --workspace your-workspace --max-nod
 
 Project mode includes disconnected issues and empty projects. It paginates the inventory, then reads both directions of relations, parents, children, and attachments with bounded concurrency. Connections outside the project remain visible without fetching those issues. Depth and hub expansion limits apply only to issue neighborhoods. `--max-pages` also bounds the project inventory; reaching either limit leaves the capture visibly incomplete. Rerun the command to refresh a saved capture.
 
+Each dashboard entry shows one project. In an issue neighborhood, related issues from other projects are counted in the coverage notice and kept in `--json`, but not drawn; their edges stay on the issues that point to them.
+
 The dashboard keeps successful reads under **Snapshot details** and **Connection details**. Empty connections are valid results. Scope exclusions, such as archived issues or text mentions, do not flag individual issues. Failed, truncated, or inconsistent reads retain warnings.
 
 The dashboard switches between saved Linear projects and GitHub repositories. Each Linear entry is labeled `Workspace / Project` and keyed by workspace and project UUID. Issues from other projects are excluded from that view; boundary relationships remain visible. Issues without a project are scoped to their team. Older captures without project metadata are labeled `Unscoped capture`.
+
+Rate limits: Linear allows an API key 2,500 requests and 3,000,000 complexity points per hour, shared by all of a user's keys. A full project capture can spend a large part of that: each issue takes at least one request, and every extra page of a connection takes another. When the limit is hit, the command stops and prints when the window resets instead of retrying.
 
 The selector counts all non-archived open issues in the project, independent of graph depth and node caps. Open means triage, backlog, unstarted, or started. A separate query reads up to 100 pages of 250 IDs across all teams in the project. `≥` marks a partial count; `—` means unavailable, including captures without a project. The tooltip records when the count was read. Saved dashboards do not refresh automatically. GitHub entries count open issues plus pull requests, with the breakdown in the tooltip.
 
 Linear shows issue identifiers, native workflow states, archived issues, relationship direction, attachment links, and read coverage. Explore and Swarm support relationships and depth; GitHub-only impact and discussion ranking are not shown for Linear.
 
-`--open` creates a temporary HTML file when `--html` is omitted. HTML runs save the latest project model under `~/.issue-graph/dashboard`. Add `--no-snapshot` to write or open the HTML without saving a dashboard entry. `--json` can be combined with HTML output; file notices go to stderr.
+`--open` creates a temporary HTML file when `--html` is omitted. HTML runs save the latest project model under `~/.issue-graph/dashboard`. Add `--no-save` to write or open the HTML without saving a dashboard entry. `--json` can be combined with HTML output; file notices go to stderr.
 
 ### Thematic clusters
 
@@ -94,13 +98,13 @@ Exit codes are `0` for complete coverage within scope, `1` for partial coverage 
 
 ## Library
 
-The reader is a separate entry point, keeping SDK types out of the graph contract:
+The reader is a separate entry point, keeping transport details out of the graph contract:
 
 ```ts
 import { buildLinearGraph } from "issue-graph";
-import { linearSdkReader } from "issue-graph/transport/linear";
+import { linearReader } from "issue-graph/transport/linear";
 
-const reader = linearSdkReader({ apiKey: process.env.LINEAR_API_KEY });
+const reader = linearReader({ apiKey: process.env.LINEAR_API_KEY });
 const report = await buildLinearGraph(reader, "ENG-123", {
   workspace: "your-workspace",
   maxDepth: 1,
@@ -113,6 +117,6 @@ const report = await buildLinearGraph(reader, "ENG-123", {
 
 Use `buildLinearProject(reader, projectUuid, options)` for a project capture. Pass `linearDashboardModel(report)` to `renderDashboard()` to combine Linear and GitHub models in one HTML page. These functions are exported from `issue-graph`.
 
-An authenticated Linear MCP session is separate from SDK credentials. MCP captures should record their actual source and supported relationship categories in the report scope. A returned empty array is a successful read; an unrequested or unexposed category belongs in the scope notes. Never mark a failed requested read as a scope exclusion.
+An authenticated Linear MCP session is separate from these credentials. MCP captures should record their actual source and supported relationship categories in the report scope. A returned empty array is a successful read; an unrequested or unexposed category belongs in the scope notes. Never mark a failed requested read as a scope exclusion.
 
-The reader accepts a per-request timeout and bounded retry options. Credentials and raw upstream error messages are not included in the report.
+The reader accepts a per-request timeout and bounded retry options. Rate limits use Linear's reset headers: a reset within the retry budget is awaited once, a later one fails with its reset time. Credentials and raw upstream error messages are not included in the report.

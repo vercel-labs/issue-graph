@@ -11,6 +11,7 @@ import {
 } from "../tests/linear-fixtures.js";
 import { buildLinearGraph, countLinearProjectOpen } from "./linear.js";
 import { linearDashboardModel } from "./linear-html.js";
+import { LinearReadError } from "./linear-queries.js";
 
 const project = { id: id(900), name: "Project A", url: "https://linear.app/fixture/project/a" };
 const team = { id: id(901), name: "Engineering", key: "ENG", organization: { id: organization } };
@@ -145,4 +146,21 @@ test("scopes unassigned issues by team and treats duplicates as closed", async (
   expect(Object.keys(model.nodes)).toEqual([key(1)]);
   expect(model.nodes[key(1)].state).toBe("CLOSED");
   expect(model.openCount).toBeUndefined();
+});
+
+test("a count that fails mid-pagination says why it is partial", async () => {
+  const reader = countedReader(
+    countPage([countNode(1), countNode(2)], "next"),
+    new LinearReadError("RATE_LIMITED"),
+  );
+  const count = await countLinearProjectOpen(reader, project.id, organization);
+  expect(count).toMatchObject({ value: 2, complete: false });
+  expect(count?.reason).toBe("read failed after 1 page(s): RATE_LIMITED");
+});
+
+test("a count that hits its page limit says so", async () => {
+  const reader = countedReader(countPage([countNode(1)], "a"), countPage([countNode(2)], "b"));
+  const count = await countLinearProjectOpen(reader, project.id, organization, 2);
+  expect(count).toMatchObject({ value: 2, complete: false });
+  expect(count?.reason).toBe("stopped at the 2-page count limit");
 });

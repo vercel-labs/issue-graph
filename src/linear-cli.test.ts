@@ -39,7 +39,7 @@ test("Linear help and invalid arguments never initialize authentication", async 
     expect((await invoke(args, unused)).code).toBe(2);
 });
 
-test("HTML and open are explicit, preserve JSON stdout and respect no-snapshot", async () => {
+test("HTML and open are explicit, preserve JSON stdout and respect no-save", async () => {
   const calls: unknown[] = [];
   let stdout = "";
   const io = {
@@ -56,7 +56,7 @@ test("HTML and open are explicit, preserve JSON stdout and respect no-snapshot",
   stdout = "";
   expect(
     await runLinear(
-      ["ENG-1", "--html", "nested/linear.html", "--open", "--no-snapshot", "--json"],
+      ["ENG-1", "--html", "nested/linear.html", "--open", "--no-save", "--json"],
       () => fixtureReader(),
       io,
     ),

@@ -4,6 +4,8 @@ export interface OpenItemCount {
   observedAt: string;
   issues: number;
   pullRequests?: number;
+  /** Why a count is partial, when known. */
+  reason?: string;
 }
 
 export interface ReadCoverage {

@@ -23,7 +23,7 @@ Read explicit Linear issue relationships, hierarchy, and attachment links.
   --json                print JSON to stdout
   --html PATH           write an HTML explorer and save this project to the dashboard
   --open                open the HTML explorer (creates a temporary file if needed)
-  --no-snapshot         do not save this run to the dashboard
+  --no-save             do not save this run to the dashboard
   --cluster             print a thematic clustering task for the calling agent
   --clusters PATH       apply proposed themes from JSON to --html or --open
   -h, --help            show help without authentication or network
@@ -80,8 +80,11 @@ export async function runLinear(
       const arg = argv[index];
       if (arg === "--json") json = true;
       else if (arg === "--open") open = true;
-      else if (arg === "--no-snapshot") save = false;
-      else if (arg === "--cluster") cluster = true;
+      else if (arg === "--no-save" || arg === "--no-snapshot") {
+        if (arg === "--no-snapshot")
+          io.stderr("note: --no-snapshot is deprecated; use --no-save\n");
+        save = false;
+      } else if (arg === "--cluster") cluster = true;
       else if (arg === "--clusters") {
         const value = argv[++index];
         if (!value || value.startsWith("-")) throw new Error("--clusters requires a JSON path");

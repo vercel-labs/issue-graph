@@ -48,6 +48,8 @@ describe("Linear identity", () => {
     const reader = fixtureReader();
     reader.issue = async () => ({ issue: issue(2) });
     await expect(buildLinearGraph(reader, id(1), options)).rejects.toThrow("IDENTITY_MISMATCH");
+    // An identifier seed is checked too, not only UUIDs.
+    await expect(buildLinearGraph(reader, "ENG-1", options)).rejects.toThrow("IDENTITY_MISMATCH");
     const wrong = issue(1);
     wrong.team.organization.id = id(99);
     reader.issue = async () => ({ issue: wrong });

@@ -286,7 +286,7 @@ connected workspace; it does not mutate Linear issues.
 
 - `issue-graph linear ENG-123 --workspace example --json` reads a bounded neighborhood.
 - `issue-graph linear --project UUID --html project.html` reads non-archived project issues
-  across teams and saves that project for `issue-graph dashboard`. Use `--no-snapshot`
+  across teams and saves that project for `issue-graph dashboard`. Use `--no-save`
   to skip the saved model; explicit HTML output is still written.
 - `--cluster` prints a task for the current agent. `--clusters PATH --html project.html`
   applies proposed themes without changing native relationships or statuses.

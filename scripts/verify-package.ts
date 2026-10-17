@@ -218,14 +218,14 @@ const name = ${JSON.stringify(packageName)};
 const core = await import(name);
 const { httpTransport } = await import(name + "/transport/http");
 const { shellTransport } = await import(name + "/transport/shell");
-const { linearSdkReader } = await import(name + "/transport/linear");
+const { linearReader } = await import(name + "/transport/linear");
 assert.ok(import.meta.resolve(name).endsWith("/dist/index.js"));
 assert.equal(typeof core.crawl, "function");
 assert.equal(typeof core.parseNodeResponse, "function");
 assert.equal(typeof core.collectStatus, "function");
 assert.equal(typeof httpTransport, "function");
 assert.equal(typeof shellTransport, "function");
-assert.equal(typeof linearSdkReader, "function");
+assert.equal(typeof linearReader, "function");
 assert.equal(typeof core.buildLinearGraph, "function");
 assert.equal(typeof core.buildLinearProject, "function");
 assert.equal(typeof core.linearDashboardModel, "function");
@@ -694,16 +694,16 @@ try {
   );
   const linearHtmlPath = join(consumer, "linear", "graph.html");
   const linearHtml = invoke(
-    ["linear", "ENG-1", "--html", linearHtmlPath, "--no-snapshot", "--json"],
+    ["linear", "ENG-1", "--html", linearHtmlPath, "--no-save", "--json"],
     0,
     linearEnv,
   );
   assert.equal(JSON.parse(linearHtml.stdout).source, "linear");
-  assert.ok(!existsSync(join(home, ".issue-graph")), "Linear --no-snapshot must not save a model");
+  assert.ok(!existsSync(join(home, ".issue-graph")), "Linear --no-save must not save a model");
   const embedded = (path: string) =>
     JSON.parse(
       readFileSync(path, "utf8")
-        .split('<script id="data" type="application/json">')[1]
+        .split('<script id="issue-graph-data" type="application/json">')[1]
         .split("</script>")[0],
     );
   assert.equal(embedded(linearHtmlPath).projects[0].provider.id, "linear");
@@ -722,7 +722,7 @@ try {
     }),
   );
   invoke(
-    ["linear", "ENG-1", "--clusters", themePath, "--html", linearHtmlPath, "--no-snapshot"],
+    ["linear", "ENG-1", "--clusters", themePath, "--html", linearHtmlPath, "--no-save"],
     0,
     linearEnv,
   );

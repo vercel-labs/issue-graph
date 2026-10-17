@@ -23,12 +23,12 @@ export const ISSUE_GRAPH_SCHEMA = {
       remoteMutations: false,
       localWrites: [
         "HTML with --html PATH or --open",
-        "latest project model under ~/.issue-graph/dashboard with HTML output unless --no-snapshot",
+        "latest project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
       ],
       outputSchemaVersion: 1,
       formats: ["markdown", "json", "html"],
       authentication: "Exactly one of LINEAR_API_KEY or LINEAR_ACCESS_TOKEN",
-      transport: "@linear/sdk 96.0.0; fixed GraphQL queries",
+      transport: "fetch to api.linear.app/graphql; fixed read-only GraphQL queries",
       required: ["issue URL, identifier, or UUID; alternatively --project UUID"],
       projectCapture: {
         scope: "non-archived project issues across all teams, including disconnected issues",

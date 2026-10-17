@@ -448,8 +448,8 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     process.exitCode = await runLinear(
       argv.slice(1),
       async () => {
-        const { linearSdkReader } = await import("./transports/linear.js");
-        return linearSdkReader({
+        const { linearReader } = await import("./transports/linear.js");
+        return linearReader({
           apiKey: process.env.LINEAR_API_KEY,
           accessToken: process.env.LINEAR_ACCESS_TOKEN,
         });
