@@ -150,8 +150,10 @@ export function linearDashboardModel(
             .map((members, index) => ({
               label: `Component ${index + 1}`,
               subtitle:
-                report.nodes.find((node) => seeds.has(node.key) && members.includes(node.key))
-                  ?.title ?? "Connected by explicit relationships",
+                members.length === 1
+                  ? "No explicit relationships"
+                  : (report.nodes.find((node) => seeds.has(node.key) && members.includes(node.key))
+                      ?.title ?? "Connected by explicit relationships"),
               members: members.filter((key) => nodes[key]),
             }))
             .filter((group) => group.members.length),

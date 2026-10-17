@@ -185,3 +185,9 @@ test("filtering a fetched neighboring project preserves the boundary without deg
     "1 issues outside this project are omitted from this view.",
   );
 });
+
+test("an issue with no relationships is not described as connected", async () => {
+  const model = linearDashboardModel(await buildLinearGraph(fixtureReader(), "ENG-1", options));
+  const single = model.groups.find((group) => group.members.length === 1);
+  expect(single?.subtitle).toBe("No explicit relationships");
+});
