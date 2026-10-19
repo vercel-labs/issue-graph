@@ -98,7 +98,8 @@ export function linearReader(options: LinearReaderOptions): LinearReader {
   if (!Number.isInteger(maxBackoffMs) || maxBackoffMs < 0 || maxBackoffMs > 30_000)
     throw new RangeError("Linear maxBackoffMs must be from 0 to 30000");
   // API keys go bare; OAuth access tokens use the Bearer scheme.
-  const authorization = options.apiKey ?? `Bearer ${options.accessToken}`;
+  // `||`, not `??`: an empty LINEAR_API_KEY must not shadow a set access token.
+  const authorization = options.apiKey || `Bearer ${options.accessToken}`;
 
   async function attempt(query: string, variables: Record<string, unknown>): Promise<unknown> {
     let response: Response;

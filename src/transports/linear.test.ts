@@ -199,3 +199,13 @@ test("a rate limit that resets within the budget waits for the reset and retries
   });
   expect(requests).toBe(2);
 });
+
+test("an empty API key does not shadow a valid access token", async () => {
+  vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer fixture-oauth");
+    return Response.json({ data: { organization: workspace } });
+  });
+  await expect(
+    linearReader({ apiKey: "", accessToken: "fixture-oauth" }).workspace(),
+  ).resolves.toEqual({ organization: workspace });
+});
