@@ -30,12 +30,15 @@ If a command or asset is missing, report the CLI/skill mismatch and observed err
 | Replay a saved view | `issue-graph query --history HISTORY_ID --json --open` |
 | Inspect effective scoring defaults | `issue-graph config show --provider github --scope owner/repo --json` |
 | Backlog verification queue | `issue-graph reconcile owner/repo` |
+| Linear issue or project relationships | `issue-graph linear <issue>`, or `issue-graph linear --project UUID` |
 | Next backlog action | `issue-graph plan owner/repo` |
 | Find work one fix resolves together | `issue-graph plan owner/repo --budget 1000 --format json`, then read `sweep` |
 
 For counts, skip graph discovery. Resolve repositories and authors from the request and available context; never silently enumerate an organization or guess members. Status accepts repeated repositories and repeated/comma-separated authors, with case-insensitive matching. Ask only if scope remains unresolved.
 
 Live collection supports GitHub. `open`, `rank`, and `cluster` accept a repository or items. `graph` needs items or `--label`. Items can be numbers, `owner/repo#123`, or URLs; bare numbers use `--repo` or the checkout's GitHub remote. Inspect an issue's graph before starting work and credit existing contributors.
+
+Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Read `issue-graph linear --help` for its flags and limits.
 
 ## Query saved data
 

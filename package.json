@@ -22,6 +22,10 @@
     "./transport/http": {
       "types": "./dist/transports/http.d.ts",
       "import": "./dist/transports/http.js"
+    },
+    "./transport/linear": {
+      "types": "./dist/transports/linear.d.ts",
+      "import": "./dist/transports/linear.js"
     }
   },
   "main": "./dist/index.js",
