@@ -1,6 +1,32 @@
 # Changelog
 
 <!-- release:start -->
+## 0.6.0
+
+### Features
+
+- `issue-graph linear <issue>` reads a Linear issue neighborhood: relations in both directions, parents, sub-issues, and attachment links, with native states and workspace-scoped identifiers.
+- `issue-graph linear --project UUID` captures a whole Linear project, including disconnected issues, and counts its open issues.
+- `issue-graph linear login` connects through the browser to Linear's read-only MCP server, with no API key or admin access. `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` also works and takes precedence. `linear status`, `linear logout`, and `auth status` show the connection.
+- Linear projects open in the dashboard next to saved GitHub runs, and `--cluster` with `--clusters` applies proposed themes.
+- When Linear rate limits a capture, the command waits if the window resets within the retry budget and otherwise stops with the reset time.
+- `--no-save` replaces `--no-snapshot`, which still works as a deprecated alias.
+- The dashboard uses Geist color tokens in light and dark themes, and the first 14 cluster colors come from the Geist hue scales. Larger graphs keep every cluster color distinct.
+
+### Fixes
+
+- Provider logos in imported dashboard models must be static SVG shapes with allowlisted attributes, so an imported capture cannot run script in the dashboard.
+- Default dashboard exports are written to a new private temporary directory. Exports refuse asset paths through directories that another account owns or can write, including existing assets with open permissions.
+- `cluster --agent claude` runs Claude with no tools or MCP servers, and `cluster --agent codex` runs Codex in its read-only sandbox. Both start in an empty directory, and the prompt marks issue titles as untrusted data.
+
+### Documentation
+
+- Add a Linear guide, and describe Linear in the README, the bundled agent guide, and `schema`.
+- The landing page shows agent-proposed clusters from a real capture, the GitHub and Linear providers, and Heat ranking with adjustable weights.
+- Shorten the README and move website and dashboard development notes to CONTRIBUTING.
+
+<!-- release:end -->
+
 ## 0.5.0
 
 ### Features
@@ -17,8 +43,6 @@
 ### Documentation
 
 - The bundled agent guide adds a sweep workflow that verifies each group on the current release before drafting close comments.
-
-<!-- release:end -->
 
 ## 0.4.1
 
