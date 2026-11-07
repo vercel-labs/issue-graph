@@ -8,9 +8,10 @@ Find related issues and pull requests before you start work. For humans and agen
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
 </p>
 
-![issue-graph demo: related fixes and follow-ups, superseded PRs to review, and a per-author PR status ledger](https://issue-graph.dev/issue-graph-workflows.gif)
-
-Illustrated workflows: graph, reconcile, and PR status. [Static version](https://issue-graph.dev/issue-graph-workflows.png).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://issue-graph.dev/readme-hero-dark.png">
+  <img alt="issue-graph: open issues and pull requests from vercel-labs/portless grouped into five root-cause clusters, such as proxy port allocation and TLS trust" src="https://issue-graph.dev/readme-hero-light.png">
+</picture>
 
 issue-graph reads GitHub issues and pull requests, or Linear issues, and follows the references between them: closing links, mentions, cross-references, and Linear relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub and Linear.
 
