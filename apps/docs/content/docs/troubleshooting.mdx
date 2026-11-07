@@ -1,0 +1,103 @@
+---
+title: Troubleshooting
+navTitle: Troubleshooting
+description: Diagnose GitHub and Linear sign-in failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
+lastModified: 2026-11-07
+---
+
+## GitHub requests fail
+
+Graph, status, reconcile, and plan read GitHub through the GitHub CLI. When `gh` cannot authenticate, a seed search fails with `gh api search failed:` and graph reads fail with `gh api graphql failed:`, each followed by the message `gh` printed. Nodes that fail during a crawl stay in the graph as unfetched nodes with an `UNKNOWN` state, and status reports the repository as incomplete.
+
+1. Check the sign-in state:
+
+   ```bash
+   issue-graph auth status
+   ```
+
+   When GitHub is not available, the first line reads `github  not signed in via gh  (run: gh auth login)` and the command exits with code `1`. The command never prints tokens.
+
+2. If GitHub is not signed in, sign in with the GitHub CLI and run `issue-graph auth status` again:
+
+   ```bash
+   gh auth login
+   ```
+
+3. If GitHub is signed in but some repositories still fail, check that your account can read each repository, including private repositories reached through references, and that your organization's SSO authorization covers the credential. See [Permissions and privacy](/docs/security).
+
+## A command exits with code 1 after printing a report
+
+`status` and `linear` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
+
+For `status`, stderr ends with `INCOMPLETE_INVENTORY: some counts are unknown; inspect coverage and rerun.` Unknown counts print as `?` in the table and as `null` in JSON. Common causes:
+
+- The page cap: the report says `PR pagination limit (N pages) reached.` Raise `--max-pages`, up to 1000.
+- A failed read: an access error or API failure for one repository. Fix access as described in [GitHub requests fail](#github-requests-fail), then rerun.
+
+With `--since`, `INCOMPLETE_HISTORY` means some transitions could not be verified. See [Status and history](/docs/status).
+
+For `linear`, `coverageComplete` is false when a node cannot be read, a connection stops at the `--max-pages` limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Nodes that could not be read print `Read failed:` followed by an error code. Depth boundaries are listed in the coverage but do not make the result partial. Raise the limit that stopped the crawl, or start a new run from an unexpanded hub. See [Linear](/docs/linear) for the limits and ranges.
+
+`graph`, `open`, and `rank` print partial results without changing the exit code. Check the report instead:
+
+- `## Not crawled (node cap N reached)` lists nodes beyond the `--budget` cap. Raise `--budget`, up to 1000.
+- `## Hubs not expanded` lists nodes with more references than `--hub-threshold`, each with a `--depth 1` command that starts a new crawl from that hub.
+- Unfetched nodes, with `fetched: false` in JSON, are reads that failed.
+- Same-repository references stop at `--depth`, and cross-repository references stop after one hop.
+
+## Linear is not connected
+
+`issue-graph linear` and `issue-graph linear status` print a setup guide that starts with `Linear is not connected.` when no session or environment key exists. `linear status` then exits with code `1`.
+
+Connect through the browser, then check the result:
+
+```bash
+issue-graph linear login
+issue-graph linear status
+```
+
+You can instead set exactly one of `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN`. Environment keys take precedence over the login session.
+
+## Linear rejects the session
+
+When Linear rejects the stored credential, the command stops and prints `Linear read failed (AUTHENTICATION)`. Sign in again to replace the session:
+
+```bash
+issue-graph linear login
+```
+
+If `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses it instead of the session, so check or replace that value. `issue-graph linear status` shows which credential the CLI uses. If an expired session cannot be refreshed, the command prints a message starting with `Linear sign-in failed`; run `issue-graph linear login` again in that case too.
+
+## Linear rate limits
+
+With `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN`, the CLI waits and retries when Linear's reset time falls within its retry budget. When the reset is later, the command stops instead of waiting and prints `Linear read failed (RATE_LIMITED); the limit resets at` followed by an ISO timestamp, or `Linear read failed (RATE_LIMITED)` when Linear reports no reset time. With a login session, the command stops on the first rate-limited read and prints `Linear read failed (RATE_LIMITED)`.
+
+A rate limit on a node after the seed shows up as `Read failed: RATE_LIMITED` on that node instead, and the command exits with code `1`.
+
+Wait until the reset time and rerun the command. A lower `--max-nodes` or `--depth` reduces the number of reads per run.
+
+## Query finds no saved model
+
+`query` reads only saved models and makes no provider requests. When no saved model matches, it exits with code `2` and prints a JSON error on stderr with the message `no matching capture; use a saved run or --input model.json`. If several saved models match, the message is `select a provider:scope; more than one saved model matches`.
+
+1. List the saved runs:
+
+   ```bash
+   issue-graph runs
+   ```
+
+2. If the project you want is missing, capture it without `--no-save`:
+
+   ```bash
+   issue-graph open owner/repo
+   ```
+
+   For Linear, run `issue-graph linear` with `--html PATH` or `--open`. Only HTML output saves a Linear model.
+
+3. Pass an explicit scope, such as `github:owner/repo`, when more than one model exists. You can also query a normalized model file with `--input model.json`.
+
+`issue-graph dashboard` fails for the same reason with `no saved runs yet: run issue-graph open owner/repo first (without --no-save)`.
+
+## Report a problem
+
+When you open an issue, include the command, its exit code, the error text, and the coverage section of the report. Remove tokens, private repository names, and other private data first. Report security vulnerabilities privately as described in [Permissions and privacy](/docs/security#vulnerability-reports).

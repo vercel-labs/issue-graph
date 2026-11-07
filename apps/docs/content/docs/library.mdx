@@ -2,7 +2,7 @@
 title: Use issue-graph as a library
 navTitle: Library
 description: Use issue-graph in your application to crawl issue graphs, collect PR status, and query dashboard models over HTTP or GitHub CLI.
-lastModified: 2026-09-27
+lastModified: 2026-11-07
 ---
 
 ## Install
@@ -11,15 +11,16 @@ lastModified: 2026-09-27
 npm install issue-graph@latest
 ```
 
-The package provides ESM imports and TypeScript declarations. It declares Node.js 20 or later. The core has no Node built-in imports; collectors use the transport you supply.
+The package ships ESM imports with TypeScript declarations and declares Node.js 20 or later. The core imports no Node built-in modules. Collectors make requests through the transport you pass them.
 
 | Import | Runtime requirements |
 | --- | --- |
 | `issue-graph` | Core collectors, classification, ranking, and rendering |
-| `issue-graph/transport/shell` | Node-compatible child processes and authenticated `gh` |
+| `issue-graph/transport/shell` | Node-compatible child processes and an authenticated `gh` |
 | `issue-graph/transport/http` | `fetch` and a GitHub token |
+| `issue-graph/transport/linear` | `fetch` and a Linear API key or OAuth access token |
 
-CLI snapshot storage and the headless agent runner are separate from the core exports. Your application manages persistence and agent execution.
+The core exports exclude CLI snapshot storage and the headless agent runner. Your application handles persistence and agent execution. For the Linear reader, see [Linear](/docs/linear).
 
 ## Crawl with HTTP
 
@@ -61,9 +62,9 @@ const unfetched = [...nodes.values()].filter((node) => !node.fetched);
 console.log({ priorities, overlaps, cappedOut: [...cappedOut], unfetched });
 ```
 
-Include `cappedOut` and unfetched nodes in your results. The [graph crawl limits](/docs/graph) apply to library calls too.
+Report `cappedOut` and unfetched nodes with your results. The [graph crawl limits](/docs/graph) apply to library calls as well.
 
-`httpTransport` uses GitHub's public API host. Its `token` option accepts a string or a synchronous/asynchronous resolver. It handles bounded retries and exposes these options:
+`httpTransport` sends requests to `api.github.com`. Its `token` option accepts a string or a function that returns the token, synchronously or as a promise. The transport retries a bounded number of times and accepts these options:
 
 | Option | Default |
 | --- | --- |
@@ -73,11 +74,11 @@ Include `cappedOut` and unfetched nodes in your results. The [graph crawl limits
 | `maxBackoffMs` | 60000 |
 | `userAgent` | `issue-graph` |
 
-Transport concurrency is separate from crawl concurrency. Handle exhausted retries and report incomplete nodes.
+Transport concurrency is separate from crawl concurrency. When retries run out, the transport throws, so handle the error and report the incomplete nodes.
 
 ## Use GitHub CLI authentication
 
-In a Node-compatible process, replace the HTTP transport with:
+In a Node-compatible process, replace the HTTP transport with the shell transport:
 
 ```ts
 import { shellTransport } from "issue-graph/transport/shell";
@@ -85,11 +86,11 @@ import { shellTransport } from "issue-graph/transport/shell";
 const transport = shellTransport();
 ```
 
-Pass this transport to `makeFetchNode`. It runs `gh api` with the process's GitHub CLI credentials and requires child-process support. Authentication and retries are handled by `gh`.
+Pass this transport to `makeFetchNode`. It runs `gh api` with the process's GitHub CLI credentials, so the runtime must support child processes. `gh` handles authentication and retries.
 
 ## Collect PR status
 
-With either transport:
+Use either transport:
 
 ```ts
 import { collectStatus } from "issue-graph";
@@ -104,11 +105,11 @@ const report = await collectStatus(transport, {
 console.log({ coverageComplete: report.coverageComplete, totals: report.totals });
 ```
 
-Keep `coverageComplete` and per-repository coverage alongside the counts. A `null` count means unknown. See [Status and history](/docs/status) for the report fields and comparison behavior.
+Keep `coverageComplete` and the per-repository coverage next to the counts. A `null` count means unknown. For the report fields and comparison behavior, see [Status and history](/docs/status).
 
 ## Query a dashboard model
 
-The core exports the same filters and scoring used by the CLI and dashboard. Continue from the crawl example to build a normalized model and rank matching open issues:
+The core exports the same filters and scoring that the CLI and dashboard use. Continuing from the crawl example, build a normalized model and rank the matching open issues:
 
 ```ts
 import { dashboardModel, dashboardQuery } from "issue-graph";
@@ -133,12 +134,12 @@ console.log({
 });
 ```
 
-`normalize` fills defaults and rejects unsupported filters or views. `evaluate` returns matching keys and ranked open items. Both run without network or filesystem access. Library calls use built-in weights unless you supply overrides; they do not read CLI configuration.
+`normalize` fills in defaults and rejects unsupported filters or views. `evaluate` returns the matching keys and the ranked open items. Neither function touches the network or the filesystem. Library calls use the built-in weights unless you pass overrides, and they do not read the CLI configuration.
 
-`Model`, `ProviderDescriptor`, `DashboardFilters`, `DashboardQuery`, `Weights`, and `HeatSignals` are exported types. `scoring` exposes the versioned Heat formula. `createGraphMetrics(model)` computes the observed relationships used by Impact and Swarm. Live collectors support GitHub; other providers must supply a normalized model and its capabilities.
+The package also exports the types `Model`, `ProviderDescriptor`, `DashboardFilters`, `DashboardQuery`, `Weights`, and `HeatSignals`. `scoring` exposes the versioned Heat formula, and `createGraphMetrics(model)` computes the observed relationships that Impact and Swarm use. Live collectors exist for GitHub and Linear. Other providers must supply a normalized model and its capabilities.
 
-The CLI writes static Next.js exports. The library's `renderHtml` and `renderDashboard` return HTML strings using the shared renderer; they do not write the Next.js assets or query history.
+The CLI writes static Next.js exports. The library's `renderHtml` and `renderDashboard` return HTML strings from the shared renderer and do not write Next.js assets or query history.
 
 ## Protect credentials and results
 
-Keep GitHub tokens server-side and check access before showing private repository results to other users. See [Permissions and privacy](/docs/security).
+Keep GitHub tokens on the server, and check that a user has access before showing them results from private repositories. See [Permissions and privacy](/docs/security).
