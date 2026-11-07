@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 export const stateHome = () =>
   resolve(process.env.ISSUE_GRAPH_HOME || join(homedir(), ".issue-graph"));
@@ -57,24 +57,45 @@ export function privateExportPath(name: string): string {
   return join(fs.mkdtempSync(join(tmpdir(), "issue-graph-")), name);
 }
 
+const othersCanWrite = (mode: number) => (mode & 0o022) !== 0;
+
+/** Refuse `root` when it or any ancestor is foreign, or writable by others without the sticky bit. Returns its real path. */
+export function assertPrivateRoot(root: string): string {
+  const uid = process.getuid?.();
+  const real = fs.realpathSync(root);
+  if (uid === undefined) return real;
+  for (let dir = real; ; dir = dirname(dir)) {
+    const stat = fs.statSync(dir);
+    if (
+      (stat.uid !== uid && stat.uid !== 0) ||
+      (othersCanWrite(stat.mode) && !(stat.mode & 0o1000))
+    )
+      throw new Error(`refusing to publish under a directory other accounts can modify: ${dir}`);
+    if (dirname(dir) === dir) break;
+  }
+  return real;
+}
+
 /**
- * Refuse a published tree when any directory between `root` and `file` is a symlink, belongs to
- * another account, or is writable by group or others. Owners of such a directory could swap files
- * after they are written.
+ * Refuse a published file that another account could replace or edit: any ancestor of `root` that
+ * is not owned by this account or root, or is writable by others without the sticky bit; any
+ * directory between `root` and `file` that is a symlink, foreign, or writable by others; or the
+ * file itself when it is not a private regular file.
  */
-export function assertPrivateDirs(root: string, file: string): void {
+export function assertPrivatePath(root: string, file: string): void {
   const uid = process.getuid?.();
   if (uid === undefined) return;
-  let dir = fs.realpathSync(root);
-  const top = fs.statSync(dir);
-  if ((top.uid !== uid && top.uid !== 0) || ((top.mode & 0o022) !== 0 && (top.mode & 0o1000) === 0))
-    throw new Error(`refusing to publish into a directory other accounts can modify: ${dir}`);
+  const real = assertPrivateRoot(root);
+  let dir = real;
   for (const part of relative(resolve(root), dirname(resolve(file)))
     .split(sep)
     .filter(Boolean)) {
     dir = join(dir, part);
     const stat = fs.lstatSync(dir);
-    if (!stat.isDirectory() || stat.uid !== uid || (stat.mode & 0o022) !== 0)
+    if (!stat.isDirectory() || stat.uid !== uid || othersCanWrite(stat.mode))
       throw new Error(`refusing to publish through a shared or linked directory: ${dir}`);
   }
+  const stat = fs.lstatSync(join(dir, basename(file)));
+  if (!stat.isFile() || stat.uid !== uid || othersCanWrite(stat.mode))
+    throw new Error(`refusing a published file other accounts can modify: ${file}`);
 }

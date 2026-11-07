@@ -1,9 +1,11 @@
+import * as fs from "node:fs";
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Model } from "./html.js";
 import {
-  assertPrivateDirs,
+  assertPrivatePath,
+  assertPrivateRoot,
   contentId,
   publishLocal,
   readLocal,
@@ -50,10 +52,12 @@ export function prepareDashboard(models: Model[], weights: Record<string, Weight
 }
 
 export function publishDashboardAssets(dir: string, assets: Record<string, Buffer>) {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  assertPrivateRoot(dir);
   for (const [name, bytes] of Object.entries(assets)) {
     const file = join(dir, name);
     publishLocal(file, bytes);
-    assertPrivateDirs(dir, file);
+    assertPrivatePath(dir, file);
   }
 }
 
@@ -68,9 +72,11 @@ export function verifyDashboardAssets(dir: string, manifest: Record<string, stri
   for (const [name, hash] of Object.entries(manifest)) {
     if (
       (name !== "font-LICENSE.txt" && !/^_next\/[a-zA-Z0-9_./()[\]-]+$/.test(name)) ||
-      name.split("/").includes("..") ||
-      contentId(readLocalBytes(join(dir, name))) !== hash
+      name.split("/").includes("..")
     )
+      throw new Error("saved dashboard asset has changed");
+    assertPrivatePath(dir, join(dir, name));
+    if (contentId(readLocalBytes(join(dir, name))) !== hash)
       throw new Error("saved dashboard asset has changed");
   }
 }
