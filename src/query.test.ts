@@ -1,13 +1,13 @@
 import * as fs from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { readConfig, resolveWeights, setWeights, validateConfig } from "./config.js";
 import { createGraphMetrics, dashboardQuery } from "./dashboard-query.js";
 import { type ClientNode, dashboardModel, type Model, renderDashboard } from "./html.js";
-import { publishLocal } from "./local-store.js";
+import { privateExportPath, publishLocal } from "./local-store.js";
 import { prepareDashboard, writeNextDashboard } from "./next-dashboard.js";
 import { runQueryCli } from "./query-cli.js";
 import { parseModel, readCapture, readQuery, saveCapture, saveQuery } from "./query-store.js";
@@ -128,6 +128,43 @@ test("Next dashboard embeds data safely and publishes every referenced local ass
   expect(html).toContain("self.__next_f");
   expect(prepareDashboard([m]).html).toBe(html);
 });
+
+test("default dashboard exports get their own private directory", () => {
+  const out = privateExportPath("view.html");
+  try {
+    expect(fs.statSync(dirname(out)).mode & 0o777).toBe(0o700);
+    writeNextDashboard(out, [model()]);
+    expect(fs.existsSync(join(dirname(out), "_next"))).toBe(true);
+  } finally {
+    fs.rmSync(dirname(out), { recursive: true, force: true });
+  }
+});
+
+test.skipIf(process.platform === "win32")(
+  "dashboard export refuses asset directories other accounts can modify",
+  () => {
+    const shared = join(home, "shared");
+    fs.mkdirSync(join(shared, "_next"), { recursive: true });
+    fs.chmodSync(join(shared, "_next"), 0o777);
+    expect(() => writeNextDashboard(join(shared, "view.html"), [model()])).toThrow(
+      "shared or linked",
+    );
+    expect(fs.existsSync(join(shared, "view.html"))).toBe(false);
+    const linked = join(home, "linked");
+    fs.mkdirSync(linked);
+    fs.mkdirSync(join(home, "elsewhere"));
+    fs.symlinkSync(join(home, "elsewhere"), join(linked, "_next"));
+    expect(() => writeNextDashboard(join(linked, "view.html"), [model()])).toThrow(
+      "shared or linked",
+    );
+    const open = join(home, "open");
+    fs.mkdirSync(open);
+    fs.chmodSync(open, 0o777);
+    expect(() => writeNextDashboard(join(open, "view.html"), [model()])).toThrow(
+      "other accounts can modify",
+    );
+  },
+);
 
 test("history refuses altered Next assets and retries a failed asset publication", async () => {
   const m = model(),
@@ -539,6 +576,15 @@ describe("import validation", () => {
     "<svg><script>alert(1)</script></svg>",
     "<svg><foreignObject></foreignObject></svg>",
     '<svg><path style="background:url(x)"/></svg>',
+    '<svg><path d=">" onload="alert(1)"/></svg>',
+    "<svg><path d='>' onload='alert(1)'/></svg>",
+    '<svg><g fill=">"><path onmouseover="alert(1)"/></g></svg>',
+    "<svg><path d=x onload=alert(1)/></svg>",
+    "<svg>text<img src=x onerror=alert(1)></svg>",
+    '<svg><path d="&#x3e;"/></svg>',
+    "<svg><g></svg>",
+    "<svg></g></svg>",
+    "<svg><!-- --></svg>",
   ])("refuses active logo markup", (logo) => {
     const m = model();
     m.provider.logo = logo;

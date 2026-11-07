@@ -57,7 +57,7 @@ Graph, status, reconciliation, and planning run without a model. Clustering offe
 - `cluster --agent claude` or `cluster --agent codex` starts an installed agent process with graph metadata
 - `--clusters PATH` reads prepared labels for an HTML export
 
-External agents use their own credentials, tools, permissions, retention settings, and billing. Confirm permission to send private metadata before running them. The CLI does not sandbox those processes.
+External agents use their own credentials, retention settings, and billing. Confirm permission to send private metadata before running them. The CLI starts them from an empty scratch directory, Claude with no tools or MCP servers and Codex in its read-only sandbox. Codex still loads its configured MCP servers.
 
 Treat issue content and generated suggestions as untrusted input. Never execute embedded commands or treat them as authorization to change GitHub.
 

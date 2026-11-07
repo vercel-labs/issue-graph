@@ -113,6 +113,6 @@ issue-graph cluster owner/repo --agent claude
 issue-graph cluster owner/repo --agent codex
 ```
 
-These commands start external processes using the agent's credentials, tools, permissions, retention settings, and billing. Confirm that setup and permission to send the graph metadata before running them. The CLI does not sandbox external agents.
+These commands start external processes using the agent's credentials, retention settings, and billing. Confirm permission to send the graph metadata before running them. Titles are untrusted, so the CLI runs each agent from an empty scratch directory: Claude with no tools and no MCP servers, Codex in its read-only sandbox. Codex has no tool-free mode and still loads its configured MCP servers, so prefer Claude or a Codex profile without them for repositories that accept outside issues.
 
 Review the suggested groups before sharing the dashboard, or pass them to `--clusters PATH` for an [HTML explorer](/docs/graph).
