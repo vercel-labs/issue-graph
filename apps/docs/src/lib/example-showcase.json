@@ -1,0 +1,610 @@
+{
+  "repo": "vercel-labs/portless",
+  "command": "issue-graph cluster vercel-labs/portless --agent claude",
+  "capturedAt": "2026-11-07",
+  "captured": 80,
+  "open": {
+    "total": 118,
+    "issues": 61,
+    "pullRequests": 57
+  },
+  "clusterCount": 16,
+  "clusters": [
+    {
+      "label": "Proxy/app port allocation",
+      "rootCause": "Proxy instances and app ports are not coordinated, causing duplicate proxies, port collisions and unstable ports",
+      "size": 9,
+      "members": [540, 521, 541, 533, 460, 459, 415, 318, 436]
+    },
+    {
+      "label": "CLI dispatch/flags/clean",
+      "rootCause": "CLI parsing, help, output streams and clean logic are scattered and inconsistent",
+      "size": 8,
+      "members": [556, 557, 558, 559, 560, 520, 369, 536]
+    },
+    {
+      "label": "TLS/CA trust",
+      "rootCause": "Certificate issuance and CA trust handling are wrong across platforms and runtimes",
+      "size": 7,
+      "members": [527, 526, 470, 469, 418, 412, 336]
+    },
+    {
+      "label": "Worktree hostnames",
+      "rootCause": "Worktree prefix and placement in hostnames is not configurable",
+      "size": 6,
+      "members": [407, 326, 372, 398, 340, 377]
+    },
+    {
+      "label": "Tunnels & sharing",
+      "rootCause": "Sharing backends such as Tailscale, ngrok and localtunnel lack coverage and integration",
+      "size": 6,
+      "members": [432, 310, 425, 335, 347, 390]
+    }
+  ],
+  "items": [
+    {
+      "number": 540,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(proxy): keep one proxy per state directory",
+      "url": "https://github.com/vercel-labs/portless/pull/540",
+      "cluster": 0,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 3,
+        "daysOpen": 5
+      }
+    },
+    {
+      "number": 521,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "proxy start -p starts an untracked second proxy and overwrites proxy.pid, so proxy stop kills the wrong one",
+      "url": "https://github.com/vercel-labs/portless/issues/521",
+      "cluster": 0,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 11
+      }
+    },
+    {
+      "number": 541,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(cli): give concurrent runs different app ports",
+      "url": "https://github.com/vercel-labs/portless/pull/541",
+      "cluster": 0,
+      "heat": {
+        "comments": 2,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 3,
+        "daysOpen": 4
+      }
+    },
+    {
+      "number": 533,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "Concurrent starts can get the same app port; a child that survives EADDRINUSE leaves its route pointing at another app",
+      "url": "https://github.com/vercel-labs/portless/issues/533",
+      "cluster": 0,
+      "heat": {
+        "comments": 2,
+        "participants": 2,
+        "reactions": 1,
+        "inboundRefs": 1,
+        "daysOpen": 6
+      }
+    },
+    {
+      "number": 460,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "feat(ports): add appPortStrategy and appPortRange for stable or sequential app ports",
+      "url": "https://github.com/vercel-labs/portless/pull/460",
+      "cluster": 0,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 4,
+        "daysOpen": 34
+      }
+    },
+    {
+      "number": 459,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "Proposal: appPortStrategy and appPortRange, so an app's port can be stable or sequential instead of random",
+      "url": "https://github.com/vercel-labs/portless/issues/459",
+      "cluster": 0,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 2,
+        "daysOpen": 34
+      }
+    },
+    {
+      "number": 415,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "Feature Request: Look Up a Route’s Port",
+      "url": "https://github.com/vercel-labs/portless/issues/415",
+      "cluster": 0,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 59
+      }
+    },
+    {
+      "number": 318,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "Redirect direct localhost:<port> access to the registered portless URL",
+      "url": "https://github.com/vercel-labs/portless/issues/318",
+      "cluster": 0,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 1,
+        "inboundRefs": 2,
+        "daysOpen": 161
+      }
+    },
+    {
+      "number": 436,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "App startup retries proxy on occupied Portless port and times out",
+      "url": "https://github.com/vercel-labs/portless/issues/436",
+      "cluster": 0,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 40
+      }
+    },
+    {
+      "number": 556,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(cli): drive dispatch and help from one command list",
+      "url": "https://github.com/vercel-labs/portless/pull/556",
+      "cluster": 1,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 1
+      }
+    },
+    {
+      "number": 557,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(cli): parse command flags in one place and exit 2 on usage errors",
+      "url": "https://github.com/vercel-labs/portless/pull/557",
+      "cluster": 1,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 2,
+        "daysOpen": 1
+      }
+    },
+    {
+      "number": 558,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(cli): keep stdout for results and add --json to list, get, and doctor",
+      "url": "https://github.com/vercel-labs/portless/pull/558",
+      "cluster": 1,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 4,
+        "daysOpen": 1
+      }
+    },
+    {
+      "number": 559,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(cli): confirm clean, report its failures, and only prune what portless owns",
+      "url": "https://github.com/vercel-labs/portless/pull/559",
+      "cluster": 1,
+      "heat": {
+        "comments": 2,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 5,
+        "daysOpen": 1
+      }
+    },
+    {
+      "number": 560,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "docs(cli): shorten the main help and keep proxy options under proxy --help",
+      "url": "https://github.com/vercel-labs/portless/pull/560",
+      "cluster": 1,
+      "heat": {
+        "comments": 2,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 2,
+        "daysOpen": 1
+      }
+    },
+    {
+      "number": 520,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(cli): reject unknown alias and proxy stop flags",
+      "url": "https://github.com/vercel-labs/portless/pull/520",
+      "cluster": 1,
+      "heat": {
+        "comments": 2,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 11
+      }
+    },
+    {
+      "number": 369,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "A partial hosts write leaves a block portless cannot remove, and clean reports success",
+      "url": "https://github.com/vercel-labs/portless/issues/369",
+      "cluster": 1,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 104
+      }
+    },
+    {
+      "number": 536,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(clean): remove the unprivileged marker with the other proxy state files",
+      "url": "https://github.com/vercel-labs/portless/pull/536",
+      "cluster": 1,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 6
+      }
+    },
+    {
+      "number": 527,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(trust): skip the prompt when the CA is already trusted",
+      "url": "https://github.com/vercel-labs/portless/pull/527",
+      "cluster": 2,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 9
+      }
+    },
+    {
+      "number": 526,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "`portless trust` asks for authorization again when the CA is already trusted",
+      "url": "https://github.com/vercel-labs/portless/issues/526",
+      "cluster": 2,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 9
+      }
+    },
+    {
+      "number": 470,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix(bun): prepare TLS contexts for registered app hostnames",
+      "url": "https://github.com/vercel-labs/portless/pull/470",
+      "cluster": 2,
+      "heat": {
+        "comments": 4,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 26
+      }
+    },
+    {
+      "number": 469,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "HTTPS under Bun: nested hosts get the *.localhost cert because Bun ignores SNICallback",
+      "url": "https://github.com/vercel-labs/portless/issues/469",
+      "cluster": 2,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 27
+      }
+    },
+    {
+      "number": 418,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "TLS SNI accepts arbitrary hostnames and performs unbounded certificate generation",
+      "url": "https://github.com/vercel-labs/portless/issues/418",
+      "cluster": 2,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 1,
+        "inboundRefs": 0,
+        "daysOpen": 57
+      }
+    },
+    {
+      "number": 412,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix: trust Linux Chrome certificates in the user NSS database",
+      "url": "https://github.com/vercel-labs/portless/pull/412",
+      "cluster": 2,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 60
+      }
+    },
+    {
+      "number": 336,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "NixOS: portless trust fails with update-ca-certificates ENOENT",
+      "url": "https://github.com/vercel-labs/portless/issues/336",
+      "cluster": 2,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 137
+      }
+    },
+    {
+      "number": 407,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "feat(cli): add `--no-worktree` to `portless run` to match `portless get`",
+      "url": "https://github.com/vercel-labs/portless/pull/407",
+      "cluster": 3,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 64
+      }
+    },
+    {
+      "number": 326,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "Add --no-worktree support when running apps with explicit names",
+      "url": "https://github.com/vercel-labs/portless/issues/326",
+      "cluster": 3,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 7,
+        "inboundRefs": 2,
+        "daysOpen": 149
+      }
+    },
+    {
+      "number": 372,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "feat: support configurable worktree label placement for multi-service hostnames",
+      "url": "https://github.com/vercel-labs/portless/issues/372",
+      "cluster": 3,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 2,
+        "inboundRefs": 1,
+        "daysOpen": 101
+      }
+    },
+    {
+      "number": 398,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "feat: let the worktree prefix be set explicitly (--prefix / PORTLESS_PREFIX)",
+      "url": "https://github.com/vercel-labs/portless/pull/398",
+      "cluster": 3,
+      "heat": {
+        "comments": 2,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 71
+      }
+    },
+    {
+      "number": 340,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "feat: add worktree hostname template config",
+      "url": "https://github.com/vercel-labs/portless/pull/340",
+      "cluster": 3,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 133
+      }
+    },
+    {
+      "number": 377,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "feat: Add flat worktree hostnames",
+      "url": "https://github.com/vercel-labs/portless/pull/377",
+      "cluster": 3,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 97
+      }
+    },
+    {
+      "number": 432,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "fix: allow Tailscale hosts in Vite",
+      "url": "https://github.com/vercel-labs/portless/pull/432",
+      "cluster": 4,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 1,
+        "daysOpen": 43
+      }
+    },
+    {
+      "number": 310,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "Vite host allowlist does not include Tailscale `.ts.net` host when using `PORTLESS_TAILSCALE=1`",
+      "url": "https://github.com/vercel-labs/portless/issues/310",
+      "cluster": 4,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 1,
+        "inboundRefs": 1,
+        "daysOpen": 169
+      }
+    },
+    {
+      "number": 425,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "feat: add `--tailscale-http` for `tailnet`s without MagicDNS",
+      "url": "https://github.com/vercel-labs/portless/pull/425",
+      "cluster": 4,
+      "heat": {
+        "comments": 1,
+        "participants": 2,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 51
+      }
+    },
+    {
+      "number": 335,
+      "kind": "PullRequest",
+      "state": "OPEN",
+      "title": "Support for custom Ngrok URLs",
+      "url": "https://github.com/vercel-labs/portless/pull/335",
+      "cluster": 4,
+      "heat": {
+        "comments": 1,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 139
+      }
+    },
+    {
+      "number": 347,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "localtunnel support as an alternative to grok",
+      "url": "https://github.com/vercel-labs/portless/issues/347",
+      "cluster": 4,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 124
+      }
+    },
+    {
+      "number": 390,
+      "kind": "Issue",
+      "state": "OPEN",
+      "title": "Add --datum sharing backend",
+      "url": "https://github.com/vercel-labs/portless/issues/390",
+      "cluster": 4,
+      "heat": {
+        "comments": 0,
+        "participants": 1,
+        "reactions": 0,
+        "inboundRefs": 0,
+        "daysOpen": 77
+      }
+    }
+  ],
+  "edges": [
+    [310, 432],
+    [318, 459],
+    [318, 460],
+    [326, 372],
+    [326, 407],
+    [369, 559],
+    [415, 460],
+    [459, 460],
+    [460, 541],
+    [469, 470],
+    [521, 540],
+    [526, 527],
+    [533, 541],
+    [540, 541],
+    [540, 559],
+    [556, 557],
+    [556, 558],
+    [556, 559],
+    [556, 560],
+    [557, 558],
+    [558, 559],
+    [559, 560]
+  ]
+}

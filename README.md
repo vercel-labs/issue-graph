@@ -1,238 +1,124 @@
 # issue-graph
 
+Find related issues and pull requests before you start work. For humans and agents.
+
 <p>
   <a href="https://vercel.com/labs#active-experiments"><img alt="Vercel Labs Experiment" src="https://img.shields.io/badge/LABS-EXPERIMENT-0a0a0a.svg?style=for-the-badge&amp;logo=Vercel&amp;labelColor=000000" height="28"></a>
   <a href="https://www.npmjs.com/package/issue-graph"><img alt="npm version: issue-graph" src="https://img.shields.io/npm/v/issue-graph.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
 </p>
 
-Find related issues, competing changes, and unresolved follow-ups before you start work.
-
-`issue-graph` traces linked GitHub issues and pull requests. Use it to find existing fixes, check PR status by author, and choose what to review next.
-
 ![issue-graph demo: related fixes and follow-ups, superseded PRs to review, and a per-author PR status ledger](https://issue-graph.dev/issue-graph-workflows.gif)
 
-Illustrated workflows: Graph → Reconcile → PR status. [Static version](https://issue-graph.dev/issue-graph-workflows.png) · [Explore the workflows](https://issue-graph.dev/docs).
+Illustrated workflows: graph, reconcile, and PR status. [Static version](https://issue-graph.dev/issue-graph-workflows.png).
 
-## Start here
+issue-graph reads GitHub issues and pull requests, or Linear issues, and follows the references between them: closing links, mentions, cross-references, and Linear relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub and Linear.
 
-Install the [npm package](https://www.npmjs.com/package/issue-graph) with [Node.js](https://nodejs.org) 20 or later. GitHub queries use your [GitHub CLI](https://cli.github.com) login.
+## Install
 
-Try the CLI without a global installation:
-
-```bash
-npx issue-graph@latest --help
-```
-
-For the installed command used below:
-
-```bash
-npm install --global issue-graph@latest
-issue-graph --help
-gh auth login
-gh auth status
-```
-
-Trace public [agent-browser issue #1113](https://github.com/vercel-labs/agent-browser/issues/1113) without saving a snapshot:
-
-```bash
-issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
-```
-
-To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. At the 2026-09-22 capture, issue #1113 was closed, [PR #1137](https://github.com/vercel-labs/agent-browser/pull/1137) was merged, [regression #1148](https://github.com/vercel-labs/agent-browser/issues/1148) was closed, and follow-ups [#1371](https://github.com/vercel-labs/agent-browser/issues/1371) and [#1607](https://github.com/vercel-labs/agent-browser/issues/1607) were open. Check the open follow-ups before assuming the fix covers them.
-
-Check missing references and crawl limits in the report. Each run queries GitHub, so results can change. [Capture details](https://issue-graph.dev/docs/graph).
-
-### Update an npm installation
+Install the CLI with [Node.js](https://nodejs.org) 20 or later:
 
 ```bash
 npm install --global issue-graph@latest
 ```
 
-Use `issue-graph --help` to check the commands supported by your installed release.
+To try it without installing, run `npx issue-graph@latest --help`. GitHub queries use your [GitHub CLI](https://cli.github.com) login, so run `gh auth login` first if `gh auth status` shows no account.
 
-This README follows repository `main`, which can be ahead of the published package. If a documented command is missing, use a release that includes it or follow the source setup below.
+## Quick start
 
-## Choose a workflow
-
-| Need | Installed command |
-| --- | --- |
-| Capture a backlog and open its dashboard | `issue-graph open owner/repo` |
-| Inspect an issue or PR before starting work | `issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save` |
-| Inspect explicit Linear relationships | `issue-graph linear ENG-123 --workspace your-workspace --depth 1 --json` |
-| Survey labeled open issues | `issue-graph rank owner/repo --label bug` |
-| Filter a saved model and open its exact dashboard view | `issue-graph query github:owner/repo --state open --view rank --open` |
-| Count open PRs by author | `issue-graph status vercel-labs/portless --author ctate,Railly` |
-| See PR evidence, assignees, and requested reviewers | `issue-graph status vercel-labs/portless --author ctate --view prs` |
-| Reconcile an open backlog, with or without labels | `issue-graph reconcile owner/repo --format json --no-save` |
-| Select the next backlog action | `issue-graph plan owner/repo --format json` |
-| Inspect the machine contract | `issue-graph schema` |
-
-Graph and plan default to compact human output in a terminal. Graph still prints Markdown in a pipe; plan prints versioned JSON. Use `--format text` for the human view outside a terminal, or `--format markdown` for Markdown. Plan also supports `--format json`. Human output wraps at up to 100 columns; monochrome bold/dim styling requires a TTY and is disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
-
-Graph `-o PATH.json` writes a graph file; its legacy `--format json` still prints Markdown. Reconcile defaults to terminal Markdown and piped JSON; `--format human` and `text` select Markdown. Status defaults to a terminal table or JSON in a pipe; its `--json` flag takes no filename.
-
-## Explore and compare
-
-Export a graph and a local Next.js dashboard:
+From a GitHub repository checkout:
 
 ```bash
-issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save -o graph.json -o graph.html
+issue-graph
+# -> captures open issues and PRs, then opens the dashboard
 ```
 
-Open `graph.html` directly in a browser to explore relationships, filter nodes, and review cleanup candidates. Keep the sibling `_next/` directory and `font-LICENSE.txt` when moving the export.
-
-Graph and reconcile runs save local history under `~/.issue-graph/` by default. Re-running the same graph seeds shows a snapshot diff; reconciliation tracks repository-level action changes. `--no-save` skips saving history but does not prevent explicitly requested `-o` exports. Plan writes no snapshots.
-
-Status history is opt-in:
+Pass a repository, or one or more items, to choose the scope:
 
 ```bash
-issue-graph status vercel-labs/portless --author ctate,Railly --save
-issue-graph status vercel-labs/portless --author ctate,Railly --since last --save
+issue-graph open vercel-labs/portless
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1
 ```
 
-Status reports unknown counts as `?` or `null`. Check coverage before using totals, and review CI and unresolved review threads separately before merging.
-
-## Linear
-
-Connect once with `issue-graph linear login`, which approves read-only access in the browser through Linear's MCP server, with no API key or admin needed. `LINEAR_API_KEY` with Read access, or `LINEAR_ACCESS_TOKEN`, also works and takes precedence.
+For Linear, connect once in the browser, then capture an issue neighborhood or a whole project:
 
 ```bash
-issue-graph linear https://linear.app/your-workspace/issue/ENG-123/example --depth 1 --max-nodes 20 --json
+issue-graph linear login
+issue-graph linear ENG-123 --workspace your-workspace --open
+issue-graph linear --project <project-uuid> --open
 ```
 
-The command reads explicit relations in both directions, parents, sub-issues, and attachment URLs. It preserves native status and relation direction, checks the connected workspace, and paginates each connection. Archived issues are included; archived relations and attachments are excluded. It reports attachment targets without fetching them and does not collect text mentions.
+The full walkthrough is in [Get started](https://issue-graph.dev/docs/get-started).
 
-`--json` prints the report to stdout. Add `--html linear.html --open` to visualize the graph and save the latest project run for `issue-graph dashboard --open`. Each Linear project has its own entry, labeled `Workspace / Project`, and includes only that project's issues. Use `--no-save` to skip saving the dashboard entry. Plain Markdown/JSON runs do not write files, and no remote mutations are sent.
+## How it works
 
-Selector counts cover all open items in the project, independently of graph limits. Linear counts non-archived issues in triage, backlog, unstarted, or started states. GitHub counts open issues plus pull requests. Counts include their capture time; `≥` marks an incomplete count and `—` means unavailable. Saved dashboards are offline snapshots; rerun the graph command to refresh them.
+Each run starts from seeds, such as open issues, a label, or specific items, and follows references up to a depth and node budget you set. An item with many references is fetched but not expanded further. The report lists missing references, failed reads, and crawl limits, so you can see what the graph does not cover.
 
-Linear defaults to connected groups. Use `--cluster` to print a thematic grouping task for the calling agent, then `--clusters themes.json --html linear.html` to apply its reviewed assignments. The dashboard marks them as proposed themes, validates project membership, and preserves native relationships and open totals.
+The dashboard groups items into connected components by default. Your agent can propose root-cause clusters instead: `issue-graph cluster` prints the task, and `cluster --apply` loads the answer. The dashboard has four views: Explore, Impact, Swarm, and Rank. Rank orders open work by Heat, a weighted score of discussion activity with weights you control.
 
-Use `linear --project <project-uuid> --max-nodes 1000 --max-pages 100 --html linear.html --open` to capture a whole non-archived project, including disconnected issues and each issue's connections. Rerun it to refresh the saved dashboard. Successful reads are folded under Snapshot details; failed or truncated reads retain visible warnings. Linear allows an API key 2,500 requests and 3,000,000 complexity points per hour, shared by all of a user's keys. A full project capture can spend a large part of that: each issue takes at least one request, and every extra page of a connection takes another. When the limit is hit, the command stops and prints when the window resets instead of retrying.
+Runs save locally under `~/.issue-graph/`, and `issue-graph dashboard` shows every saved run with a project switcher. `issue-graph query` filters a saved capture from the CLI and returns a link to the exact dashboard view. See [Dashboard](https://issue-graph.dev/docs/dashboard).
 
-The dashboard shows native Linear states, directional relationships, and coverage alongside saved GitHub graphs. Exit `0` means complete within the declared depth and sources; `1` means partial coverage or a read failure; `2` means invalid usage. Inspect per-node coverage, node caps, hubs, and depth boundaries before relying on the result. See [Linear](apps/docs/content/docs/linear.mdx).
+## For AI agents
 
-## Query a saved dashboard
-
-Save a dashboard model with `issue-graph open owner/repo --no-open`, then use its filters and scoring from the CLI without another provider request:
-
-```bash
-issue-graph query github:owner/repo --kind Issue --heat-min 50 --view rank --open
-issue-graph query github:owner/repo --cluster 0 --cluster 2 --view swarm --metric heat --json
-issue-graph query --history HISTORY_ID --open
-```
-
-Query prints JSON in a pipe. In a terminal it shows a short summary and requests opening the exact view; `--no-open` suppresses that request. Results include captured items, scores, capabilities, coverage, a capture ID, a history ID and `viewUrl`. Return `viewUrl` unchanged, including the query string and hash. The Next.js page embeds the capture and effective weights; its compiled assets are stored beside it, so an old link stays stable when defaults or saved runs change. Replace `HISTORY_ID` with the returned `historyId` to replay frozen parameters. `--capture` queries the same data with current defaults and newly supplied filters, without inheriting earlier filters.
-
-Scopes are provider-qualified: `github:owner/repo` or `linear:workspace:project:project-id`. Other providers can supply the same normalized dashboard model through `--input model.json`; graph JSON from `-o graph.json` is a different format. This command does not collect live Linear or Jira data. Unsupported provider filters fail explicitly. Cluster indices belong to the selected capture; inspect `groups` before choosing them. See [Dashboard and saved queries](apps/docs/content/docs/dashboard.mdx) for the full workflow.
-
-Set persistent weights explicitly:
-
-```bash
-issue-graph config set --weights comments=3,age=1
-issue-graph config set --provider github --scope owner/repo --weights reactions=4
-issue-graph config show --provider github --scope owner/repo
-```
-
-Defaults resolve from built-in values, global defaults, provider defaults, project defaults, then command overrides. Named weights range from 0 to 10. Config lives in `~/.issue-graph/config.json`; immutable captures and query receipts live in `captures/` and `history/`. `ISSUE_GRAPH_HOME` overrides the state directory. Dashboard sliders affect only the current URL/session; Reset weights restores that document's opening weights. Only `config set` updates persistent defaults. Captures remain on this machine until you remove them.
-
-## Agents and integrations
-
-Install the CLI with `npm install --global issue-graph@latest`, then install the agent skill separately:
+Install the agent skill from this repository:
 
 ```bash
 npx skills@latest add vercel-labs/issue-graph
 ```
 
-Choose your agent and project scope, preserving any local skill changes. If you cannot access the repository, use `npx skills@latest add https://issue-graph.dev`. The public site, `/skill.md`, and [repository skill](skills/issue-graph/SKILL.md) serve the same canonical skill. CLI installation and GitHub authentication are separate setup steps.
-
-Before operational commands, load and read the guidance bundled with the installed CLI:
+The skill tells the agent to load the guidance bundled with the installed CLI, so the instructions match its version:
 
 ```bash
 issue-graph skills get core
-issue-graph skills get core --full
 ```
 
-Use `--full` for workflow references, `issue-graph skills list` for available guides, and command-specific `--help` for syntax. If the CLI or guidance is missing, report the error and ask for an authorized setup correction. See [Agents](apps/docs/content/docs/agents.mdx) for setup.
+Plan, query, reconcile, and status print JSON in a pipe, and `issue-graph schema` prints the command contract. See [Agents](https://issue-graph.dev/docs/agents).
 
-Use `issue-graph cluster owner/repo` to print a root-cause clustering task for the calling agent, then `issue-graph cluster owner/repo --apply answer.json` (or `-` for stdin) to load its answer. For cron or CI, `--agent claude` or `--agent codex` sends it to an installed headless agent. Review the payload and the agent's data policy before using private repository evidence. The CLI runs Claude with no tools or MCP servers and Codex in its read-only sandbox, both from an empty scratch directory; Codex still loads its configured MCP servers.
+## Commands
 
-Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
+Run `issue-graph --help` for the full list, or `issue-graph <command> --help` for one command.
 
-## Documentation
+| Group | Commands | Docs |
+| --- | --- | --- |
+| Map work | `open`, `graph`, `linear` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear) |
+| Prioritize | `rank`, `cluster`, `reconcile`, `plan` | [Backlog](https://issue-graph.dev/docs/backlog), [Agents](https://issue-graph.dev/docs/agents) |
+| Dashboard | `dashboard`, `query`, `runs`, `config` | [Dashboard](https://issue-graph.dev/docs/dashboard) |
+| Pull requests | `status` | [Status](https://issue-graph.dev/docs/status) |
+| Setup | `auth`, `schema`, `skills` | [Reference](https://issue-graph.dev/docs/reference) |
 
-Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), or browse its source in this checkout:
+## Library
 
-- [Get started](apps/docs/content/docs/get-started.mdx): installation, authentication, and a first result
-- [Graph](apps/docs/content/docs/graph.mdx): depth, caps, snapshots, and HTML
-- [Dashboard](apps/docs/content/docs/dashboard.mdx): filters, exact links, replay, and scoring defaults
-- [Status](apps/docs/content/docs/status.mdx): counts, coverage, and history
-- [Backlog](apps/docs/content/docs/backlog.mdx): reconcile and plan
-- [Agents](apps/docs/content/docs/agents.mdx): skill setup and optional clustering
-- [Library](apps/docs/content/docs/library.mdx): core, shell, and HTTP integrations
-- [Security](apps/docs/content/docs/security.mdx): permissions and private data
-- [Reference](apps/docs/content/docs/reference.mdx): commands and output contracts
-- [Changelog](https://issue-graph.dev/docs/changelog): release notes
+Install the package as a dependency to use the graph core from your own code:
+
+```bash
+npm install issue-graph@latest
+```
+
+The core runs in any JavaScript runtime. Transports read GitHub through `gh`, or through `fetch` with a token. See [Library](https://issue-graph.dev/docs/library).
 
 ## Limits and privacy
 
-The CLI reads GitHub data and can save local snapshots or exports. Depth, node caps, hubs, permissions, and per-node API limits affect coverage. Inspect linked code and current behavior before closing an issue or merging a PR.
+Depth, node budgets, permissions, and API limits affect coverage. Check the linked code and current behavior before you close an issue or merge a PR.
 
-Snapshots, exports, logs, and cluster prompts can contain private repository metadata. Anyone with an HTML export can read its embedded data. Review content and storage permissions before sharing. See [security guidance](apps/docs/content/docs/security.mdx) and [vulnerability reporting](SECURITY.md).
+Saved runs, HTML exports, and cluster prompts can contain private repository metadata, and anyone with an export can read the data embedded in it. See [Security](https://issue-graph.dev/docs/security) and [vulnerability reporting](SECURITY.md).
 
-## Source development
+## Development
 
-The source repository is public. Use Node.js 20.19.x or 22.12+ (24 recommended) and pnpm. Live queries also need GitHub CLI authentication. Follow [Contributing](CONTRIBUTING.md#setup) for setup.
-
-To update a clean source checkout:
+This repository is a pnpm workspace. The CLI and library are in `src/`, the dashboard is `apps/dashboard/`, and the docs site is `apps/docs/`. Use Node.js 20.19.x or 22.12 and later with pnpm:
 
 ```bash
-git pull --ff-only
 pnpm install --frozen-lockfile
 pnpm build
-pnpm link --global
-```
-
-Contributor checks:
-
-```bash
 pnpm check
 pnpm test:package
 ```
 
-`pnpm build` emits the Node CLI and library in `dist`. Package verification tests a packed local installation, or an existing archive in supplied-tarball mode. See [Contributing](CONTRIBUTING.md#release-process) for the retained-artifact release process. To compare transports against live GitHub data, use `pnpm exec tsx scripts/verify-transports.ts <number> <owner/repo> <depth>` with appropriate access.
+[Contributing](CONTRIBUTING.md) covers setup, the docs and dashboard dev servers, and the release process. [AGENTS.md](AGENTS.md) lists what to update with each change.
 
-### Local website development
+## Documentation
 
-From the repository root, start the docs website on a fixed local port:
-
-```bash
-pnpm dev:docs --hostname 127.0.0.1 --port 3399
-```
-
-Validate the production build separately. The HTTP suite checks production cache behavior, which differs from the development server:
-
-```bash
-pnpm check:docs
-pnpm build:docs
-pnpm --filter @issue-graph/docs test:ci
-```
-
-The last command starts and stops its own test server. For a manual browser session or audit, stop the development server and run `pnpm --filter @issue-graph/docs start --hostname 127.0.0.1 --port 3399`. In another terminal:
-
-```bash
-DOCS_TEST_URL=http://127.0.0.1:3399 pnpm test:docs:routes
-DOCS_TEST_URL=http://127.0.0.1:3399 pnpm audit:docs
-```
-
-The agent-readability audit may follow production canonical URLs from a localhost start URL. Check its destinations when comparing local changes. [is-agentic.com](https://is-agentic.com) requires a publicly reachable URL.
-
-### Dashboard development
-
-`apps/dashboard` is the Next.js dashboard used by `open`, `dashboard`, `cluster --apply`, and `query`. Its React host mounts the original dashboard renderer and CSS, preserving its layout, graphs, and animations. The renderer lives in `src/dashboard-view.js`; filters, ranking, graph metrics, and URL state share the CLI core. `src/html.ts` retains the programmatic HTML exporter using the same renderer. `apps/docs` remains the documentation site.
-
-Run `bun run dev:dashboard` and choose a normalized capture JSON locally. The browser does not upload it. `bun run build` includes the static Next.js export in the CLI package; end users do not need to run a Next.js server. `bun run test` prepares the same dashboard build before testing saved views.
+- [issue-graph.dev](https://issue-graph.dev/docs): get started, commands, dashboard, and Linear
+- [Changelog](https://issue-graph.dev/docs/changelog)
 
 ## License
 

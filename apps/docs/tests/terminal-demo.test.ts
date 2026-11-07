@@ -76,20 +76,26 @@ test("SSR includes three semantic examples, short display commands and linked ac
   expect(html).toMatch(/<img\b[^>]*alt="Captured portless Rank dashboard/);
 });
 
-test("the compact demo uses scoped monochrome hierarchy without restyling shared commands", () => {
+test("the compact demo highlights commands and output with Geist colors", () => {
   const html = renderToStaticMarkup(createElement(TerminalDemo, { examples }));
   expect(html).toContain('class="ig-terminal-command"');
   expect(html).toContain('ig-demo-token-merged">issue-graph</span>');
   expect(html).toContain('ig-demo-token-reference">--heat-top</span>');
   expect(html).toContain('ig-demo-token-positive">vercel-labs/portless</span>');
   const css = read("../src/components/terminal-output.css");
-  const monochrome = css.match(/\.ig-demo \.ig-demo-token-reference,[\s\S]*?\}/)?.[0] ?? "";
-  expect(monochrome).toContain(".ig-demo .ig-demo-token-positive");
-  expect(monochrome).toContain(".ig-demo .ig-demo-token-merged");
-  expect(monochrome).toContain("color: var(--ig-demo-fg)");
-  expect(monochrome).toContain("font-weight: 600");
+  for (const [token, color] of [
+    ["reference", "--ds-blue-900"],
+    ["positive", "--ds-green-900"],
+    ["merged", "--ds-purple-900"],
+    ["attention", "--ds-amber-900"],
+  ])
+    expect(css).toMatch(
+      new RegExp(`\\.ig-demo \\.ig-demo-token-${token}[^{]*\\{\\s*color: var\\(${color}\\);`),
+    );
   expect(css).toMatch(/\.ig-demo \.ig-demo-token-muted \{\s*color: var\(--ig-demo-muted\);/);
-  expect(css).toContain("color: var(--ds-green-900)");
+  expect(css).not.toMatch(
+    /\.ig-terminal-command \.ig-demo-token-(?:reference|positive)[^{]*\{\s*color: var\(--ig-demo-muted\)/,
+  );
   const frame = read("../src/components/terminal-demo.css").match(/\.ig-demo \{[^}]+\}/)?.[0] ?? "";
   expect(frame).toContain("max-width: 600px");
   expect(frame).toContain("margin-inline: auto");

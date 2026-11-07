@@ -233,14 +233,28 @@
   font-size: 12px;
 }
 
-.ig-demo .ig-demo-token-reference,
-.ig-demo .ig-demo-token-positive,
-.ig-demo .ig-demo-token-merged,
-.ig-demo .ig-demo-token-attention,
 .ig-demo .ig-demo-token-strong,
 .ig-demo .ig-demo-state {
   color: var(--ig-demo-fg);
   font-weight: 600;
+}
+
+.ig-demo .ig-demo-token-reference,
+.ig-demo .ig-demo-identity {
+  color: var(--ds-blue-900);
+}
+
+.ig-demo .ig-demo-token-positive,
+.ig-demo .ig-demo-reading-context {
+  color: var(--ds-green-900);
+}
+
+.ig-demo .ig-demo-token-merged {
+  color: var(--ds-purple-900);
+}
+
+.ig-demo .ig-demo-token-attention {
+  color: var(--ds-amber-900);
 }
 
 .ig-demo .ig-demo-token-muted {
@@ -248,11 +262,12 @@
   font-weight: 400;
 }
 
-.ig-demo .ig-terminal-command,
-.ig-demo .ig-terminal-command .ig-demo-token-reference,
-.ig-demo .ig-terminal-command .ig-demo-token-positive {
-  color: var(--ig-demo-muted);
-  font-weight: 400;
+.ig-demo .ig-terminal-command {
+  color: var(--ig-demo-fg);
+}
+
+.ig-demo .ig-terminal-command .ig-demo-token-merged {
+  font-weight: 600;
 }
 
 .ig-demo .ig-demo-line-heading,

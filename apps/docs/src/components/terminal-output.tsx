@@ -188,7 +188,11 @@ export function TerminalPresentation({ output, exampleId }: { output: string; ex
           </div>
         ) : (
           <div className={`ig-demo-reading-${row.kind}`} key={row.text}>
-            {highlight(row.text, /(?<=: )\d+$/g, ([value]) => (value === "0" ? "muted" : "strong"))}
+            {row.text.startsWith("issue-graph ")
+              ? renderTerminalCommand(row.text)
+              : highlight(row.text, /(?<=: )\d+$/g, ([value]) =>
+                  value === "0" ? "muted" : "strong",
+                )}
           </div>
         ),
       )}

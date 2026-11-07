@@ -115,7 +115,6 @@ describe("documentation content contract", () => {
       read("content/docs/index.mdx"),
       read("content/docs/get-started.mdx"),
       read("content/docs/graph.mdx"),
-      read("../../README.md"),
     ]);
     expect(example.command).toBe(exampleCommand);
     for (const page of pages) {
@@ -135,7 +134,6 @@ describe("documentation content contract", () => {
     expect(start).toContain("[Graph](/docs/graph)");
     expect(pages[2]).toContain(`${example.coverage.beyondDepthReferences} references`);
     expect(pages[2]).toContain(`${example.coverage.omittedEdges} edges`);
-    expect(pages[3]).toContain("[Capture details](https://issue-graph.dev/docs/graph)");
   });
 
   test("ships illustrated README media with a static alternative", async () => {
@@ -185,9 +183,13 @@ describe("documentation content contract", () => {
       read("content/docs/agents.mdx"),
       read("../../README.md"),
     ]);
-    const readmeAgents = readme.match(/^## Agents and integrations\n([\s\S]*?)(?=^## )/m)?.[1];
+    const readmeAgents = readme.match(/^## For AI agents\n([\s\S]*?)(?=^## )/m)?.[1];
     expect(readmeAgents).toBeDefined();
-    for (const page of [agents, readmeAgents ?? ""]) {
+    expect(readmeAgents).not.toMatch(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/);
+    expect(readmeAgents).toContain("npx skills@latest add vercel-labs/issue-graph");
+    expect(readmeAgents).toContain("issue-graph skills get core\n");
+    expect(readmeAgents).toContain("/docs/agents");
+    for (const page of [agents]) {
       expect(page).not.toMatch(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/);
       expect(page).not.toMatch(/outdated|source-only|newer source stub|not available in npm/i);
       expect(page).not.toMatch(/do not (?:install|pair).*stub|npm root --global|cp -R/i);

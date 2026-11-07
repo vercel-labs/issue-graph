@@ -680,7 +680,7 @@ export function mountDashboardView(
     return [...groups.values()];
   }
   function colorAttrs(color) {
-    return color.startsWith("hsl(")
+    return color.startsWith("var(")
       ? 'class="c-group" style="--group-color:' + color + '"'
       : 'class="c-' + color + '"';
   }
@@ -732,8 +732,12 @@ export function mountDashboardView(
       )
       .join("");
   }
+  // Geist hue scales in a fixed order; later rounds use the 900 step so neighbors stay distinct.
+  const GROUP_HUES = ["blue", "amber", "purple", "green", "pink", "teal", "red"];
   function groupColor(index) {
-    return "hsl(" + ((216 + index * 137.508) % 360).toFixed(3) + " 62% 55%)";
+    const hue = GROUP_HUES[index % GROUP_HUES.length];
+    const step = Math.floor(index / GROUP_HUES.length) % 2 ? 900 : 700;
+    return "var(--ds-" + hue + "-" + step + ")";
   }
   function proposedGroups() {
     return (
