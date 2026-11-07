@@ -156,7 +156,7 @@ issue-graph skills get core --full
 
 Use `--full` for workflow references, `issue-graph skills list` for available guides, and command-specific `--help` for syntax. If the CLI or guidance is missing, report the error and ask for an authorized setup correction. See [Agents](apps/docs/content/docs/agents.mdx) for setup.
 
-Use `issue-graph cluster owner/repo` to print a root-cause clustering task for the calling agent, then `issue-graph cluster owner/repo --apply answer.json` (or `-` for stdin) to load its answer. For cron or CI, `--agent claude` or `--agent codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
+Use `issue-graph cluster owner/repo` to print a root-cause clustering task for the calling agent, then `issue-graph cluster owner/repo --apply answer.json` (or `-` for stdin) to load its answer. For cron or CI, `--agent claude` or `--agent codex` sends it to an installed headless agent. Review the payload and the agent's data policy before using private repository evidence. The CLI runs Claude with no tools or MCP servers and Codex in its read-only sandbox, both from an empty scratch directory; Codex still loads its configured MCP servers.
 
 Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
 

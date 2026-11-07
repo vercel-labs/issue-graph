@@ -1,7 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { classify, fillMentionedBy } from "./classify.js";
@@ -32,6 +31,7 @@ import {
   runLinear,
 } from "./linear-cli.js";
 import { linearDashboardModel } from "./linear-html.js";
+import { privateExportPath } from "./local-store.js";
 import { writeNextDashboard } from "./next-dashboard.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
@@ -479,8 +479,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         dashboard: async (report, options) => {
           const model = linearDashboardModel(report, options.clusters);
           const out =
-            options.path ||
-            join(tmpdir(), `issue-graph-linear-${report.workspace.id}-${Date.now()}.html`);
+            options.path || privateExportPath(`issue-graph-linear-${report.workspace.id}.html`);
           writeNextDashboard(out, [model], modelDefaults([model]));
           process.stderr.write(`wrote ${out}\n`);
           if (options.save)
@@ -507,7 +506,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         "no saved runs yet: run issue-graph open owner/repo first (without --no-save)",
       );
     }
-    const out = args.htmlOut || join(tmpdir(), `issue-graph-dashboard-${Date.now()}.html`);
+    const out = args.htmlOut || privateExportPath("issue-graph-dashboard.html");
     writeNextDashboard(out, models, modelDefaults(models));
     process.stderr.write(`wrote ${out} (${models.map((m) => m.label ?? m.repo).join(", ")})\n`);
     if (args.openMode === "yes" || (args.openMode === "auto" && interactive())) openInBrowser(out);
@@ -805,8 +804,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       ? (JSON.parse(readFileSync(args.clustersFile, "utf8")) as ClustersConfig)
       : (agentClusters ?? carriedClusters(readDashboardModel<Model>(repoName), nodes));
     const out =
-      args.htmlOut ||
-      join(tmpdir(), `issue-graph-${primary.owner}-${primary.repo}-${Date.now()}.html`);
+      args.htmlOut || privateExportPath(`issue-graph-${primary.owner}-${primary.repo}.html`);
     const model = dashboardModel(nodes, seedKeys, repoName, clusters, cappedOut.size);
     try {
       model.openCount = await repositoryOpenCount(transport, primary.owner, primary.repo);
@@ -867,8 +865,7 @@ async function runApply(a: Args): Promise<void> {
     );
   }
   writeDashboardModel(repo, next);
-  const out =
-    a.htmlOut || join(tmpdir(), `issue-graph-${repo.replace("/", "-")}-${Date.now()}.html`);
+  const out = a.htmlOut || privateExportPath(`issue-graph-${repo.replace("/", "-")}.html`);
   writeNextDashboard(out, [next], modelDefaults([next]));
   const opened = a.openMode === "yes" || (a.openMode === "auto" && interactive());
   if (opened) openInBrowser(out);

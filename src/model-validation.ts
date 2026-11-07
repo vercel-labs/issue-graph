@@ -1,5 +1,72 @@
 import type { Model } from "./html.js";
 
+const SVG_TAGS = new Set([
+  "svg",
+  "g",
+  "path",
+  "circle",
+  "ellipse",
+  "rect",
+  "line",
+  "polyline",
+  "polygon",
+]);
+const SVG_ATTRS = new Set([
+  "class",
+  "role",
+  "aria-hidden",
+  "aria-label",
+  "xmlns",
+  "viewBox",
+  "width",
+  "height",
+  "fill",
+  "fill-rule",
+  "fill-opacity",
+  "clip-rule",
+  "stroke",
+  "stroke-width",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "stroke-opacity",
+  "opacity",
+  "transform",
+  "d",
+  "cx",
+  "cy",
+  "r",
+  "rx",
+  "ry",
+  "x",
+  "y",
+  "x1",
+  "y1",
+  "x2",
+  "y2",
+  "points",
+]);
+const SVG_TAG = /\s*<(\/?)([a-zA-Z]+)((?:\s+[a-zA-Z][\w:-]*="[^"<>&]*")*)\s*(\/?)>\s*/y;
+const SVG_ATTR = /\s+([a-zA-Z][\w:-]*)="[^"<>&]*"/g;
+
+/** Accept only a whitespace-separated sequence of allowlisted SVG tags with quoted, allowlisted attributes. */
+function staticSvg(logo: string): boolean {
+  SVG_TAG.lastIndex = 0;
+  const open: string[] = [];
+  while (SVG_TAG.lastIndex < logo.length) {
+    const match = SVG_TAG.exec(logo);
+    if (!match) return false;
+    const [, closing, tag, attrs, selfClosing] = match;
+    if (!SVG_TAGS.has(tag)) return false;
+    if (closing) {
+      if (attrs || selfClosing || open.pop() !== tag) return false;
+      continue;
+    }
+    for (const [, name] of attrs.matchAll(SVG_ATTR)) if (!SVG_ATTRS.has(name)) return false;
+    if (!selfClosing) open.push(tag);
+  }
+  return open.length === 0;
+}
+
 export function parseModel(value: unknown): Model {
   if (!value || typeof value !== "object") throw new Error("expected a dashboard model");
   const m = value as Model;
@@ -56,16 +123,7 @@ export function parseModel(value: unknown): Model {
     throw new Error("invalid dashboard metadata");
   if (!safeUrl(m.provider.repoUrl) || (m.url !== undefined && !safeUrl(m.url)))
     throw new Error("dashboard links must use HTTP or HTTPS");
-  if (
-    /<\s*[^>]*\b(?:on[\w-]+|href|src|style)\s*=|<\s*[!?]|&(?:#|colon)/i.test(m.provider.logo) ||
-    [...m.provider.logo.matchAll(/<\s*\/?\s*([\w:-]+)/g)].some(
-      (match) =>
-        !["svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon"].includes(
-          match[1],
-        ),
-    )
-  )
-    throw new Error("provider logo must contain static SVG shapes");
+  if (!staticSvg(m.provider.logo)) throw new Error("provider logo must contain static SVG shapes");
   for (const [key, n] of Object.entries(m.nodes)) {
     if (
       unsafeKey(key) ||

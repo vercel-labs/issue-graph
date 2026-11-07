@@ -2,7 +2,13 @@ import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Model } from "./html.js";
-import { contentId, publishLocal, readLocal, readLocalBytes } from "./local-store.js";
+import {
+  assertPrivateDirs,
+  contentId,
+  publishLocal,
+  readLocal,
+  readLocalBytes,
+} from "./local-store.js";
 import { parseModel } from "./model-validation.js";
 import type { Weights } from "./scoring.js";
 
@@ -44,7 +50,11 @@ export function prepareDashboard(models: Model[], weights: Record<string, Weight
 }
 
 export function publishDashboardAssets(dir: string, assets: Record<string, Buffer>) {
-  for (const [name, bytes] of Object.entries(assets)) publishLocal(join(dir, name), bytes);
+  for (const [name, bytes] of Object.entries(assets)) {
+    const file = join(dir, name);
+    publishLocal(file, bytes);
+    assertPrivateDirs(dir, file);
+  }
 }
 
 export function verifyDashboardAssets(dir: string, manifest: Record<string, string>) {
