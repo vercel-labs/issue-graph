@@ -158,11 +158,25 @@ test.skipIf(process.platform === "win32")(
       "shared or linked",
     );
     const open = join(home, "open");
-    fs.mkdirSync(open);
+    fs.mkdirSync(join(open, "nested"), { recursive: true });
     fs.chmodSync(open, 0o777);
     expect(() => writeNextDashboard(join(open, "view.html"), [model()])).toThrow(
       "other accounts can modify",
     );
+    expect(() => writeNextDashboard(join(open, "nested", "view.html"), [model()])).toThrow(
+      "other accounts can modify",
+    );
+    expect(fs.readdirSync(join(open, "nested"))).toEqual([]);
+    const planted = join(home, "planted");
+    const { assets } = prepareDashboard([model()]);
+    const [name, bytes] = Object.entries(assets).find(([n]) => n.endsWith(".js")) ?? [];
+    fs.mkdirSync(dirname(join(planted, name as string)), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(join(planted, name as string), bytes as Buffer, { mode: 0o666 });
+    fs.chmodSync(join(planted, name as string), 0o666);
+    expect(() => writeNextDashboard(join(planted, "view.html"), [model()])).toThrow(
+      "published file other accounts can modify",
+    );
+    expect(fs.existsSync(join(planted, "view.html"))).toBe(false);
   },
 );
 
