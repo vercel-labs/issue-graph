@@ -796,7 +796,9 @@ export function mountDashboardView(
           " open issues" +
           (c.pullRequests === undefined ? "" : " + " + c.pullRequests + " open PRs") +
           " · " +
-          (c.complete ? "entire project" : "partial count") +
+          (c.complete
+            ? "entire project"
+            : "partial count" + (c.reason ? " (" + c.reason + ")" : "")) +
           " · " +
           c.observedAt;
       return '<b title="' + esc(detail) + '" aria-label="' + esc(detail) + '">' + text + "</b>";
