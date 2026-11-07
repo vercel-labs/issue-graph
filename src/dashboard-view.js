@@ -732,12 +732,15 @@ export function mountDashboardView(
       )
       .join("");
   }
-  // Geist hue scales in a fixed order; later rounds use the 900 step so neighbors stay distinct.
+  // Geist hue scales at the 700 then 900 step; past those, golden-angle hues keep every cluster distinct.
   const GROUP_HUES = ["blue", "amber", "purple", "green", "pink", "teal", "red"];
   function groupColor(index) {
-    const hue = GROUP_HUES[index % GROUP_HUES.length];
-    const step = Math.floor(index / GROUP_HUES.length) % 2 ? 900 : 700;
-    return "var(--ds-" + hue + "-" + step + ")";
+    if (index < GROUP_HUES.length * 2) {
+      const hue = GROUP_HUES[index % GROUP_HUES.length];
+      const step = index < GROUP_HUES.length ? 700 : 900;
+      return "var(--ds-" + hue + "-" + step + ")";
+    }
+    return "hsl(" + ((216 + index * 137.508) % 360).toFixed(3) + " 62% 55%)";
   }
   function proposedGroups() {
     return (
