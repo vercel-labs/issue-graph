@@ -39,6 +39,48 @@ For transport changes, compare both implementations against a live public reposi
 pnpm exec tsx scripts/verify-transports.ts <number> <owner/repo> <depth>
 ```
 
+To update a clean source checkout and link the local CLI:
+
+```bash
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm build
+pnpm link --global
+```
+
+`pnpm build` emits the Node CLI and library in `dist`.
+
+## Docs website
+
+From the repository root, start the docs website on a fixed local port:
+
+```bash
+pnpm dev:docs --hostname 127.0.0.1 --port 3399
+```
+
+Validate the production build separately, because the HTTP suite checks production cache behavior that the development server does not have:
+
+```bash
+pnpm check:docs
+pnpm build:docs
+pnpm --filter @issue-graph/docs test:ci
+```
+
+The last command starts and stops its own test server. For a manual browser session or audit, stop the development server and run `pnpm --filter @issue-graph/docs start --hostname 127.0.0.1 --port 3399`. In another terminal:
+
+```bash
+DOCS_TEST_URL=http://127.0.0.1:3399 pnpm test:docs:routes
+DOCS_TEST_URL=http://127.0.0.1:3399 pnpm audit:docs
+```
+
+The agent-readability audit may follow production canonical URLs from a localhost start URL, so check its destinations when you compare local changes. [is-agentic.com](https://is-agentic.com) requires a publicly reachable URL.
+
+## Dashboard
+
+`apps/dashboard` is the Next.js dashboard used by `open`, `dashboard`, `cluster --apply`, and `query`. Its React host mounts the dashboard renderer and CSS from `src/dashboard-view.js`. Filters, ranking, graph metrics, and URL state share the CLI core, and `src/html.ts` keeps the programmatic HTML exporter on the same renderer.
+
+Run `bun run dev:dashboard` and choose a normalized capture JSON file. The browser reads it locally and does not upload it. `pnpm build` includes the static Next.js export in the CLI package, so end users do not run a Next.js server. `pnpm test` builds the same dashboard before testing saved views.
+
 ## Skill maintenance
 
 Maintain these skill files:

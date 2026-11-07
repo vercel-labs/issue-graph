@@ -7,7 +7,7 @@ import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
 import { TerminalPresentation } from "../src/components/terminal-output";
-import { landingTitle, workflows } from "../src/lib/landing-content";
+import { clusterCommands, landingTitle, providerCommands } from "../src/lib/landing-content";
 import { agentSetupPrompt, plannedInstallCommand, siteName } from "../src/lib/site";
 import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
 
@@ -43,14 +43,17 @@ describe("launch feedback", () => {
     expect(html).toContain("For agents");
   });
 
-  test("uses native Geistdocs code blocks for the three workflows and final install", () => {
+  test("uses native Geistdocs code blocks for providers, clustering, and final install", () => {
     const html = renderToStaticMarkup(createElement(Home));
-    expect(html.match(/data-geist-code-block=""/g)).toHaveLength(4);
-    expect(html.match(/data-section="tabs"/g)).toHaveLength(4);
-    expect(html.match(/data-section="content"/g)).toHaveLength(4);
+    expect(html.match(/data-geist-code-block=""/g)).toHaveLength(5);
+    expect(html.match(/data-section="tabs"/g)).toHaveLength(5);
+    expect(html.match(/data-section="content"/g)).toHaveLength(5);
     const codes = html.match(/<code\b[^>]*>[\s\S]*?<\/code>/g) ?? [];
     for (const command of [
-      ...workflows.map((workflow) => workflow.command),
+      providerCommands.github,
+      providerCommands.linear,
+      providerCommands.model,
+      clusterCommands,
       plannedInstallCommand,
     ]) {
       expect(
