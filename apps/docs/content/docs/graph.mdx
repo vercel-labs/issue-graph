@@ -7,7 +7,7 @@ lastModified: 2026-09-27
 
 ## Start from an issue or PR
 
-Pass an item as `owner/repo#123`, a URL, or a number inside a GitHub checkout:
+Pass an item as `owner/repo#123`, as an issue or PR URL, or as a bare number when you run the command inside a GitHub checkout:
 
 ```bash
 issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
@@ -16,22 +16,22 @@ issue-graph graph https://github.com/vercel-labs/agent-browser/issues/1113 --dep
 
 `graph` prints a formatted report in a terminal and Markdown when piped.
 
-For several seeds, or to rank labeled open issues:
+To start from several seeds, or to rank the open issues with a label:
 
 ```bash
 issue-graph graph 64 246 281 --repo owner/repo --no-save
 issue-graph rank owner/repo --label bug --no-save
 ```
 
-Replace `owner/repo` and the seed numbers with your repository. Multi-seed results also show connected components.
+Replace `owner/repo` and the seed numbers with your own. A run with several seeds also reports connected components.
 
 ## Read the graph
 
-Nodes represent issues and PRs. Edges come from body and comment mentions, timeline cross-references, connected events, and closing references. Each node includes its fetched state and available author, discussion, and PR metadata. Edges retain their source and available actor/date information.
+Nodes represent issues and PRs. Edges come from mentions in bodies and comments, timeline cross-references, connected events, and closing references. Each node records its fetched state and any available author, discussion, and PR metadata. Each edge records its source and, when available, its actor and date.
 
-The report flags competing PRs, shared changed files, possible superseded work, and closing claims missing a GitHub closing link. Use those signals to choose what to inspect. Check the implementations and scope before recommending a closure.
+The report flags competing PRs, shared changed files, possibly superseded work, and closing claims that lack a GitHub closing link. Use these signals to choose what to inspect, and check the implementations and scope before you recommend closing anything.
 
-`rank` orders open nodes by discussion activity: comments, participants, reactions, inbound references, and time open. Graph JSON exports also include the ranking in `priorities`.
+`rank` orders open nodes by discussion activity, using comments, participants, reactions, inbound references, and time open. Graph JSON exports include the same ranking in `priorities`.
 
 ## Control the crawl
 
@@ -42,27 +42,27 @@ The report flags competing PRs, shared changed files, possible superseded work, 
 | `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it above this reference count |
 | `--concurrency N` | `4` | Concurrent node requests, from 1 to 32 |
 
-Cross-repository references are fetched one hop. Explicit seeds are exempt from the hub guard; use the report's suggested re-seed command to inspect a hub.
+Cross-repository references are fetched one hop deep. The hub threshold does not apply to explicit seeds, so to inspect an unexpanded hub, run the re-seed command the report suggests.
 
-Each node query reads up to 100 comments, 100 timeline items, 100 PR files, and 50 closing references. These connections are not fully paginated. Search-based seed discovery is limited by the node budget and GitHub's 1000-result search ceiling.
+Each node query reads up to 100 comments, 100 timeline items, 100 PR files, and 50 closing references, without paginating past those limits. Search-based seed discovery is limited by the node budget and by GitHub's 1000-result search ceiling.
 
-Check `cappedOut`, unfetched nodes, and unexpanded hubs when interpreting the graph. Increasing the node cap leaves the per-node limits unchanged.
+When you interpret the graph, check `cappedOut`, unfetched nodes, and unexpanded hubs. Raising `--budget` does not change the per-node limits.
 
 ## Example capture
 
 The example captured on 2026-09-22 includes five nodes in `vercel-labs/agent-browser`: closed issue #1113, merged PR #1137, closed regression #1148, and open follow-ups #1371 and #1607. See [Get started](/docs/get-started) for their links and descriptions.
 
-The capture reached its depth boundary with 19 references left unfetched. It omits 22 edges to those references. No node-cap or hub truncation occurred. States were collected over a time window, so a new run can return different results. The landing page uses a separate Portless backlog capture.
+The capture reached its depth limit with 19 references left unfetched and omits the 22 edges to those references. Neither the node cap nor the hub threshold truncated it. States were read over a time window rather than at one instant, and a new run can return different results. The landing page uses a separate capture of the Portless backlog.
 
 ## Compare snapshots
 
-Graph mode saves history under `~/.issue-graph/`, or `ISSUE_GRAPH_HOME` when set, keyed by repository and seed list. Run the same seed list again to see new nodes, state changes, and new links:
+`graph` saves history under `~/.issue-graph/`, or under `ISSUE_GRAPH_HOME` when it is set, keyed by repository and seed list. Run the same seed list again to see new nodes, state changes, and new links:
 
 ```bash
 issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12
 ```
 
-Keep the seed order consistent for history lookup. `--no-save` skips saving a new capture while still allowing comparison with existing history. Changes in access or crawl limits affect what can be compared.
+History lookup depends on seed order, so pass the seeds in the same order each time. `--no-save` skips saving a new capture but still compares the run with existing history. Changes to your access or crawl limits between runs also change what the comparison can show.
 
 ## Export JSON and HTML
 
@@ -70,17 +70,17 @@ Keep the seed order consistent for history lookup. `--no-save` skips saving a ne
 issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save -o graph.json -o graph.html
 ```
 
-`-o PATH.json` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Graph JSON has no `schemaVersion` field. The report stays on stdout: formatted in a terminal, Markdown in a pipe.
+`-o PATH.json` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Graph JSON has no `schemaVersion` field. The report still prints to stdout, formatted in a terminal and as Markdown in a pipe.
 
-`-o PATH.html` writes the static Next.js dashboard with Explore, Impact, Swarm, and Rank views. Open the HTML directly in your browser; no Next server is needed. Keep its sibling `_next/` assets and `font-LICENSE.txt` when moving it. Impact shows relationships found in the graph, not proven causality.
+`-o PATH.html` writes the static Next.js dashboard with Explore, Impact, Swarm, and Rank views. Open the file directly in your browser without running a server. If you move it, move its sibling `_next/` assets and `font-LICENSE.txt` with it. Impact shows relationships found in the graph and does not establish causality.
 
-To query the same data from the CLI, export a dashboard without `--no-save`, or start with `issue-graph open owner/repo`. Then use `query` for shared filters, scoring, exact links, and replay. See [Dashboard and saved queries](/docs/dashboard).
+To query the same data from the CLI, export a dashboard without `--no-save`, or start with `issue-graph open owner/repo`. Then use `query` for shared filters, scoring, exact links, and replay, as described in [Dashboard and saved queries](/docs/dashboard).
 
 Export paths write files even with `--no-save` and can overwrite existing paths. Review private results before sharing them.
 
 ## Add cluster labels
 
-Print a task for your agent, then load its reviewed labels into an explorer:
+Print a clustering task for your agent, then load its reviewed labels into an explorer:
 
 ```bash
 issue-graph cluster owner/repo
@@ -88,7 +88,7 @@ issue-graph cluster owner/repo --apply clusters.json
 issue-graph graph 64 246 281 --repo owner/repo --clusters clusters.json -o graph.html --no-save
 ```
 
-`cluster` saves the run and prints the task; `--apply` loads your agent's answer into that run's dashboard. `--clusters PATH` reads prepared labels into any graph export. The input can be an array of clusters or an object containing `clusters` and `cleanup`:
+`cluster` saves the run and prints the task. `--apply` loads your agent's answer into that run's dashboard. `--clusters PATH` reads prepared labels into any graph export. The input can be an array of clusters or an object with `clusters` and `cleanup` fields:
 
 ```json
 {

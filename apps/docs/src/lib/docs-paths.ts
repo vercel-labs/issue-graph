@@ -9,6 +9,7 @@ export const docsSlugs = [
   "agents",
   "library",
   "security",
+  "troubleshooting",
   "reference",
   "changelog",
 ] as const;
