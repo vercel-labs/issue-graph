@@ -290,7 +290,11 @@ first; if Linear is not connected, ask the user to run `issue-graph linear login
   to skip the saved model; explicit HTML output is still written.
 - `--cluster` prints a task for the current agent. `--clusters PATH --html project.html`
   applies proposed themes without changing native relationships or statuses.
+- `--github` reads attached GitHub issues and pull requests one hop through `gh`. A
+  blocked issue then shows whether each blocker's linked work is open, draft, closed,
+  or merged. An unreadable target marks its issue partial.
 
 Read coverage before making completeness claims: node/page limits and read failures
-can make the graph partial. Text mentions and attachment targets are not crawled.
+can make the graph partial. Text mentions and non-GitHub attachment targets are not
+crawled, and GitHub targets are never expanded past one hop.
 The HTML is a static capture; regenerate it to refresh.

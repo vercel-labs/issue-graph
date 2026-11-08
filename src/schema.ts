@@ -53,7 +53,15 @@ export const ISSUE_GRAPH_SCHEMA = {
       },
       concurrency: { default: 4, minimum: 1, maximum: 32 },
       relationships: ["relations", "inverseRelations", "parent", "children", "attachments"],
-      exclusions: ["text mentions", "fetching attachment targets"],
+      exclusions: ["text mentions", "fetching non-GitHub attachment targets"],
+      githubAttachments: {
+        flag: "--github",
+        default: "not fetched",
+        transport: "gh api graphql",
+        depth: "one hop; targets are not expanded",
+        fields: ["repo", "number", "kind", "state", "draft", "title", "observedAt"],
+        failure: "target recorded as unavailable; owning issue marked partial; exit 1",
+      },
       exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
       jsonFlag: "--json emits the report on stdout; takes no path",
       description:

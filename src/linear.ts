@@ -1,4 +1,5 @@
 import { components, crawlGraph } from "./crawl.js";
+import { githubTargetLabel } from "./linear-github.js";
 import {
   LINEAR_CONNECTIONS,
   type LinearConnection,
@@ -66,7 +67,7 @@ export interface LinearReport {
     issues?: "project" | "neighborhood";
     notes?: readonly string[];
     relationships: readonly string[];
-    externalLinks: "reported-not-fetched";
+    externalLinks: "reported-not-fetched" | "github-resolved";
     textReferences: "not-collected";
     archived: "issues-included-links-excluded" | "excluded";
   };
@@ -665,10 +666,16 @@ export function renderLinear(report: LinearReport): string {
     "",
     `Coverage: ${report.coverageComplete ? "complete within requested scope" : "partial"} · ${report.nodes.length} nodes · ${report.scope.issues === "project" ? "project capture" : `depth ${report.limits.maxDepth}`}`,
     "",
-    `Explicit relationships and hierarchy. ${report.scope.archived === "excluded" ? "Archived issues are excluded." : "Archived issues are included; archived relations and attachments are excluded."} Attachment URLs are reported without fetching their targets. Text mentions are not collected.`,
+    `Explicit relationships and hierarchy. ${report.scope.archived === "excluded" ? "Archived issues are excluded." : "Archived issues are included; archived relations and attachments are excluded."} ${report.scope.externalLinks === "github-resolved" ? "GitHub issue and pull request attachments are read one hop; other attachment URLs are reported without fetching." : "Attachment URLs are reported without fetching their targets."} Text mentions are not collected.`,
     "",
   ];
   const labels = new Map(report.nodes.map((node) => [node.key, node.identifier]));
+  const linked = new Map(
+    report.nodes.map((node) => [
+      node.key,
+      node.externalLinks.flatMap((link) => (link.github ? [githubTargetLabel(link.github)] : [])),
+    ]),
+  );
   for (const node of report.nodes) {
     lines.push(
       `## ${markdown(node.identifier)} · ${markdown(node.title)}`,
@@ -681,12 +688,16 @@ export function renderLinear(report: LinearReport): string {
     for (const edge of node.edges) {
       const arrow =
         edge.direction === "incoming" ? "←" : edge.direction === "undirected" ? "↔" : "→";
+      const work =
+        edge.relation === "blocks" && edge.direction === "incoming" ? linked.get(edge.to) : [];
       lines.push(
-        `- ${arrow} ${markdown(edge.nativeRelation)}: ${markdown(labels.get(edge.to) ?? edge.to)}`,
+        `- ${arrow} ${markdown(edge.nativeRelation)}: ${markdown(labels.get(edge.to) ?? edge.to)}${work?.length ? ` · ${markdown(work.join("; "))}` : ""}`,
       );
     }
     for (const link of node.externalLinks)
-      lines.push(`- Attachment: ${markdown(link.title)} · ${markdown(link.url)}`);
+      lines.push(
+        `- Attachment: ${markdown(link.title)} · ${markdown(link.url)}${link.github ? ` · ${markdown(githubTargetLabel(link.github))}` : ""}`,
+      );
     for (const part of node.coverage.filter((part) => !part.complete))
       lines.push(`- Incomplete ${part.source}: ${part.reason}`);
     lines.push("");

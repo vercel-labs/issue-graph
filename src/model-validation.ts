@@ -173,7 +173,13 @@ export function parseModel(value: unknown): Model {
         (link) =>
           !link ||
           !safeUrl(link.url) ||
-          (link.title !== undefined && typeof link.title !== "string"),
+          (link.title !== undefined && typeof link.title !== "string") ||
+          (link.github !== undefined &&
+            (!link.github ||
+              typeof link.github.repo !== "string" ||
+              !Number.isSafeInteger(link.github.number) ||
+              (link.github.state !== undefined &&
+                !["OPEN", "CLOSED", "MERGED"].includes(link.github.state)))),
       )
     )
       throw new Error(`captured links must use HTTP or HTTPS: ${key}`);

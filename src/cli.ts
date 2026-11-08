@@ -476,6 +476,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         stdout: (value) => process.stdout.write(value),
         stderr: (value) => process.stderr.write(value),
         readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        github: () => shellTransport(),
         dashboard: async (report, options) => {
           const model = linearDashboardModel(report, options.clusters);
           const out =
