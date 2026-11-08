@@ -421,7 +421,10 @@ function relationEdges(context: Context, current: Item, raw: unknown): WorkEdge[
 }
 
 async function readNode(context: Context, id: string, depth: number): Promise<WorkNode> {
-  const item = context.items.get(id) ?? (await fetchItem(context, id));
+  let item = context.items.get(id);
+  // A complete index already lists every readable item; Plane does not serve archived ones.
+  if (!item && context.index.complete) throw new PlaneReadError("NOT_FOUND");
+  item ??= await fetchItem(context, id);
   const coverage: ReadCoverage[] = [];
   const edges: WorkEdge[] = [];
   try {

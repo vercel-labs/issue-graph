@@ -161,6 +161,20 @@ describe("Plane neighborhood", () => {
     expect(report.nodes.find((node) => node.key === key(4))?.fetched).toBe(true);
   });
 
+  test("does not look up items missing from a complete index", async () => {
+    const reader = fixtureReader({
+      items: [item(1)],
+      relations: { [id(1)]: { blocking: [id(99)] } },
+    });
+    const report = await buildPlaneGraph(reader, "ENG-1", options);
+    expect(reader.calls.some((call) => call.startsWith("item "))).toBe(false);
+    expect(report.nodes.find((node) => node.key === key(99))).toMatchObject({
+      fetched: false,
+      error: "NOT_FOUND",
+    });
+    expect(report.coverage.failed).toEqual([key(99)]);
+  });
+
   test("marks a node partial when its relations cannot be read", async () => {
     const reader = fixtureReader({ items: [item(1)] });
     reader.relations = async () => {
