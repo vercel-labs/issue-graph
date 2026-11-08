@@ -38,7 +38,7 @@ For counts, skip graph discovery. Resolve repositories and authors from the requ
 
 Live collection supports GitHub. `open`, `rank`, and `cluster` accept a repository or items. `graph` needs items or `--label`. Items can be numbers, `owner/repo#123`, or URLs; bare numbers use `--repo` or the checkout's GitHub remote. Inspect an issue's graph before starting work and credit existing contributors.
 
-Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Read `issue-graph linear --help` for its flags and limits.
+Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Add `--github` to read the state of attached GitHub issues and pull requests, which shows whether a blocker's linked work is open, draft, or merged. Read `issue-graph linear --help` for its flags and limits.
 
 ## Query saved data
 
@@ -56,7 +56,7 @@ The link is a local file. If the chat client cannot open it, also give `issue-gr
 
 Weights resolve built-in → global → provider → project → command. Inspect `config show` first. Use `query --weights comments=4,reactions=3` for temporary exploration. Use `config set --weights comments=4` only when the user wants persistent defaults.
 
-Take `--provider` and `--scope` from the query result, without adding the provider prefix to `--scope`. Linear project identity includes workspace and project IDs, such as `linear:WORKSPACE_ID:project:PROJECT_ID`. This supports imported models; live Linear and Jira collection is not available.
+Take `--provider` and `--scope` from the query result, without adding the provider prefix to `--scope`. Linear project identity includes workspace and project IDs, such as `linear:WORKSPACE_ID:project:PROJECT_ID`. `query` also reads imported models. Live Linear reads go through `issue-graph linear`; Jira collection is not available.
 
 Dashboard sliders affect the URL/session only. Reset weights restores the document's opening weights. Config stores preferences, never credentials.
 

@@ -1351,7 +1351,21 @@ export function mountDashboardView(
             esc(a.url) +
             '" target="_blank" rel="noopener">' +
             esc(a.title || a.url) +
-            "</a></div>",
+            "</a>" +
+            (a.github
+              ? ' <span class="badge ' +
+                (a.github.error ? "b-warn" : "b-muted") +
+                '">' +
+                esc(
+                  a.github.error
+                    ? "unavailable"
+                    : (a.github.kind === "pull-request" ? "PR " : "issue ") +
+                        String(a.github.state).toLowerCase() +
+                        (a.github.draft ? ", draft" : ""),
+                ) +
+                "</span>"
+              : "") +
+            "</div>",
         )
       : n.external.map(
           (u) =>

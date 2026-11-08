@@ -5,8 +5,10 @@ import {
   parseLinearLocator,
   renderLinear,
 } from "./linear.js";
+import { resolveGithubAttachments } from "./linear-github.js";
 import { linearDashboardModel } from "./linear-html.js";
 import type { LinearReader } from "./linear-queries.js";
+import type { GhTransport } from "./transport.js";
 import { parseWorkClusters, workClusterPrompt } from "./work-clusters.js";
 
 export const LINEAR_USAGE = `usage: issue-graph linear <issue-url|identifier|uuid> [options]
@@ -21,6 +23,7 @@ Read explicit Linear issue relationships, hierarchy, and attachment links.
   --max-pages N         pages per connection per issue, 1..100 (default 5)
   --hub-threshold N     stop expanding non-seed hubs, 1..1000 (default 12)
   --concurrency N       issue reads in flight, 1..32 (default 4)
+  --github              read attached GitHub issues and PRs one hop with gh (state, draft)
   --json                print JSON to stdout
   --html PATH           write an HTML explorer and save this project to the dashboard
   --open                open the HTML explorer (creates a temporary file if needed)
@@ -32,7 +35,7 @@ Read explicit Linear issue relationships, hierarchy, and attachment links.
 Connect once with \`issue-graph linear login\` (browser, read-only, no API key needed),
 or set exactly one of LINEAR_API_KEY or LINEAR_ACCESS_TOKEN. Environment keys win.
 Only queries are sent. Local files are written only with --html or --open.
-Text mentions are not collected; attachment targets are not fetched.
+Text mentions are not collected; attachment targets are fetched only with --github.
 Exit codes: 0 complete within scope, 1 partial or failed, 2 invalid usage.`;
 
 export interface LinearIO {
@@ -43,6 +46,7 @@ export interface LinearIO {
     options: { path?: string; open: boolean; save: boolean; clusters?: unknown },
   ): Promise<void>;
   readClusters?(path: string): Promise<unknown>;
+  github?(): Pick<GhTransport, "graphql">;
 }
 
 export async function runLinear(
@@ -77,11 +81,13 @@ export async function runLinear(
   let save = true;
   let cluster = false;
   let clustersPath: string | undefined;
+  let github = false;
   try {
     for (let index = 0; index < argv.length; index++) {
       const arg = argv[index];
       if (arg === "--json") json = true;
       else if (arg === "--open") open = true;
+      else if (arg === "--github") github = true;
       else if (arg === "--no-save" || arg === "--no-snapshot") {
         if (arg === "--no-snapshot")
           io.stderr("note: --no-snapshot is deprecated; use --no-save\n");
@@ -140,6 +146,10 @@ export async function runLinear(
       ? await buildLinearProject(source, project, options)
       : await buildLinearGraph(source, seed as string, options);
     if (source.label) report.readSource = source.label;
+    if (github) {
+      if (!io.github) throw new Error("GitHub reads are unavailable in this caller");
+      await resolveGithubAttachments(report, io.github());
+    }
     if (htmlPath || open) {
       if (!io.dashboard) throw new Error("HTML output is unavailable in this caller");
       await io.dashboard(report, { path: htmlPath, open, save, clusters });

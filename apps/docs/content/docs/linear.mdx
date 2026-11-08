@@ -36,7 +36,19 @@ The workspace in an issue URL and the `--workspace` value must both match the au
 - Attachment URLs and titles, including linked GitHub pull requests.
 - Native workflow status, archive state, and update time.
 
-The command lists attachment targets without fetching them, and it doesn't collect text mentions in descriptions or comments. A linked pull request doesn't show that an issue is resolved.
+By default the command lists attachment targets without fetching them, and it doesn't collect text mentions in descriptions or comments. A linked pull request doesn't show that an issue is resolved.
+
+## Linked GitHub work
+
+Add `--github` to read the GitHub issues and pull requests attached to each Linear issue. The command reads each target once through your authenticated `gh` and records its kind, title, state, and draft status:
+
+```bash
+issue-graph linear ENG-123 --depth 2 --github
+```
+
+When an issue is blocked by another issue, the blocker's line shows the state of its linked work, such as `← blocks: ENG-120 · vercel/app#412 PR open, draft`. The attachment rows in the dashboard show the same state.
+
+GitHub targets are one hop. The command doesn't follow their references, and other attachment URLs stay unfetched. A target that can't be read stays visible as unavailable and marks its Linear issue as partial, so the command exits with `1`. Without `--github`, the command makes no GitHub requests.
 
 Output is Markdown by default. `--json` prints the versioned report on stdout. Neither writes local files.
 
