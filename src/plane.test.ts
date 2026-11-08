@@ -250,20 +250,31 @@ describe("Plane project capture", () => {
     expect(report.intake).toMatchObject({ complete: true, pages: 1 });
   });
 
-  test("treats a project without intake access as having no requests", async () => {
+  test.each([
+    "NOT_FOUND",
+    "PAYMENT_REQUIRED",
+  ])("treats an intake list that answers %s as having no requests", async (code) => {
     const reader = fixtureReader({ items: [item(1)] });
     reader.intake = async () => {
-      throw new PlaneReadError("FORBIDDEN");
+      throw new PlaneReadError(code);
     };
     const report = await buildPlaneProject(reader, "ENG", options);
     expect(report.intake.complete).toBe(true);
     expect(report.coverageComplete).toBe(true);
+  });
+
+  test.each([
+    "FORBIDDEN",
+    "UPSTREAM",
+  ])("marks intake incomplete when the intake list answers %s", async (code) => {
+    const reader = fixtureReader({ items: [item(1)] });
     reader.intake = async () => {
-      throw new PlaneReadError("UPSTREAM");
+      throw new PlaneReadError(code);
     };
-    const failed = await buildPlaneProject(reader, "ENG", options);
-    expect(failed.intake).toMatchObject({ complete: false, reason: "read-failed" });
-    expect(failed.coverageComplete).toBe(false);
+    const report = await buildPlaneProject(reader, "ENG", options);
+    expect(report.intake).toMatchObject({ complete: false, reason: "read-failed" });
+    expect(report.coverageComplete).toBe(false);
+    expect(renderPlane(report)).toContain("Intake requests incomplete (read-failed).");
   });
 
   test("reports node-capped items", async () => {

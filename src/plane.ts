@@ -364,11 +364,9 @@ async function readIntake(context: Context): Promise<void> {
         context.intake.reason = coverage.reason;
       }
     } catch (error) {
-      // Intake turned off or not in this plan: there are no requests to read.
-      if (
-        error instanceof PlaneReadError &&
-        ["NOT_FOUND", "FORBIDDEN", "PAYMENT_REQUIRED"].includes(error.code)
-      )
+      // Intake removed or not in this plan: there are no requests to read. A 403 is
+      // different: requests may exist that this key cannot see, so coverage is partial.
+      if (error instanceof PlaneReadError && ["NOT_FOUND", "PAYMENT_REQUIRED"].includes(error.code))
         continue;
       context.intake.complete = false;
       context.intake.reason =
