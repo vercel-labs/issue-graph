@@ -1,7 +1,7 @@
 # Changelog
 
 <!-- release:start -->
-## 0.7.0
+## 0.6.1
 
 ### Features
 
