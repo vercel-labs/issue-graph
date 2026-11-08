@@ -1,6 +1,15 @@
 import type { GithubTarget } from "./dashboard-types.js";
-import type { LinearReport } from "./linear.js";
 import type { GhTransport } from "./transport.js";
+import type { WorkNode } from "./work-types.js";
+
+/** The parts of a Linear or Plane report that GitHub link resolution reads and updates. */
+export interface GithubResolvableReport {
+  nodes: WorkNode[];
+  limits: { concurrency?: number };
+  coverage: { partial: string[] };
+  scope: { externalLinks: "reported-not-fetched" | "github-resolved" };
+  coverageComplete: boolean;
+}
 
 export const GITHUB_TARGET_QUERY = `query IssueGraphLinkedWork($owner:String!,$repo:String!,$n:Int!){
   repository(owner:$owner,name:$repo){
@@ -100,10 +109,10 @@ async function readTarget(
  * Read the GitHub issues and pull requests attached to Linear issues, one hop and
  * never expanded. Each target is read once; failures mark the owning issue partial.
  */
-export async function resolveGithubAttachments(
-  report: LinearReport,
+export async function resolveGithubAttachments<T extends GithubResolvableReport>(
+  report: T,
   transport: Pick<GhTransport, "graphql">,
-): Promise<LinearReport> {
+): Promise<T> {
   const targets = new Map<string, { repo: string; number: number }>();
   for (const node of report.nodes)
     for (const link of node.externalLinks) {

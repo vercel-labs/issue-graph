@@ -73,6 +73,56 @@ export const ISSUE_GRAPH_SCHEMA = {
         validation: "rejects foreign or duplicate member keys; unassigned nodes stay visible",
       },
     },
+    plane: {
+      remoteMutations: false,
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+      ],
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json", "html"],
+      authentication: "PLANE_API_KEY (X-API-Key header); PLANE_WORKSPACE or --workspace",
+      transport:
+        "fetch GET to api.plane.so (or PLANE_API_URL): v2 work items, projects, links; v1 relations",
+      required: ["work item URL, PROJ-123 key, or UUID; alternatively --project UUID|IDENTIFIER"],
+      workspaceIndex:
+        "workspace work item list read first (pages of 100, bounded by --max-pages) to resolve projects, parents, and children",
+      projectCapture: {
+        scope: "non-archived work items in one project, including disconnected items",
+        pageSize: 100,
+        limits: "--max-pages bounds the index and inventory; --max-nodes bounds detail reads",
+        boundary: "retain connections outside the project without fetching those work items",
+      },
+      rateLimit:
+        "client-side budget of PLANE_REQUESTS_PER_MINUTE (default 50); Plane Cloud allows 60 per minute per key; 429 Retry-After is honored",
+      requestsPerWorkItem: 2,
+      maxDepth: { default: 1, minimum: 0, maximum: 8 },
+      maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+      maxPages: { default: 5, minimum: 1, maximum: 100 },
+      concurrency: { default: 2, minimum: 1, maximum: 32 },
+      relationships: ["relations", "parent", "children", "links"],
+      relationTypes: [
+        "blocking",
+        "blocked_by",
+        "duplicate",
+        "relates_to",
+        "start_before",
+        "start_after",
+        "finish_before",
+        "finish_after",
+      ],
+      exclusions: ["text mentions", "archived work items", "fetching non-GitHub link targets"],
+      githubAttachments: {
+        flag: "--github",
+        default: "not fetched",
+        transport: "gh api graphql",
+        depth: "one hop; targets are not expanded",
+      },
+      exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
+      jsonFlag: "--json emits the report on stdout; takes no path",
+      description:
+        "Read a bounded Plane work item neighborhood or project with workspace-scoped identities and native relation direction.",
+    },
     query: {
       providerMutations: false,
       network: false,

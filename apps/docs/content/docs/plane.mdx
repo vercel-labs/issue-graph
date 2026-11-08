@@ -1,0 +1,97 @@
+---
+title: Plane
+description: Read explicit Plane work item relations, hierarchy, and links with workspace-scoped identity and visible coverage limits.
+---
+
+Start from one Plane work item to see what blocks it, what it blocks, its parent and sub-work-items, and its links. Or capture a whole project for the dashboard.
+
+## Connect Plane
+
+Create a personal access token in Plane under **Profile settings > Personal access tokens**, then set it with the workspace slug:
+
+```bash
+export PLANE_API_KEY=plane_api_...
+export PLANE_WORKSPACE=your-workspace
+```
+
+The workspace slug is the first part of your Plane URLs: in `https://app.plane.so/your-workspace/projects/`, it is `your-workspace`. `--workspace` overrides `PLANE_WORKSPACE`, and a work item URL supplies its own workspace. `issue-graph auth status` shows whether a key is set.
+
+For self-hosted Plane, set `PLANE_API_URL` to your instance's origin, such as `https://plane.example.com`. Set `PLANE_WEB_URL` too if the web app is served from another origin. Both must use `https`, except on `localhost`.
+
+The command sends only `GET` requests, with the key in the `X-API-Key` header. Reports never include the key.
+
+## Capture a neighborhood
+
+Pass a work item key, URL, or UUID:
+
+```bash
+issue-graph plane ENG-123 --depth 1
+issue-graph plane https://app.plane.so/your-workspace/browse/ENG-123/ --json
+```
+
+The URL forms `/<workspace>/browse/ENG-123/` and `/<workspace>/projects/<project-id>/issues/<work-item-id>/` are accepted. Each node key includes the workspace slug and the work item UUID, so keys from different workspaces can't collide.
+
+## What the graph includes
+
+- Relations, with their direction from the side that was read. `blocking` and `blocked_by` become one `blocks` edge, `start_before` and `start_after` become one `start_before` edge, and `finish_before` and `finish_after` become one `finish_before` edge. `duplicate` and `relates_to` are undirected. Unknown relation types are kept with their native name.
+- Parent and sub-work-item relationships, including epics and their children.
+- Link URLs and titles, including linked GitHub pull requests.
+- Native state name and state group, and update time. Plane's `cancelled` state group is stored as `canceled`, the spelling the dashboard shares with Linear.
+
+Archived work items are excluded. Text mentions in descriptions and comments aren't collected, and link targets aren't fetched. Add `--github` to read linked GitHub issues and pull requests one hop through `gh`, as described in [Linear](/docs/linear#linked-github-work).
+
+## How reads work
+
+The command first reads the projects in the workspace, then the workspace work item list in pages of 100. That list gives every work item's project, parent, and state, so sub-work-items, parents, and items in other projects resolve without extra requests. Then it reads two things per crawled work item: its relations and its links.
+
+If the workspace has more work items than `--max-pages` pages of 100 hold, the index is marked incomplete. Items outside it are then looked up one at a time, trying the project of the item that referenced them first, and each crawled item also reads its children. The report's `index` field records this.
+
+## Rate limits
+
+Plane Cloud allows 60 requests per minute per API key. The reader keeps a client-side budget of 50 requests per minute by default and prints a line on stderr when it waits. Change the budget with `PLANE_REQUESTS_PER_MINUTE`, for example on a self-hosted instance with a higher limit. When Plane returns `429`, the reader waits for `Retry-After` and retries, up to three times.
+
+A capture of 80 work items costs about 160 requests and takes a little over three minutes at the default budget. Lower `--max-nodes` for a faster first look.
+
+## Dashboard
+
+Write an HTML explorer, or capture a whole project:
+
+```bash
+issue-graph plane ENG-123 --html plane.html --open
+issue-graph plane --project ENG --open
+issue-graph dashboard --open
+```
+
+`--project` takes a project UUID or its identifier, such as `ENG`. Project mode includes disconnected work items and counts the project's open work items: those in the triage, backlog, unstarted, and started state groups. Connections to work items outside the project stay visible, but those items aren't fetched.
+
+Saved Plane entries are keyed `plane:<workspace>:project:<project-id>` and appear next to GitHub and Linear entries in the dashboard. Explore and Swarm are available; Impact and Heat ranking are GitHub-only. `--cluster` and `--clusters` work as they do for [Linear](/docs/linear#thematic-clusters).
+
+## Limits and coverage
+
+| Option | Default | Range |
+| --- | --- | --- |
+| `--depth` | 1 | 0 to 8 |
+| `--max-nodes` | 80 | 1 to 1000 |
+| `--max-pages` | 5 | 1 to 100 pages of 100 per list |
+| `--hub-threshold` | 12 | 1 to 1000 |
+| `--concurrency` | 2 | 1 to 32 |
+
+`coverageComplete` is `false` when a work item can't be read, its relations or links are incomplete, or a node cap or hub stops traversal. The command exits with `0` for complete coverage within scope, `1` for partial coverage or a runtime failure, and `2` for invalid arguments.
+
+## Library
+
+```ts
+import { buildPlaneGraph, planeDashboardModel } from "issue-graph";
+import { planeReader } from "issue-graph/transport/plane";
+
+const reader = planeReader({ apiKey: process.env.PLANE_API_KEY ?? "", workspace: "your-workspace" });
+const report = await buildPlaneGraph(reader, "ENG-123", {
+  maxDepth: 1,
+  maxNodes: 20,
+  maxPages: 5,
+  hubThreshold: 12,
+  concurrency: 2,
+});
+```
+
+Use `buildPlaneProject(reader, "ENG", options)` for a project capture and `planeDashboardModel(report)` for the dashboard model. Any object that implements `PlaneReader` can stand in for the REST reader.

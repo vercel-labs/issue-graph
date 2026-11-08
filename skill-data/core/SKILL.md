@@ -31,6 +31,7 @@ If a command or asset is missing, report the CLI/skill mismatch and observed err
 | Inspect effective scoring defaults | `issue-graph config show --provider github --scope owner/repo --json` |
 | Backlog verification queue | `issue-graph reconcile owner/repo` |
 | Linear issue or project relationships | `issue-graph linear <issue>`, or `issue-graph linear --project UUID` |
+| Plane work item or project relationships | `issue-graph plane <PROJ-123>`, or `issue-graph plane --project IDENTIFIER` |
 | Next backlog action | `issue-graph plan owner/repo` |
 | Find work one fix resolves together | `issue-graph plan owner/repo --budget 1000 --format json`, then read `sweep` |
 
@@ -38,7 +39,7 @@ For counts, skip graph discovery. Resolve repositories and authors from the requ
 
 Live collection supports GitHub. `open`, `rank`, and `cluster` accept a repository or items. `graph` needs items or `--label`. Items can be numbers, `owner/repo#123`, or URLs; bare numbers use `--repo` or the checkout's GitHub remote. Inspect an issue's graph before starting work and credit existing contributors.
 
-Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Add `--github` to read the state of attached GitHub issues and pull requests, which shows whether a blocker's linked work is open, draft, or merged. Read `issue-graph linear --help` for its flags and limits.
+Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Add `--github` to read the state of attached GitHub issues and pull requests, which shows whether a blocker's linked work is open, draft, or merged. Read `issue-graph linear --help` for its flags and limits. Use the `plane` command for Plane. It needs `PLANE_API_KEY` and a workspace (`--workspace` or `PLANE_WORKSPACE`); if `issue-graph auth status` shows Plane not signed in, ask the user to set the key in their environment, never in chat. Plane Cloud allows 60 requests per minute, and each work item costs about two, so large captures take minutes. Read `issue-graph plane --help` for its flags.
 
 ## Query saved data
 
