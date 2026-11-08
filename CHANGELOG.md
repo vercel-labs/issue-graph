@@ -5,7 +5,7 @@
 ### Features
 
 - `issue-graph plane <work-item>` reads a Plane work item neighborhood: relations (blocking, duplicate, relates to, start and finish ordering), parents, sub-work-items, and links, with native states and workspace-scoped identifiers.
-- `issue-graph plane --project ID` captures a whole Plane project by UUID or identifier and counts its open work items.
+- `issue-graph plane --project ID` captures a whole Plane project by UUID or identifier, including pending intake requests, and counts its open work items.
 - Plane reads use `PLANE_API_KEY`, pace themselves to Plane's 60 requests per minute, honor `Retry-After`, and support self-hosted Plane through `PLANE_API_URL`.
 - `--github` reads linked GitHub issues and pull requests for Plane work items, as it does for Linear.
 

@@ -74,6 +74,8 @@ describe("planeReader", () => {
       "https://api.plane.so/api/v2/workspaces/fixture/work-items/ENG-1/?expand=state",
     );
     expect(requests[1].url).toContain("parent_id=00000000-0000-4000-8000-000000000001");
+    // Lists drop description_html unless every field is requested.
+    expect(requests[1].url).toContain("fields=all");
     for (const request of requests) {
       expect(request.init?.method).toBe("GET");
       expect(request.init?.redirect).toBe("error");
@@ -91,6 +93,16 @@ describe("planeReader", () => {
       "https://api.plane.so/api/v1/workspaces/fixture/projects/p/work-items/i/relations/",
     );
     expect(requests[1].url).toContain("offset=100");
+  });
+
+  test("reads intake requests from v1", async () => {
+    const { reader, requests } = harness([
+      json({ results: [], next_cursor: "100:1:0", next_page_results: false }),
+    ]);
+    await expect(reader.intake?.("p")).resolves.toEqual({ items: [] });
+    expect(requests[0].url).toBe(
+      "https://api.plane.so/api/v1/workspaces/fixture/projects/p/intake-issues/?per_page=100",
+    );
   });
 
   test("paces requests to the per-minute budget", async () => {

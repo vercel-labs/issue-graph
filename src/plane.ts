@@ -78,6 +78,8 @@ export interface PlaneReport {
   readSource?: string;
   /** The workspace work item list read up front to resolve projects, parents, and children. */
   index: ReadCoverage;
+  /** Pending intake requests, read per intake-enabled project and merged into the index. */
+  intake: ReadCoverage;
   inventory?: ReadCoverage;
   seeds: string[];
   scope: {
@@ -160,7 +162,11 @@ interface PlaneProject {
   id: string;
   identifier: string;
   name: string;
+  intake: boolean;
 }
+
+/** Plane intake statuses whose work item is still waiting for triage. */
+const PENDING_INTAKE = new Set([-2, 0]);
 
 interface Item {
   id: string;
@@ -172,6 +178,8 @@ interface Item {
   state: { name: string; type: string };
   archived: boolean;
   updatedAt: string;
+  /** A pending intake request, which Plane serves only through the intake list. */
+  intake?: boolean;
 }
 
 function parseItem(value: unknown, projects: Map<string, PlaneProject>): Item {
@@ -270,6 +278,7 @@ interface Context {
   /** Children by parent id, trustworthy only when the index is complete. */
   children: Map<string, string[]>;
   index: ReadCoverage;
+  intake: ReadCoverage;
   /** A guess at the project of an item seen only as a relation target. */
   hints: Map<string, string>;
 }
@@ -289,7 +298,12 @@ async function readContext(reader: PlaneReader, options: PlaneGraphOptions): Pro
         const project = object(value);
         if (project.archived_at) continue;
         const id = uuid(project.id);
-        projects.set(id, { id, identifier: text(project.identifier), name: text(project.name) });
+        projects.set(id, {
+          id,
+          identifier: text(project.identifier),
+          name: text(project.name),
+          intake: project.intake_view === true,
+        });
       }
     },
   );
@@ -302,6 +316,7 @@ async function readContext(reader: PlaneReader, options: PlaneGraphOptions): Pro
     items: new Map(),
     children: new Map(),
     index: { source: "workspace work items", pages: 0, complete: false },
+    intake: { source: "intake requests", pages: 0, complete: true },
     hints: new Map(),
   };
   context.index = await readPages(
@@ -312,6 +327,7 @@ async function readContext(reader: PlaneReader, options: PlaneGraphOptions): Pro
       for (const value of values) remember(context, parseItem(value, projects));
     },
   );
+  await readIntake(context);
   for (const item of context.items.values()) {
     if (!item.parentId) continue;
     const list = context.children.get(item.parentId) ?? [];
@@ -321,7 +337,55 @@ async function readContext(reader: PlaneReader, options: PlaneGraphOptions): Pro
   return context;
 }
 
-function itemUrl(context: Context, item: Pick<Item, "identifier">): string {
+/** Adds pending intake requests, which no work item list returns, to the index. */
+async function readIntake(context: Context): Promise<void> {
+  const { reader } = context;
+  if (!reader.intake) return;
+  for (const project of context.projects.values()) {
+    if (!project.intake) continue;
+    try {
+      const coverage = await readPages(
+        "intake requests",
+        context.maxPages,
+        (next) => reader.intake?.(project.id, next) ?? Promise.resolve({ items: [] }),
+        (values) => {
+          for (const value of values) {
+            const request = object(value);
+            if (!PENDING_INTAKE.has(request.status as number) || !request.issue_detail) continue;
+            const item = parseItem(request.issue_detail, context.projects);
+            if (item.projectId !== project.id) throw new PlaneReadError("INVALID_PAYLOAD");
+            if (!context.items.has(item.id)) remember(context, { ...item, intake: true });
+          }
+        },
+      );
+      context.intake.pages += coverage.pages;
+      if (!coverage.complete) {
+        context.intake.complete = false;
+        context.intake.reason = coverage.reason;
+      }
+    } catch (error) {
+      // Intake turned off or not in this plan: there are no requests to read.
+      if (
+        error instanceof PlaneReadError &&
+        ["NOT_FOUND", "FORBIDDEN", "PAYMENT_REQUIRED"].includes(error.code)
+      )
+        continue;
+      context.intake.complete = false;
+      context.intake.reason =
+        error instanceof PlaneReadError && error.code === "INVALID_PAYLOAD"
+          ? "invalid-page"
+          : "read-failed";
+    }
+  }
+}
+
+function itemUrl(
+  context: Context,
+  item: Pick<Item, "identifier" | "intake" | "projectId">,
+): string {
+  // Pending intake requests have no browse page until they are accepted.
+  if (item.intake)
+    return `${context.webUrl}/${context.workspace}/projects/${item.projectId}/intake/`;
   return `${context.webUrl}/${context.workspace}/browse/${item.identifier}/`;
 }
 
@@ -672,6 +736,7 @@ export async function buildPlaneGraph(
     project: first.project ?? null,
     openCount: first.project ? await openCount(context, first.project.id) : undefined,
     index: context.index,
+    intake: context.intake,
     seeds: [first.key],
     scope: {
       issues: "neighborhood",
@@ -682,6 +747,7 @@ export async function buildPlaneGraph(
     },
     limits,
     coverageComplete:
+      context.intake.complete &&
       !coverage.failed.length &&
       !coverage.partial.length &&
       !coverage.cappedOut.length &&
@@ -728,6 +794,8 @@ export async function buildPlaneProject(
         }
       },
     );
+    for (const item of context.items.values())
+      if (item.intake && item.projectId === project.id && !item.archived) found.add(item.id);
     listed = [...found];
   }
   const ids = listed.sort();
@@ -755,6 +823,7 @@ export async function buildPlaneProject(
     project: projectOf(context, project.id),
     openCount: await openCount(context, project.id),
     index: context.index,
+    intake: context.intake,
     inventory,
     seeds: [],
     scope: {
@@ -774,6 +843,7 @@ export async function buildPlaneProject(
     },
     coverageComplete:
       inventory.complete &&
+      context.intake.complete &&
       !coverage.failed.length &&
       !coverage.partial.length &&
       !coverage.cappedOut.length,
@@ -840,6 +910,8 @@ export function renderPlane(report: PlaneReport): string {
       `Workspace index incomplete (${report.index.reason ?? "read incomplete"}); items outside it were looked up one by one.`,
       "",
     );
+  if (!report.intake.complete)
+    lines.push(`Intake requests incomplete (${report.intake.reason ?? "read incomplete"}).`, "");
   if (report.coverage.cappedOut.length)
     lines.push(`Node cap: ${report.coverage.cappedOut.length} known nodes not fetched.`, "");
   if (report.inventory && !report.inventory.complete)

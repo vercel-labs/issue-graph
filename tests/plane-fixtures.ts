@@ -6,8 +6,20 @@ export const id = (number: number) => `00000000-0000-4000-8000-${String(number).
 export const pid = (number: number) =>
   `11111111-1111-4111-8111-${String(number).padStart(12, "0")}`;
 export const key = (number: number) => `plane:${workspace}:issue:${id(number)}`;
-export const engine = { id: pid(1), identifier: "ENG", name: "Engine", archived_at: null };
-export const ops = { id: pid(2), identifier: "OPS", name: "Ops", archived_at: null };
+export const engine = {
+  id: pid(1),
+  identifier: "ENG",
+  name: "Engine",
+  archived_at: null,
+  intake_view: true,
+};
+export const ops = {
+  id: pid(2),
+  identifier: "OPS",
+  name: "Ops",
+  archived_at: null,
+  intake_view: false,
+};
 
 export const options: PlaneGraphOptions = {
   maxDepth: 1,
@@ -56,6 +68,8 @@ export interface Fixture {
   relations?: Record<string, Record<string, unknown[]>>;
   links?: Record<string, unknown[]>;
   projects?: Array<typeof engine>;
+  /** Intake requests by project id, as `{ status, issue_detail }`. */
+  intake?: Record<string, unknown[]>;
   /** Page size for workspace and project lists. */
   pageSize?: number;
 }
@@ -114,6 +128,10 @@ export function fixtureReader(fixture: Fixture): PlaneReader & { calls: string[]
         size,
         next,
       );
+    },
+    async intake(projectId, next) {
+      calls.push(`intake ${projectId}`);
+      return paged(fixture.intake?.[projectId] ?? [], size, next);
     },
     async projectWorkItems(projectId, next) {
       calls.push(`projectWorkItems ${projectId}`);

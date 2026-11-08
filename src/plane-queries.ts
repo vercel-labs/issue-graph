@@ -31,6 +31,11 @@ export interface PlaneReader {
   children(parentId: string, next?: string): Promise<PlanePage>;
   /** Work items in a project, with their state expanded. */
   projectWorkItems(projectId: string, next?: string): Promise<PlanePage>;
+  /**
+   * Intake requests in a project, each with its work item under `issue_detail`. Pending
+   * requests are left out of every work item list, so they are read here.
+   */
+  intake?(projectId: string, next?: string): Promise<PlanePage>;
   /** Number of open (triage, backlog, unstarted, started) work items in a project. */
   countOpen?(projectId: string): Promise<number | undefined>;
 }

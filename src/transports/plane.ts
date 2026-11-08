@@ -249,7 +249,8 @@ export function planeReader(options: PlaneReaderOptions): PlaneReader {
 
   const list = async (base: string, params: Record<string, string>, next?: string) =>
     planePage(await get(url(base, params, next)));
-  const withState = { expand: "state", per_page: "100" };
+  // v2 lists omit description_html unless every field is requested.
+  const withState = { expand: "state", fields: "all", per_page: "100" };
 
   return {
     label: `Plane REST API (${new URL(apiUrl).host})`,
@@ -278,6 +279,9 @@ export function planeReader(options: PlaneReaderOptions): PlaneReader {
       list(`${v2}/work-items/`, { ...withState, parent_id: parentId }, next),
     projectWorkItems: (projectId, next) =>
       list(`${v2}/projects/${segment(projectId)}/work-items/`, withState, next),
+    // Intake is documented only on v1.
+    intake: (projectId, next) =>
+      list(`${v1}/projects/${segment(projectId)}/intake-issues/`, { per_page: "100" }, next),
     async countOpen(projectId) {
       const page = await list(`${v2}/work-items/`, {
         project_id: projectId,

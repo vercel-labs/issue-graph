@@ -87,6 +87,8 @@ export const ISSUE_GRAPH_SCHEMA = {
       required: ["work item URL, PROJ-123 key, or UUID; alternatively --project UUID|IDENTIFIER"],
       workspaceIndex:
         "workspace work item list read first (pages of 100, bounded by --max-pages) to resolve projects, parents, and children",
+      intake:
+        "pending and snoozed intake requests, which work item lists omit, read per intake-enabled project (v1) and added to the index",
       projectCapture: {
         scope: "non-archived work items in one project, including disconnected items",
         pageSize: 100,

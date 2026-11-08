@@ -17,6 +17,7 @@ import {
   renderPlane,
 } from "./plane.js";
 import { planeDashboardModel } from "./plane-html.js";
+import { PlaneReadError } from "./plane-queries.js";
 
 describe("Plane locators", () => {
   test.each([
@@ -212,6 +213,57 @@ describe("Plane project capture", () => {
     expect(Object.keys(model.nodes)).toHaveLength(2);
     expect(model.id).toBe(`plane:fixture:project:${engine.id}`);
     expect(model.provider.id).toBe("plane");
+  });
+
+  test("includes pending intake requests, which work item lists leave out", async () => {
+    const triage = { id: pid(93), name: "Triage", group: "triage" };
+    const {
+      identifier: _key,
+      project_id: _project,
+      parent_id: _parent,
+      ...detail
+    } = item(5, {
+      state: triage,
+    });
+    const reader = fixtureReader({
+      items: [item(1)],
+      relations: { [id(1)]: { blocked_by: [id(5)] } },
+      intake: {
+        [engine.id]: [
+          { status: -2, issue_detail: { ...detail, project: engine.id, parent: null } },
+          { status: 1, issue_detail: { ...detail, id: id(6), project: engine.id } },
+        ],
+      },
+    });
+    const report = await buildPlaneProject(reader, "ENG", options);
+    expect(reader.calls).toContain(`intake ${engine.id}`);
+    expect(reader.calls).not.toContain(`intake ${ops.id}`);
+    const pending = report.nodes.find((node) => node.key === key(5));
+    expect(pending).toMatchObject({
+      identifier: "ENG-5",
+      fetched: true,
+      state: { type: "triage" },
+      url: `https://app.plane.so/fixture/projects/${engine.id}/intake/`,
+    });
+    expect(report.nodes.some((node) => node.key === key(6))).toBe(false);
+    expect(report.openCount?.value).toBe(2);
+    expect(report.intake).toMatchObject({ complete: true, pages: 1 });
+  });
+
+  test("treats a project without intake access as having no requests", async () => {
+    const reader = fixtureReader({ items: [item(1)] });
+    reader.intake = async () => {
+      throw new PlaneReadError("FORBIDDEN");
+    };
+    const report = await buildPlaneProject(reader, "ENG", options);
+    expect(report.intake.complete).toBe(true);
+    expect(report.coverageComplete).toBe(true);
+    reader.intake = async () => {
+      throw new PlaneReadError("UPSTREAM");
+    };
+    const failed = await buildPlaneProject(reader, "ENG", options);
+    expect(failed.intake).toMatchObject({ complete: false, reason: "read-failed" });
+    expect(failed.coverageComplete).toBe(false);
   });
 
   test("reports node-capped items", async () => {

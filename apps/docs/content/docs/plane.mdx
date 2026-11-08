@@ -42,7 +42,7 @@ Archived work items are excluded. Text mentions in descriptions and comments are
 
 ## How reads work
 
-The command first reads the projects in the workspace, then the workspace work item list in pages of 100. That list gives every work item's project, parent, and state, so sub-work-items, parents, and items in other projects resolve without extra requests. Then it reads two things per crawled work item: its relations and its links.
+The command first reads the projects in the workspace, then the workspace work item list in pages of 100. That list gives every work item's project, parent, and state, so sub-work-items, parents, and items in other projects resolve without extra requests. Plane leaves pending intake requests out of every work item list, so the command also reads the intake list of each project that has intake turned on, one request per project, and adds requests that are pending or snoozed. Then it reads two things per crawled work item: its relations and its links.
 
 If the workspace has more work items than `--max-pages` pages of 100 hold, the index is marked incomplete. Items outside it are then looked up one at a time, trying the project of the item that referenced them first, and each crawled item also reads its children. The report's `index` field records this.
 
@@ -62,7 +62,7 @@ issue-graph plane --project ENG --open
 issue-graph dashboard --open
 ```
 
-`--project` takes a project UUID or its identifier, such as `ENG`. Project mode includes disconnected work items and counts the project's open work items: those in the triage, backlog, unstarted, and started state groups. Connections to work items outside the project stay visible, but those items aren't fetched.
+`--project` takes a project UUID or its identifier, such as `ENG`. Project mode includes disconnected work items and pending intake requests, and counts the project's open work items: those in the triage, backlog, unstarted, and started state groups. A pending intake request links to its project's intake page, because it has no browse page until it is accepted. Connections to work items outside the project stay visible, but those items aren't fetched.
 
 Saved Plane entries are keyed `plane:<workspace>:project:<project-id>` and appear next to GitHub and Linear entries in the dashboard. Explore and Swarm are available; Impact and Heat ranking are GitHub-only. `--cluster` and `--clusters` work as they do for [Linear](/docs/linear#thematic-clusters).
 
