@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { buildLinearGraph, buildLinearProject } from "../linear.js";
+import { linearDashboardModel } from "../linear-html.js";
 import { linearMcpReader } from "./linear-mcp.js";
 import type { McpClient } from "./mcp.js";
 import { McpError } from "./mcp.js";
@@ -157,4 +158,24 @@ test("MCP failures surface as Linear read errors and the source is labeled", asy
   const reader = linearMcpReader({ token: "t", client: fake });
   expect(reader.label).toBe("Linear MCP (signed in)");
   await expect(buildLinearGraph(reader, "ENG-9", options)).rejects.toThrow("NOT_FOUND");
+});
+
+test("a relation read from both issues is one edge in the dashboard", async () => {
+  const none = { blocks: [], blockedBy: [], relatedTo: [], duplicateOf: null };
+  const { fake } = client({
+    "ENG-1": mcpIssue(1, { relations: { ...none, blocks: ["ENG-2"], relatedTo: ["ENG-3"] } }),
+    "ENG-2": mcpIssue(2, { relations: { ...none, blockedBy: ["ENG-1"] } }),
+    "ENG-3": mcpIssue(3, { relations: { ...none, relatedTo: ["ENG-1"] } }),
+  });
+  const report = await buildLinearGraph(
+    linearMcpReader({ token: "t", client: fake }),
+    "ENG-1",
+    options,
+  );
+  const model = linearDashboardModel(report);
+  const root = Object.values(model.nodes).find((node) => node.identifier === "ENG-1");
+  const blocked = Object.values(model.nodes).find((node) => node.identifier === "ENG-2");
+  expect(root?.out.filter((edge) => edge.via === "blocks")).toHaveLength(1);
+  expect(root?.out.filter((edge) => edge.via === "related")).toHaveLength(1);
+  expect(blocked?.in.filter((edge) => edge.via === "blocked by")).toHaveLength(1);
 });
