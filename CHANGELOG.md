@@ -1,6 +1,23 @@
 # Changelog
 
 <!-- release:start -->
+## 0.6.1
+
+### Features
+
+- `issue-graph linear --github` reads the GitHub issues and pull requests attached to each Linear issue, one hop through `gh`. A blocked issue shows whether its blocker's linked work is open, draft, closed, or merged, and the dashboard shows the state on each attachment. Unreadable targets stay visible and mark the issue partial.
+
+### Fixes
+
+- With the Linear MCP session, a relation read from both of its issues shows once in the dashboard instead of twice.
+
+### Documentation
+
+- The bundled agent guide no longer says live Linear collection is unavailable.
+- Docs pages follow the technical-writer style, and the README hero shows clusters in light and dark themes.
+
+<!-- release:end -->
+
 ## 0.6.0
 
 ### Features
@@ -24,8 +41,6 @@
 - Add a Linear guide, and describe Linear in the README, the bundled agent guide, and `schema`.
 - The landing page shows agent-proposed clusters from a real capture, the GitHub and Linear providers, and Heat ranking with adjustable weights.
 - Shorten the README and move website and dashboard development notes to CONTRIBUTING.
-
-<!-- release:end -->
 
 ## 0.5.0
 
