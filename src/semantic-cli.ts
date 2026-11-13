@@ -26,7 +26,7 @@ Suggest classifications for public issues with typesafe-ai/jev through AI Gatewa
 Without --dry-run, uncached inference may incur charges and needs AI_GATEWAY_API_KEY.
 Every suggestion requires human review. No GitHub mutations or automatic acceptance.
 
-  --repo owner/repo  exactly one public repository (required)
+  --repo owner/repo  exactly one public github.com repository (required)
   --dry-run          capture/prepare/read cache; no Gateway keys, calls or local writes
   --cached           local saved-evidence view; no GitHub, Gateway, keys or writes
   --concurrency N    inference workers, 1..4 (default 1; configure against your quota)

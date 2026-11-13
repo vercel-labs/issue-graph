@@ -16,7 +16,7 @@ const BODY_CONTINUATION_BATCH_SIZE = Math.floor(
 const MAX_COMMENTS = 300;
 const MAX_COMMENT_PAGES = 1 + Math.ceil((MAX_COMMENTS - INITIAL_COMMENTS) / COMMENT_PAGE_SIZE);
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
-const REPOSITORY_FIELDS = "nameWithOwner visibility isPrivate";
+const REPOSITORY_FIELDS = "nameWithOwner visibility isPrivate url";
 const REPOSITORY_QUERY = `query SemanticRepository($owner: String!, $repo: String!) {
   repository(owner: $owner, name: $repo) {
     ${REPOSITORY_FIELDS}
@@ -144,9 +144,15 @@ async function repository(
   if (!object(repo) || repo.visibility !== "PUBLIC" || repo.isPrivate !== false) {
     throw error("repository-not-public");
   }
+  // PUBLIC only says public on whichever host answered, and a private
+  // Enterprise server reports its own repositories that way. Pin the identity
+  // to github.com so only Internet-public evidence can be captured.
+  const name = `${variables.owner}/${variables.repo}`;
   if (
     typeof repo.nameWithOwner !== "string" ||
-    repo.nameWithOwner.toLowerCase() !== `${variables.owner}/${variables.repo}`.toLowerCase()
+    repo.nameWithOwner.toLowerCase() !== name.toLowerCase() ||
+    typeof repo.url !== "string" ||
+    repo.url.toLowerCase() !== `https://github.com/${name}`.toLowerCase()
   )
     throw error("repository-identity-unverified");
   return repo;

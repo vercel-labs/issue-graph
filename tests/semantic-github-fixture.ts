@@ -46,7 +46,13 @@ export function issue(number: number) {
 export function envelope(fields: Record<string, unknown>) {
   return {
     data: {
-      repository: { nameWithOwner: "o/r", visibility: "PUBLIC", isPrivate: false, ...fields },
+      repository: {
+        nameWithOwner: "o/r",
+        visibility: "PUBLIC",
+        isPrivate: false,
+        url: "https://github.com/o/r",
+        ...fields,
+      },
     },
   };
 }

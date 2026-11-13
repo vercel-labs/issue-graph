@@ -52,7 +52,7 @@ test("76 issues: 11 cold queries, 11 warm capture plus 4 revalidation queries, s
   expect(saved).toEqual(before);
   for (const call of [...cold.calls, ...warm.calls]) {
     expect(call.variables).toMatchObject({ owner: "o", repo: "r" });
-    expect(call.query).toContain("nameWithOwner visibility isPrivate");
+    expect(call.query).toContain("nameWithOwner visibility isPrivate url");
     expect(call.query).not.toMatch(/\b(mutation|search|pullRequests|issueOrPullRequest)\b/);
     expect([...call.query.matchAll(/i\d+: issue/g)].length).toBeLessThanOrEqual(20);
   }
@@ -129,6 +129,7 @@ test.each([
   ["private", "Repository", "repository-not-public"],
   ["private", "Versions", "repository-not-public"],
   ["scope", "Repository", "repository-identity-unverified"],
+  ["host", "Repository", "repository-identity-unverified"],
   ["graphql", "Repository", "github-graphql-error"],
 ])("%s at %s rejects the capture", async (change, operation, code) => {
   const source = fixture(1, {
@@ -136,6 +137,7 @@ test.each([
       if (call.operation !== operation) return response;
       if (change === "private") repoData(response).visibility = "PRIVATE";
       if (change === "scope") repoData(response).nameWithOwner = "other/repo";
+      if (change === "host") repoData(response).url = "https://ghe.example.com/o/r";
       return change === "graphql"
         ? { ...record(response), errors: [{ message: "upstream-private-text" }] }
         : response;

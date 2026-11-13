@@ -442,11 +442,17 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
   if (argv[0] === "classify") {
-    process.exitCode = await runSemanticCli(argv.slice(1), shellTransport(), {
-      isTTY: Boolean(process.stdout.isTTY),
-      stdout: (value) => process.stdout.write(value),
-      stderr: (value) => process.stderr.write(value),
-    });
+    // Semantic capture only reasons about github.com repositories, so the host
+    // is pinned instead of inherited from GH_HOST or gh's config.
+    process.exitCode = await runSemanticCli(
+      argv.slice(1),
+      shellTransport({ hostname: "github.com" }),
+      {
+        isTTY: Boolean(process.stdout.isTTY),
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+      },
+    );
     return;
   }
   if (argv[0] === "status") {

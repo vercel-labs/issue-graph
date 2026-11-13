@@ -64,6 +64,7 @@ const repository = {
   nameWithOwner: "sample/public-repo",
   visibility: mode === "private" ? "PRIVATE" : "PUBLIC",
   isPrivate: mode === "private",
+  url: "https://github.com/sample/public-repo",
 };
 if (operation === "Repository") repository.issues = { totalCount: total };
 else if (operation === "Issues") {

@@ -56,9 +56,11 @@ Ready-for-review means non-draft, not approved or merge-ready. For a ready-for-r
 
 ### Preview and choose a mode
 
-`classify` is review-only for open issues in exactly one public repository. It never
-mutates GitHub. Inspect evidence coverage, exclusions, taxonomy and cache eligibility
-before explicitly authorizing inference:
+`classify` is review-only for open issues in exactly one public github.com repository. It
+never mutates GitHub. Capture runs `gh` against `github.com` and rejects a repository whose
+source URL is on another host, so an Enterprise server selected by `GH_HOST` cannot send
+its issue text to Gateway. Inspect evidence coverage, exclusions, taxonomy and cache
+eligibility before explicitly authorizing inference:
 
 ```bash
 issue-graph classify --repo owner/repo --dry-run --limit 1 --max-calls 1 --format json
