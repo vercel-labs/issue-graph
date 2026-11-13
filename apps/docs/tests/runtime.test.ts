@@ -13,6 +13,15 @@ import { pageMetadata } from "../src/lib/page-metadata";
 import { canonicalUrl, isPreview, siteName, siteUrl } from "../src/lib/site";
 import { textResponse } from "../src/lib/text-response";
 
+test("regenerates MDX after Next typegen before running TypeScript", () => {
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  expect(pkg.scripts.typecheck.split("&&").map((command: string) => command.trim())).toEqual([
+    "next typegen",
+    "fumadocs-mdx",
+    "tsc --noEmit",
+  ]);
+});
+
 describe("route boundaries", () => {
   test("preserves a separate landing page and docs root", () => {
     expect(docsPath()).toBe("/docs");

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import { statusArgs } from "./cli.js";
 import { parseStatusArgs } from "./status-cli.js";
 
 const stub = readFileSync(new URL("../skills/issue-graph/SKILL.md", import.meta.url), "utf8");
@@ -55,7 +56,8 @@ describe("issue-graph skill routing", () => {
     const commands = skill.split("\n").filter((line) => line.startsWith("issue-graph status "));
     expect(commands.length).toBeGreaterThanOrEqual(4);
     for (const command of commands) {
-      const args = parseStatusArgs(command.split(/\s+/).slice(2));
+      // the CLI turns positional repositories into --repo before status parses them
+      const args = parseStatusArgs(statusArgs(command.split(/\s+/).slice(2), () => undefined));
       expect(args.repos.length).toBeGreaterThan(0);
       expect(args.authors.length).toBeGreaterThan(0);
     }

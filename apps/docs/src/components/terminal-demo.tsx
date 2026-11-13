@@ -1,15 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 import type { TerminalDemoProps } from "@/lib/terminal-demo";
-import { renderTerminalCommand, TerminalOutput } from "./terminal-output";
+import { renderTerminalCommand, TerminalPresentation } from "./terminal-output";
 import "./terminal-demo.css";
-
-const purposes: Record<string, string> = {
-  graph: "Trace fixes and open follow-ups",
-  status: "Spot PRs waiting for review",
-  plan: "Choose what to tackle next",
-};
 
 export function TerminalDemo({ examples }: TerminalDemoProps) {
   const instanceId = useId();
@@ -113,8 +108,7 @@ export function TerminalDemo({ examples }: TerminalDemoProps) {
         ))}
       </div>
       <p className="ig-demo-summary" aria-live="polite" aria-atomic="true">
-        <span className="ig-demo-purpose">{purposes[examples[selectedIndex].id]}</span>
-        <span>{examples[selectedIndex].summary}</span>
+        {examples[selectedIndex].summary}
       </p>
       <div className="ig-demo-frame">
         <div className="ig-demo-bar">
@@ -136,14 +130,20 @@ export function TerminalDemo({ examples }: TerminalDemoProps) {
             tabIndex={selectedIndex === index ? 0 : -1}
             className="ig-demo-panel"
           >
-            <pre>
-              <code>
-                <span className="ig-demo-prompt">$ </span>
-                {renderTerminalCommand(example.command)}
-                {"\n\n"}
-                <TerminalOutput output={example.output} exampleId={example.id} />
-              </code>
-            </pre>
+            <div className="ig-demo-command">
+              <span className="ig-demo-prompt">$ </span>
+              {renderTerminalCommand(example.command)}
+            </div>
+            <TerminalPresentation output={example.output} exampleId={example.id} />
+            {example.image ? (
+              <a
+                href={example.image.src}
+                className="ig-demo-preview"
+                aria-label="View full dashboard screenshot"
+              >
+                <Image {...example.image} sizes="(max-width: 640px) 90vw, 554px" />
+              </a>
+            ) : null}
           </div>
         ))}
       </div>

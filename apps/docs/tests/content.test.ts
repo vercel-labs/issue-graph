@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import { docsSlugs } from "../src/lib/docs-paths";
+import { exampleCommand, exampleRerunCommand } from "../src/lib/site";
 
 const contentRoot = new URL("../content/docs/", import.meta.url);
 const appRoot = new URL("../", import.meta.url);
@@ -49,7 +50,7 @@ describe("documentation content contract", () => {
 
   test("names the docs entry Overview", async () => {
     const intro = await read("content/docs/index.mdx");
-    expect(intro).toMatch(/^title: Overview$/m);
+    expect(intro).toMatch(/^navTitle: Overview$/m);
   });
 
   test("documents published npm-first installation and preserves access boundaries", async () => {
@@ -64,7 +65,6 @@ describe("documentation content contract", () => {
       expect(page).toContain("npx issue-graph@latest --help");
       expect(page).toContain("npm install --global issue-graph@latest");
       expect(page).toContain("https://www.npmjs.com/package/issue-graph)");
-      expect(page).toContain("INTERNAL");
     }
     expect(start).toContain("npm install --global issue-graph@latest");
     expect(start.indexOf("## Install from npm")).toBeLessThan(
@@ -76,9 +76,9 @@ describe("documentation content contract", () => {
     expect(library).toContain('from "issue-graph/transport/shell"');
     expect(library).not.toContain("file:../issue-graph");
     expect(reference).toContain("npx issue-graph@latest");
-    expect(start).toContain("Check your installed command's help");
-    expect(start).toContain("not unreleased source capabilities");
-    expect(security).toContain("INTERNAL");
+    expect(start).toContain("supported by your installed release");
+    expect(security).toContain("source repository and npm package are public");
+    expect(security).toContain("Captures can still contain private repository data");
     expect(security.toLowerCase()).toContain("snapshot");
     const files = (await readdir(contentRoot)).filter((name) => name.endsWith(".mdx"));
     for (const file of files) {
@@ -116,30 +116,43 @@ describe("documentation content contract", () => {
       read("content/docs/get-started.mdx"),
       read("content/docs/graph.mdx"),
     ]);
-    const readme = await read("../../README.md");
-    expect(readme).toContain(
-      "issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot",
-    );
+    expect(example.command).toBe(exampleCommand);
     for (const page of pages) {
-      expect(page).toContain(example.command);
-      expect(page).toContain(example.capturedAt.slice(0, 10));
-      expect(page).toContain("not a live feed or complete history");
+      expect(page).toContain(exampleRerunCommand);
       expect(page).not.toContain("issue-graph 427");
+    }
+    for (const page of pages.slice(1)) {
+      expect(page).toContain(example.capturedAt.slice(0, 10));
       for (const node of example.nodes) expect(page).toContain(`#${node.number}`);
     }
+    expect(pages[0]).toContain("[Get started](/docs/get-started)");
     const start = pages[1] ?? "";
     for (const node of example.nodes) {
       const row = start.split("\n").find((line) => line.includes(`](${node.url}) |`));
       expect(row).toContain(`| ${node.state} |`);
     }
-    for (const page of pages.slice(1, 3)) {
-      expect(page).toContain(`${example.coverage.beyondDepthReferences} references`);
-      expect(page).toContain(`${example.coverage.omittedEdges} edges`);
-    }
-    expect(readme).toContain("[Capture details](https://issue-graph.dev/docs/graph)");
+    expect(start).toContain("[Graph](/docs/graph)");
+    expect(pages[2]).toContain(`${example.coverage.beyondDepthReferences} references`);
+    expect(pages[2]).toContain(`${example.coverage.omittedEdges} edges`);
   });
 
-  test("root guidance separates published installation from future release authorization", async () => {
+  test("ships a README hero image for light and dark themes", async () => {
+    const readme = await read("../../README.md");
+    expect(readme).toContain(
+      '<source media="(prefers-color-scheme: dark)" srcset="https://issue-graph.dev/readme-hero-dark.png">',
+    );
+    expect(readme).toContain('src="https://issue-graph.dev/readme-hero-light.png"');
+    expect(readme).toMatch(/<img alt="issue-graph: [^"]+"/);
+    for (const theme of ["dark", "light"]) {
+      const image = await readFile(new URL(`public/readme-hero-${theme}.png`, appRoot));
+      expect(image.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      expect(image.readUInt32BE(16)).toBe(2400);
+      expect(image.readUInt32BE(20)).toBe(1200);
+      expect(image.length).toBeLessThan(400_000);
+    }
+  });
+
+  test("root guidance documents published installation and automatic releases", async () => {
     const [readme, contributing] = await Promise.all([
       read("../../README.md"),
       read("../../CONTRIBUTING.md"),
@@ -148,12 +161,20 @@ describe("documentation content contract", () => {
       expect(page).toContain("npm install --global issue-graph@latest");
       expect(page).toContain("npm install issue-graph@latest");
       expect(page).toContain("npx issue-graph@latest --help");
-      expect(page).toContain("INTERNAL");
       expect(page).not.toMatch(/publication is (?:still )?pending|pending publication/i);
     }
     expect(contributing).not.toMatch(/expected_version=\d+\.\d+\.\d+/);
     expect(contributing).toContain('expected_version="$EXPECTED_VERSION"');
-    expect(contributing).toContain("Release environment approval");
+    expect(contributing).toContain("starts `.github/workflows/release.yml` automatically");
+    expect(contributing).toContain("Already-published versions skip the build and publication");
+    expect(contributing).toContain("Do not configure required reviewers or a wait timer");
+    expect(contributing).toContain("-F publish=false");
+    expect(contributing).toContain(
+      'gh run rerun "$RUN_ID" --repo vercel-labs/issue-graph --failed',
+    );
+    expect(contributing).toContain("without another `npm publish`");
+    expect(contributing).not.toContain("Release environment approval");
+    expect(contributing).not.toContain("INTERNAL");
   });
 
   test("uses canonical skill discovery and CLI-bundled guidance without release stories", async () => {
@@ -161,13 +182,18 @@ describe("documentation content contract", () => {
       read("content/docs/agents.mdx"),
       read("../../README.md"),
     ]);
-    const readmeAgents = readme.match(/^## Agents and integrations\n([\s\S]*?)(?=^## )/m)?.[1];
+    const readmeAgents = readme.match(/^## For AI agents\n([\s\S]*?)(?=^## )/m)?.[1];
     expect(readmeAgents).toBeDefined();
-    for (const page of [agents, readmeAgents ?? ""]) {
+    expect(readmeAgents).not.toMatch(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/);
+    expect(readmeAgents).toContain("npx skills@latest add vercel-labs/issue-graph");
+    expect(readmeAgents).toContain("issue-graph skills get core\n");
+    expect(readmeAgents).toContain("/docs/agents");
+    for (const page of [agents]) {
       expect(page).not.toMatch(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/);
       expect(page).not.toMatch(/outdated|source-only|newer source stub|not available in npm/i);
       expect(page).not.toMatch(/do not (?:install|pair).*stub|npm root --global|cp -R/i);
       expect(page).toContain("npm install --global issue-graph@latest");
+      expect(page).toContain("npx skills@latest add vercel-labs/issue-graph");
       expect(page).toContain("npx skills@latest add https://issue-graph.dev");
       expect(page).toContain("same canonical");
       expect(page).toContain("/skill.md");
@@ -177,16 +203,16 @@ describe("documentation content contract", () => {
       expect(page).toContain("authorized setup correction");
     }
     for (const heading of [
-      "## Match guidance to the installed release",
-      "## Route the request before collecting evidence",
-      "## Preserve evidence and uncertainty",
+      "## Load the command guidance",
+      "## Choose a command",
+      "## Report findings",
       "## Optional root-cause clustering",
     ]) {
       expect(agents).toContain(heading);
     }
   });
 
-  test("enables the native GitHub navbar link without changing source access", async () => {
+  test("enables source links for the public repository", async () => {
     const [config, site] = await Promise.all([
       read("src/lib/geistdocs/config.tsx"),
       read("src/lib/site.ts"),
@@ -196,7 +222,7 @@ describe("documentation content contract", () => {
     expect(config).toContain('repo: "issue-graph"');
     expect(config).not.toContain("...(repositoryIsPublic");
     expect(config).toContain("editSource: repositoryIsPublic");
-    expect(site).toContain("repositoryIsPublic = false");
+    expect(site).toContain("repositoryIsPublic = true");
   });
 
   test("pins the public runtime and uses no initializer or private provider", async () => {
@@ -204,9 +230,9 @@ describe("documentation content contract", () => {
     expect(pkg.name).toBe("@issue-graph/docs");
     expect(pkg.private).toBe(true);
     for (const [name, version] of Object.entries({
-      "@vercel/geistdocs": "2.4.1",
+      "@vercel/geistdocs": "2.7.5",
       "@vercel/agent-readability": "0.7.0",
-      next: "16.3.5",
+      next: "16.3.8",
       react: "19.3.0",
       "react-dom": "19.3.0",
       geist: "1.7.2",

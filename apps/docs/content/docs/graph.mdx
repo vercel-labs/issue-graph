@@ -1,84 +1,94 @@
 ---
-title: Graph
-description: Trace issue and pull request relationships with explicit crawl bounds, local history, and an HTML explorer.
-lastModified: 2026-09-22
+title: Trace linked issues and pull requests
+navTitle: Graph
+description: Trace the issues and pull requests linked to one item, control crawl depth and budget, compare snapshots, and export JSON or HTML.
+lastModified: 2026-09-27
 ---
 
-## Start from a seed
+## Start from an issue or PR
 
-Graph mode is the default command, not a `graph` subcommand. Use an issue or PR URL, or a bare number with a repository:
-
-```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot
-issue-graph https://github.com/vercel-labs/agent-browser/issues/1113 --depth 1 --max-nodes 12 --no-snapshot
-```
-
-The bounded capture from 2026-09-22 shows five nodes, all in `vercel-labs/agent-browser`: closed issue #1113, merged PR #1137, closed regression #1148, and open follow-ups #1371 and #1607. PR #1137 has a closing link to #1113; that link does not close or prove resolution of the follow-ups. See [Get started](/docs/get-started) for the individual node links and captured states.
-
-This is not a live feed or complete history. All five fetched nodes are shown, with no node-cap or hub truncation in this capture, but 19 references remain beyond the depth boundary and 22 edges to unfetched references are omitted from the displayed graph. States were collected over a window rather than atomically; future runs can differ.
-
-For a repository you maintain, replace `owner/repo` and the seed numbers with your scope:
+Pass an item as `owner/repo#123`, as an issue or PR URL, or as a bare number when you run the command inside a GitHub checkout:
 
 ```bash
-issue-graph --seeds 64,246,281 --repo owner/repo --no-snapshot
-issue-graph --label bug --repo owner/repo --prioritize --no-snapshot
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save
+issue-graph graph https://github.com/vercel-labs/agent-browser/issues/1113 --depth 1 --budget 12 --no-save
 ```
 
-Label discovery selects open issues. Multi-seed surveys add connected components. Graph mode always prints Markdown; piping it does not select JSON.
+`graph` prints a formatted report in a terminal and Markdown when piped.
 
-## What the edges mean
+To start from several seeds, or to rank the open issues with a label:
 
-The crawler reads issue and PR bodies and comments for text mentions, plus GitHub timeline cross-references, connected events, and PR closing references. Nodes include live state and available author, discussion, and PR metadata. Edges retain a source and actor/date when available. Cross-reference event state is not treated as current node state.
+```bash
+issue-graph graph 64 246 281 --repo owner/repo --no-save
+issue-graph rank owner/repo --label bug --no-save
+```
 
-Classifications surface competing PRs, superseded candidates, and closing claims without a structural link. Shared changed files identify possible overlap. Neither a shared file nor a shared closing issue guarantees duplicate implementations or equivalent scope. Inspect the changes before choosing a PR or closing work.
+Replace `owner/repo` and the seed numbers with your own. A run with several seeds also reports connected components.
 
-`--prioritize` ranks open nodes using comments, participants, reactions, visible inbound references, and time open. It measures discussion heat, not product importance or implementation correctness. Priorities are also included in graph JSON exports.
+## Read the graph
 
-## Bound the crawl
+Nodes represent issues and PRs. Edges come from mentions in bodies and comments, timeline cross-references, connected events, and closing references. Each node records its fetched state and any available author, discussion, and PR metadata. Each edge records its source and, when available, its actor and date.
+
+The report flags competing PRs, shared changed files, possibly superseded work, and closing claims that lack a GitHub closing link. Use these signals to choose what to inspect, and check the implementations and scope before you recommend closing anything.
+
+`rank` orders open nodes by discussion activity, using comments, participants, reactions, inbound references, and time open. Graph JSON exports include the same ranking in `priorities`.
+
+## Control the crawl
 
 | Flag | Default | Effect |
 | --- | --- | --- |
 | `--depth N` | `2` | Same-repository recursion from depth-zero seeds |
-| `--max-nodes N` | `80` | Total node cap, from 1 to 1000 |
-| `--hub-threshold N` | `12` | Fetch but do not expand a non-seed node with more references than this |
+| `--budget N` | `80`; `1000` for unfiltered `open`, `rank`, or `cluster` repository scopes | Total node cap, from 1 to 1000 |
+| `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it above this reference count |
 | `--concurrency N` | `4` | Concurrent node requests, from 1 to 32 |
 
-Cross-repository references are fetched one hop when reached within the crawl, not recursively expanded. The hub guard exempts explicit seeds, so re-seeding a hub lets you inspect its neighborhood deliberately. Use the exact suggested re-seed command in the report rather than increasing every limit at once.
+Cross-repository references are fetched one hop deep. The hub threshold does not apply to explicit seeds, so to inspect an unexpanded hub, run the re-seed command the report suggests.
 
-A graph is not an exhaustive repository inventory. Node queries currently read up to 100 comments, 100 timeline items, 100 PR files, and 50 closing references per node; those connections are not fully paginated by graph mode. Increasing `--max-nodes` does not remove these per-node limits. Search-based seed discovery is also bounded by the node budget and GitHub's 1000-result search ceiling.
+Each node query reads up to 100 comments, 100 timeline items, 100 PR files, and 50 closing references, without paginating past those limits. Search-based seed discovery is limited by the node budget and by GitHub's 1000-result search ceiling.
 
-Review `cappedOut`, unfetched nodes, and hubs before concluding that no related work exists. A successful process exit alone does not certify complete graph coverage.
+When you interpret the graph, check `cappedOut`, unfetched nodes, and unexpanded hubs. Raising `--budget` does not change the per-node limits.
+
+## Example capture
+
+The example captured on 2026-09-22 includes five nodes in `vercel-labs/agent-browser`: closed issue #1113, merged PR #1137, closed regression #1148, and open follow-ups #1371 and #1607. See [Get started](/docs/get-started) for their links and descriptions.
+
+The capture reached its depth limit with 19 references left unfetched and omits the 22 edges to those references. Neither the node cap nor the hub threshold truncated it. States were read over a time window rather than at one instant, and a new run can return different results. The landing page uses a separate capture of the Portless backlog.
 
 ## Compare snapshots
 
-Without `--no-snapshot`, graph mode saves under `~/.issue-graph/` in a directory derived from the repository and seed list. Re-run the same seed list to see new nodes, state changes, and new links relative to the previous saved graph. Keep seed order consistent for history lookup.
+`graph` saves history under `~/.issue-graph/`, or under `ISSUE_GRAPH_HOME` when it is set, keyed by repository and seed list. Run the same seed list again to see new nodes, state changes, and new links:
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12
 ```
 
-`--no-snapshot` skips writing a new snapshot, but the command may still read existing history to render a diff. Graph history is a comparison of observed, bounded graphs, not an audit log. Missing evidence, different crawl bounds, or changed access can change what is visible.
+History lookup depends on seed order, so pass the seeds in the same order each time. `--no-save` skips saving a new capture but still compares the run with existing history. Changes to your access or crawl limits between runs also change what the comparison can show.
 
 ## Export JSON and HTML
 
 ```bash
-issue-graph 1113 --repo vercel-labs/agent-browser --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1 --budget 12 --no-save -o graph.json -o graph.html
 ```
 
-`--json PATH` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Unlike status, graph JSON is a file export and does not carry a report `schemaVersion` in the current source. Markdown still goes to stdout. `--format json` is not a graph output switch.
+`-o PATH.json` writes `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Graph JSON has no `schemaVersion` field. The report still prints to stdout, formatted in a terminal and as Markdown in a pipe.
 
-`--html PATH` writes a self-contained explorer with node evidence, typed relationships, filters, connected components, cleanup candidates, and an Impact view. Open the file directly in a browser; no server is required. Impact projects relationships visible in this graph, not causality or verified completion.
+`-o PATH.html` writes the static Next.js dashboard with Explore, Impact, Swarm, and Rank views. Open the file directly in your browser without running a server. If you move it, move its sibling `_next/` assets and `font-LICENSE.txt` with it. Impact shows relationships found in the graph and does not establish causality.
 
-Both exports write local files even with `--no-snapshot`. Choose paths deliberately because existing files can be overwritten.
+To query the same data from the CLI, export a dashboard without `--no-save`, or start with `issue-graph open owner/repo`. Then use `query` for shared filters, scoring, exact links, and replay, as described in [Dashboard and saved queries](/docs/dashboard).
 
-## Optional cluster labels
+Export paths write files even with `--no-save` and can overwrite existing paths. Review private results before sharing them.
+
+## Add cluster labels
+
+Print a clustering task for your agent, then load its reviewed labels into an explorer:
 
 ```bash
-issue-graph --seeds 64,246,281 --repo owner/repo --cluster --no-snapshot
-issue-graph --seeds 64,246,281 --repo owner/repo --clusters clusters.json --html graph.html --no-snapshot
+issue-graph cluster owner/repo
+issue-graph cluster owner/repo --apply clusters.json
+issue-graph graph 64 246 281 --repo owner/repo --clusters clusters.json -o graph.html --no-save
 ```
 
-`--cluster` prints a task for an agent; it does not compute model-based clusters itself. `--clusters PATH` reads labels prepared separately for the HTML explorer; it does not invoke an agent. The supported input is an array of clusters, or an object with `clusters` and `cleanup`:
+`cluster` saves the run and prints the task. `--apply` loads your agent's answer into that run's dashboard. `--clusters PATH` reads prepared labels into any graph export. The input can be an array of clusters or an object with `clusters` and `cleanup` fields:
 
 ```json
 {
@@ -93,4 +103,4 @@ issue-graph --seeds 64,246,281 --repo owner/repo --clusters clusters.json --html
 }
 ```
 
-This is an input-shape illustration, not a finding about a real repository. See [Agents](/docs/agents) for clustering and [Security](/docs/security) before passing private data to an agent.
+See [Agents and skills](/docs/agents) for running an external agent and [Permissions and privacy](/docs/security) for handling private data.

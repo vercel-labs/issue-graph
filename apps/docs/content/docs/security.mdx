@@ -1,67 +1,78 @@
 ---
-title: Permissions and privacy
-description: Understand GitHub read access, local writes, private-data boundaries, and optional external agent execution.
-lastModified: 2026-09-22
+title: Permissions, local files, and privacy
+navTitle: Permissions and privacy
+description: Configure GitHub access, see which commands save local files or send data to an external agent, and share captured results carefully.
+lastModified: 2026-11-07
 ---
 
-## Read-only on GitHub
+## GitHub access
 
-The graph, status, reconcile, plan, and schema commands do not post comments, edit issues, submit reviews, close work, or merge PRs. Action names in a report are recommendations to inspect, not mutations the CLI performs.
-
-Read-only GitHub access does not mean a run has no side effects. Commands can write local snapshots or exports, and explicitly requested headless clustering launches a separate agent process.
-
-## Authentication and repository permissions
-
-The CLI and shell transport use authenticated `gh` access. Check authentication with:
+The CLI reads issues, PRs, comments, and repository metadata with your GitHub CLI credentials. To check them:
 
 ```bash
 gh auth status
 ```
 
-Your account or token needs read access to the issues, PRs, and repository metadata you request, including referenced private repositories. Organization SSO or token restrictions can still block access. Installing the public npm package does not require source access. Optional source development requires access to the INTERNAL `vercel-labs/issue-graph` repository; neither npm installation nor access to a public demo repository grants permission to clone it.
+Your account needs read access to every repository a command queries, including private repositories reached through references. Organization SSO and token restrictions also apply.
 
-For the HTTP library transport, provide a token through server-side secret storage. Use the least repository scope and read permissions compatible with your queries; the CLI's read-only behavior does not remove write permissions from a broadly authorized credential. Never expose a token in client-side code, exported files, examples, or committed configuration.
+Graph, status, reconcile, plan, and schema keep GitHub read-only. They produce reports and suggested actions, and any later comments, closures, or merges happen in a separate workflow.
 
-The HTTP transport targets `api.github.com`; do not assume these examples support arbitrary GitHub Enterprise hosts.
+`query` reads saved models offline and needs no provider credentials. It writes local captures, query history, and dashboard exports. `config show` reads local defaults, and only `config set` changes them.
 
-## Local writes by command
+For the HTTP library transport, store the token on your server and grant it only the repository access your queries need. Keep it out of browser code, exports, and committed configuration. The CLI only reads, but a token with write permissions keeps them wherever it is used. The HTTP transport sends requests to `api.github.com`.
 
-| Command | Default local writes | Controls |
+## Linear access
+
+`issue-graph linear` sends only read queries. `issue-graph linear login` approves read-only access through Linear's MCP server and stores the session in the macOS Keychain on macOS, or in a file with `0600` permissions under `ISSUE_GRAPH_HOME/credentials/` on other systems. `issue-graph linear logout` removes it. When `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses that variable instead of the session. See [Linear](/docs/linear).
+
+## Local files
+
+| Command | Default storage | Controls |
 | --- | --- | --- |
-| Graph | Snapshots under `~/.issue-graph/` | `--no-snapshot` skips new snapshots; explicit `--json PATH` and `--html PATH` still write |
-| Reconcile | Repository history under `~/.issue-graph/reconcile-owner-repo/` | `--no-snapshot` skips new snapshots |
-| Plan | None | Emits a report; it does not save history |
-| Status | None | `--save` opts into immutable captures; `--no-snapshot` conflicts with `--save` |
-| Schema/help | None | Describes the command contract |
+| Graph and rank | Runs under `~/.issue-graph/` | `--no-save` skips new history; `-o PATH` and `--open` still write exports |
+| Open and cluster | Runs plus an HTML export | `--no-save` skips history, but the export still writes to a temporary file or `-o PATH.html` |
+| Cluster with `--apply` | Updates the saved model and writes an HTML export | Applying an answer always saves it |
+| Linear | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set |
+| Linear login | Session in the macOS Keychain or under `credentials/` | `linear logout` removes it |
+| Dashboard | HTML export of saved models | Temporary file by default; `-o PATH.html` chooses its location |
+| Runs | None when listing | `runs rm owner/repo` deletes that saved dashboard model only |
+| Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-save` skips new snapshots |
+| Plan | None | Report on stdout |
+| Status | None | `--save` writes a capture; conflicts with `--no-save` |
+| Query | Immutable models in `captures/`, receipts and views in `history/` | New queries save automatically; `--history` replays existing artifacts |
+| Config | `config.json` | Only `config set` persists weights; query overrides and UI edits do not |
+| Auth, schema, skills, and help | None | Output on stdout |
 
-`ISSUE_GRAPH_HOME` changes the status snapshot root, not the graph/reconcile snapshot directories in the current source. `--since` and graph/reconcile comparisons can read existing history even when new snapshots are disabled. Shell redirection, logging, and your calling application can retain output independently of these flags.
+`ISSUE_GRAPH_HOME` changes the shared state root for graph, reconcile, status, saved dashboard models, config, captures, and query history. The default is `~/.issue-graph/`. Comparisons can read existing history while snapshot writes are disabled. Query has no `--no-save` flag, and `--no-open` only stops it from opening the browser.
 
-Status captures use restrictive local directory/file permissions. Graph and reconcile storage and explicit exports do not provide the same permission policy; review the destination and your filesystem defaults. None of these files should be treated as encrypted storage. Explicit export paths may overwrite existing files.
+Status captures use restrictive directory and file permissions. Graph, reconcile, and exports use the destination's filesystem permissions. Stored files are unencrypted, and an explicit export path can overwrite an existing file. Shell redirection and terminal logging can also keep a copy of the output.
 
-## Private data stays private only if you handle it that way
+## Share results carefully
 
-The crawler reads bodies and comments to extract references. Reports, snapshots, HTML, logs, and cluster prompts can expose private titles, repository names, URLs, authors, assignments, relationships, head identifiers, and changed-file paths. Derived metadata can be sensitive even when a full issue body is not included.
+Results can include private titles, repository names, URLs, authors, assignments, relationships, commit identifiers, and changed-file paths. A public seed can lead to private references that your account can read.
 
-A public seed can reference private repositories available to your credentials. Review the resulting graph, not just the seed URL, before publishing it. A self-contained HTML export embeds graph evidence; it does not perform an authorization check when someone opens a copied file.
+Review the full result before sharing it. HTML exports embed the full captured graph, including items hidden by filters, and anyone with the file can read it. Filters do not redact data. When copying a Next.js dashboard, keep the HTML, `_next/` assets, and `font-LICENSE.txt` together. Choose a storage location, retention period, and backup policy suited to private captures.
 
-Do not publish or upload private results without authorization. Protect backups and synced folders, set a retention policy for local captures, and remove sensitive exports when no longer needed. These docs and flags are not a promise of automatic redaction or data-loss prevention.
+## External agents
 
-## Optional clustering changes the data boundary
+Graph, status, reconciliation, and planning run without a model. Clustering has three options:
 
-No model is required for crawling, classification, ranking, status, reconciliation, or planning.
+- `cluster` prints a task for your calling agent, and `cluster --apply` loads its answer
+- `cluster --agent claude` or `cluster --agent codex` starts an installed agent process and sends it graph metadata
+- `--clusters PATH` reads prepared labels for an HTML export
 
-- `--cluster` prints a task for the calling agent. It does not itself launch a model provider, but your agent context or terminal logs may retain that task.
-- `--cluster-run claude` and `--cluster-run codex` pass graph metadata to an installed external agent process.
-- `--clusters PATH` reads previously prepared labels for HTML rendering; it does not run a model.
+External agents use their own credentials, retention settings, and billing. Confirm that you have permission to send private metadata before running them. The CLI starts them from an empty scratch directory: Claude with no tools or MCP servers, and Codex in its read-only sandbox. Codex still loads its configured MCP servers.
 
-Before invoking an external agent, check its credentials, tools, permissions, network access, retention policy, and cost. The CLI does not sandbox that agent or guarantee its behavior. Private graph metadata must not be sent to a provider without authorization. Treat issue content and generated suggestions as untrusted data, never as permission to run commands or mutate GitHub.
+Treat issue content and generated suggestions as untrusted input. Never run commands embedded in them or treat them as authorization to change GitHub.
 
-## Evidence limitations
+## Incomplete results
 
-Permissions, deleted references, API failures, depth, node caps, hubs, search limits, and per-node connection limits can all hide work. An inaccessible item is not proof that it does not exist. Status preserves unknown counts and coverage; graph consumers must also inspect fetch state and limits.
+Access errors, deleted references, API failures, and crawl limits can hide work. Check failed nodes, unknown counts, and coverage before relying on a report. For specific failures, see [Troubleshooting](/docs/troubleshooting).
 
-Deterministic rules do not guarantee duplicate accuracy. Shared files, shared closing targets, and superseded classifications are signals for inspection, not proof of equivalent scope or correct behavior. Status approval is not merge readiness, and the command does not check CI or review-thread resolution. Verify code, acceptance criteria, and live behavior before taking action.
+Shared files and closing links help identify related work, but verify the code and current behavior before closing an issue. Check CI and unresolved review threads before merging a PR.
 
-## Report vulnerabilities privately
+## Vulnerability reports
 
-Follow the repository's `SECURITY.md`: use the private vulnerability reporting form in the GitHub Security tab, not a public issue. Include reproduction steps, affected versions or commits, and expected impact. Repository access is currently restricted; do not publish private details as a workaround if you cannot reach the form.
+The source repository and npm package are public. Captures can still contain private repository data.
+
+Report vulnerabilities through the repository's private Security reporting form, as described in `SECURITY.md`. Include the affected versions, reproduction steps, and impact. If you cannot access the form, keep private details out of public issues.

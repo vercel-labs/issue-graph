@@ -1,34 +1,47 @@
 export const landingTitle = "Find related work before you start";
-export const landingLastModified = "2026-09-22";
+export const landingLastModified = "2026-11-07";
 export const landingDescription =
-  "The fix might already be in another pull request. Trace the issues, competing changes, and follow-ups around your next task, without opening another dozen tabs.";
+  "Map related issues and pull requests across GitHub and Linear, group open work by root cause, and open the exact view in your browser.";
+
+export const providerCommands = {
+  github: "issue-graph open vercel-labs/portless",
+  linear: "issue-graph linear ENG-123 --workspace your-workspace --open",
+  model: "issue-graph query --input model.json --open",
+} as const;
+
+export const clusterCommands = [
+  "issue-graph cluster vercel-labs/portless",
+  "issue-graph cluster vercel-labs/portless --apply answer.json",
+].join("\n");
 
 export const workflows = [
   {
     number: "01",
-    title: "See what is connected",
+    title: "Map your backlog",
     description:
-      "Start with an issue or PR. Follow references across repositories and find the work you should read first.",
-    command: "issue-graph 1113 --repo vercel-labs/agent-browser --depth 1",
-    href: "/docs/graph",
-    link: "Trace a graph",
+      "Capture open issues, PRs, and their references. Explore linked work or ask your agent to group it by root cause.",
+    command: "issue-graph open vercel-labs/portless --budget 80 --no-open",
+    href: "/docs/dashboard#capture-a-repository",
+    link: "Capture a backlog",
   },
   {
     number: "02",
-    title: "Know what needs attention",
+    title: "Choose what to inspect next",
     description:
-      "Get PR status by author and project, with the underlying evidence and explicit gaps in coverage.",
-    command: "issue-graph status --repo vercel-labs/portless --author Railly",
-    href: "/docs/status",
-    link: "Inspect PR status",
+      "Filter by kind, state, cluster, or Heat. Rank open work with weights you control. Heat measures discussion, not severity.",
+    command:
+      "issue-graph query github:vercel-labs/portless --kind Issue --heat-top 25 --view rank --json --no-open",
+    href: "/docs/dashboard#prioritize-with-filters",
+    link: "Filter and rank",
   },
   {
     number: "03",
-    title: "Give the backlog a next step",
+    title: "Open the exact view",
     description:
-      "Reconcile open work, even without labels. Get a review queue, not a bot that closes things for you.",
-    command: "issue-graph plan --repo vercel-labs/portless",
-    href: "/docs/backlog",
-    link: "Reconcile a backlog",
+      "Keep the CLI and dashboard on the same filters and weights. Explore in the browser or replay a saved query.",
+    command:
+      "issue-graph query github:vercel-labs/portless --kind Issue --heat-top 25 --view rank --open",
+    href: "/docs/dashboard#open-the-exact-result",
+    link: "Use the dashboard",
   },
 ] as const;

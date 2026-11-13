@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { renderHtml } from "./html.js";
+import {
+  applyClusters,
+  carriedClusters,
+  dashboardModel,
+  renderDashboard,
+  renderHtml,
+} from "./html.js";
 import type { GraphNode, NodeKey, PullRequestMeta } from "./types.js";
 
 const meta = (files: string[]): PullRequestMeta => ({
@@ -50,11 +56,15 @@ describe("renderHtml", () => {
     const html = renderHtml(nodes, ["o/r#1"], "o/r");
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain("<title>issue-graph · o/r</title>");
-    expect(html).toContain('class="logo">◆</span> issue-graph');
+    expect(html).toContain('class="brand-name">issue-graph</span>');
     expect(html).toContain('id="data"');
     expect(html).toContain("o/r#2");
     expect(html).toContain('id="impact-view"');
-    expect(html).toContain("Click a node to simulate its blast radius");
+    expect(html).toContain("Pick one to see its ripple");
+    expect(html).toContain('id="rank-view"');
+    expect(html).toContain("function exploreView(gi)");
+    expect(html).toContain('"provider":{"id":"github"');
+    expect(html).toContain('"repo":"o/r"');
     // no raw </script> break-out from data
     expect(html.split('<script id="data"')[1].split("</script>")[0]).not.toContain("</script");
   });
@@ -92,8 +102,111 @@ describe("renderHtml", () => {
     const html = renderHtml(nodes, ["o/r#1"], "o/r");
     expect(html).toContain("function blastRadius(k)");
     expect(html).toContain("function neighbors(k)");
-    expect(html).toContain("issues resolved");
+    expect(html).toContain("Issues it resolves");
     expect(html).toContain("PRs to reconcile");
-    expect(html).toContain("projection, not proof");
+    expect(html).toContain("A projection from visible links, not proof.");
+  });
+});
+
+describe("renderDashboard", () => {
+  test("embeds every project and opens the first", () => {
+    const a = dashboardModel(asMap([node("o/a#1")]), ["o/a#1"], "o/a");
+    const b = dashboardModel(asMap([node("o/b#2")]), ["o/b#2"], "o/b");
+    const html = renderDashboard([a, b]);
+    const data = JSON.parse(
+      html.split('<script id="data" type="application/json">')[1].split("</script>")[0],
+    );
+    expect(data.projects.map((p: { repo: string }) => p.repo)).toEqual(["o/a", "o/b"]);
+    expect(html).toContain("<title>issue-graph · o/a</title>");
+    expect(html).toContain("function setProject(");
+  });
+
+  test("refuses an empty project list", () => {
+    expect(() => renderDashboard([])).toThrow(/at least one model/);
+  });
+});
+
+test("a --clusters entry without members is skipped instead of crashing", () => {
+  const nodes = asMap([node("o/r#1")]);
+  const html = renderHtml(nodes, ["o/r#1"], "o/r", {
+    clusters: [{ label: "Broken" } as never, { label: "Good", members: [{ key: "o/r#1" }] }],
+  });
+  expect(html).toContain("Good");
+  expect(html).not.toContain('"label":"Broken"');
+});
+
+describe("applyClusters", () => {
+  const model = dashboardModel(
+    asMap([node("o/r#1"), node("o/r#2"), node("o/r#3")]),
+    ["o/r#1"],
+    "o/r",
+  );
+
+  test("groups a saved run, keeps the rest in Ungrouped, and lets the cluster verdict win", () => {
+    const { model: next, unknown } = applyClusters(model, {
+      clusters: [
+        {
+          label: "A",
+          root_cause: "why",
+          members: [{ key: "o/r#1", verdict: "close it" }, { key: "o/r#2" }],
+        },
+      ],
+      cleanup: [{ key: "o/r#2", text: "retest" }],
+    });
+    expect(unknown).toEqual([]);
+    expect(next.groups.map((g) => [g.label, g.members])).toEqual([
+      ["A", ["o/r#1", "o/r#2"]],
+      ["Ungrouped", ["o/r#3"]],
+    ]);
+    expect(next.nodes["o/r#1"].verdict).toBe("close it");
+    expect(next.cleanup).toEqual([{ key: "o/r#2", text: "retest" }]);
+    expect(model.nodes["o/r#1"].verdict).not.toBe("close it");
+  });
+
+  test("reports keys the run does not contain", () => {
+    const { unknown } = applyClusters(model, {
+      clusters: [{ label: "A", members: [{ key: "o/r#9" }] }],
+    });
+    expect(unknown).toEqual(["o/r#9"]);
+  });
+});
+
+describe("carriedClusters", () => {
+  test("keeps clusters for items still in the graph when a new run brings none", () => {
+    const previous = dashboardModel(
+      asMap([node("o/r#1"), node("o/r#2"), node("o/r#3")]),
+      [],
+      "o/r",
+      {
+        clusters: [
+          {
+            label: "Daemon",
+            root_cause: "sessions",
+            members: [{ key: "o/r#1" }, { key: "o/r#2" }],
+          },
+          { label: "Gone", members: [{ key: "o/r#3" }] },
+        ],
+        cleanup: [
+          { key: "o/r#3", text: "close" },
+          { key: "o/r#1", text: "retest" },
+        ],
+      },
+    );
+    const next = asMap([node("o/r#1"), node("o/r#4")]);
+    const carried = carriedClusters(previous, next);
+    const model = dashboardModel(next, [], "o/r", carried);
+
+    expect(model.grouping).toBe("themes");
+    expect(model.groups.map((group) => [group.label, group.members])).toEqual([
+      ["Daemon", ["o/r#1"]],
+      ["Ungrouped", ["o/r#4"]],
+    ]);
+    expect(model.cleanup).toEqual([{ key: "o/r#1", text: "retest" }]);
+  });
+
+  test("carries nothing from an unclustered run", () => {
+    const previous = dashboardModel(asMap([node("o/r#1")]), [], "o/r");
+    expect(carriedClusters(previous, asMap([node("o/r#1")]))).toBeUndefined();
+    expect(carriedClusters(undefined, asMap([node("o/r#1")]))).toBeUndefined();
   });
 });

@@ -13,8 +13,14 @@
  */
 export * from "./classify.js";
 export * from "./crawl.js";
+export * from "./dashboard-filters.js";
+export * from "./dashboard-query.js";
+export * from "./dashboard-types.js";
 export * from "./github.js";
 export * from "./html.js";
+export * from "./linear.js";
+export * from "./linear-html.js";
+export * from "./linear-queries.js";
 export * from "./overlaps.js";
 export * from "./plan.js";
 export * from "./priority.js";
@@ -22,6 +28,7 @@ export * from "./reconcile.js";
 export * from "./refs.js";
 export * from "./render.js";
 export * from "./schema.js";
+export * from "./scoring.js";
 export {
   buildClassificationPreview,
   buildEvaluationInput,
@@ -47,3 +54,5 @@ export * from "./status-render.js";
 export * from "./status-snapshot.js";
 export * from "./transport.js";
 export * from "./types.js";
+export * from "./work-clusters.js";
+export * from "./work-types.js";

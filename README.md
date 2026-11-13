@@ -1,69 +1,63 @@
 # issue-graph
 
+Find related issues and pull requests before you start work. For humans and agents.
+
 <p>
   <a href="https://vercel.com/labs#active-experiments"><img alt="Vercel Labs Experiment" src="https://img.shields.io/badge/LABS-EXPERIMENT-0a0a0a.svg?style=for-the-badge&amp;logo=Vercel&amp;labelColor=000000" height="28"></a>
   <a href="https://www.npmjs.com/package/issue-graph"><img alt="npm version: issue-graph" src="https://img.shields.io/npm/v/issue-graph.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
 </p>
 
-Find related issues, competing changes, and unresolved follow-ups before you start work.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://issue-graph.dev/readme-hero-dark.png">
+  <img alt="issue-graph: open issues and pull requests from vercel-labs/portless grouped into five root-cause clusters, such as proxy port allocation and TLS trust" src="https://issue-graph.dev/readme-hero-light.png">
+</picture>
 
-`issue-graph` follows text mentions and GitHub's structural links across repositories. Use it to inspect one issue's neighborhood, count open PRs by author and project, or turn a backlog into a verification queue. Crawling, graph classification, and ranking need no model. Semantic `classify` inference can incur charges; preview it first with `--dry-run`. Root-cause clustering is an optional agent step.
+issue-graph reads GitHub issues and pull requests, or Linear issues, and follows the references between them: closing links, mentions, cross-references, and Linear relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub and Linear. Crawling, graph classification, and ranking need no model; semantic `classify` inference can incur charges, so preview it first with `--dry-run`.
 
-![issue-graph demo](https://issue-graph.dev/issue-graph-demo.png)
+## Install
 
-Example output, not a live feed or complete history. [Capture details](https://issue-graph.dev/docs/graph).
-
-## Start here
-
-[`issue-graph`](https://www.npmjs.com/package/issue-graph) is published on npm with a CLI and library. Use [Node.js](https://nodejs.org) 20 or later with npm/npx. GitHub queries also need an authenticated [GitHub CLI](https://cli.github.com). No source checkout is required.
-
-Try the CLI without a global installation:
-
-```bash
-npx issue-graph@latest --help
-```
-
-For the installed command used below:
-
-```bash
-npm install --global issue-graph@latest
-issue-graph --help
-gh auth login
-gh auth status
-```
-
-Inspect an issue in your repository without saving a snapshot:
-
-```bash
-issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot
-```
-
-To use npx instead, replace `issue-graph` with `npx issue-graph@latest`. Check failed fetches, node caps and unexpanded hubs before drawing conclusions. A closed seed or merged fix does not prove related follow-ups are resolved.
-
-### Update an npm installation
-
-After reviewing the release you want to use:
+Install the CLI with [Node.js](https://nodejs.org) 20 or later:
 
 ```bash
 npm install --global issue-graph@latest
 ```
 
-`@latest` selects the latest published release. A newer source checkout may contain unreleased features; check the installed command's help rather than assuming source capabilities are published.
+To try it without installing, run `npx issue-graph@latest --help`. GitHub queries use your [GitHub CLI](https://cli.github.com) login, so run `gh auth login` first if `gh auth status` shows no account.
 
-## Choose a workflow
+## Quick start
 
-| Need | Installed command |
-| --- | --- |
-| Inspect an issue or PR before starting work | `issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot` |
-| Survey labeled open issues | `issue-graph --label bug --repo owner/repo --prioritize` |
-| Count open PRs by author | `issue-graph status --repo owner/repo --author login,other` |
-| See PR evidence, assignees, and requested reviewers | `issue-graph status --repo owner/repo --author login --view prs` |
-| Reconcile an open backlog, with or without labels | `issue-graph reconcile --repo owner/repo --format json --no-snapshot` |
-| Select the next backlog action | `issue-graph plan --repo owner/repo --format json` |
-| Inspect the machine contract | `issue-graph schema` |
+From a GitHub repository checkout:
 
-Graph mode prints Markdown, even when piped; `--json PATH` writes a graph file. Reconcile and plan default to Markdown in a terminal and versioned JSON in a pipe. Status defaults to a terminal table or JSON in a pipe; its `--json` is a boolean stdout flag, not a filename.
+```bash
+issue-graph
+# -> captures open issues and PRs, then opens the dashboard
+```
+
+Pass a repository, or one or more items, to choose the scope:
+
+```bash
+issue-graph open vercel-labs/portless
+issue-graph graph vercel-labs/agent-browser#1113 --depth 1
+```
+
+For Linear, connect once in the browser, then capture an issue neighborhood or a whole project:
+
+```bash
+issue-graph linear login
+issue-graph linear ENG-123 --workspace your-workspace --open
+issue-graph linear --project <project-uuid> --open
+```
+
+The full walkthrough is in [Get started](https://issue-graph.dev/docs/get-started).
+
+## How it works
+
+Each run starts from seeds, such as open issues, a label, or specific items, and follows references up to a depth and node budget you set. An item with many references is fetched but not expanded further. The report lists missing references, failed reads, and crawl limits, so you can see what the graph does not cover.
+
+The dashboard groups items into connected components by default. Your agent can propose root-cause clusters instead: `issue-graph cluster` prints the task, and `cluster --apply` loads the answer. The dashboard has four views: Explore, Impact, Swarm, and Rank. Rank orders open work by Heat, a weighted score of discussion activity with weights you control.
+
+Runs save locally under `~/.issue-graph/`, and `issue-graph dashboard` shows every saved run with a project switcher. `issue-graph query` filters a saved capture from the CLI and returns a link to the exact dashboard view. See [Dashboard](https://issue-graph.dev/docs/dashboard).
 
 ## Semantic suggestions
 
@@ -90,122 +84,74 @@ issue-graph classify --repo owner/repo --limit 1 --cached --format json
 - Active inference sends titles, bodies and comments to Gateway. Local evidence snapshots also contain public text; reports, receipts and response cache exclude raw bodies/comments. Review provider policy and local retention. `ISSUE_GRAPH_HOME` defaults to `~/.issue-graph`, with owned `0700` directories and regular single-link `0600` files, no symlinks. Permissions are not encryption.
 - `--no-snapshot` disables evidence/cache/receipt storage and durable locks, not the `classify/STOP` check. It has no crash recovery and is not a safe bypass for unknown requests. STOP blocks new calls, not valid hits or in-flight completion.
 
-For component suggestions, adapt the fictional [taxonomy example](skill-data/core/examples/taxonomy.json) and pass the same `--taxonomy PATH` to preview and inference. It uses `schemaVersion: 1` and catalog version `"1"`; it is not a maintainer-approved catalog. Without it, components are unavailable rather than invented.
+For component suggestions, adapt the fictional [taxonomy example](https://github.com/vercel-labs/issue-graph/blob/main/skill-data/core/examples/taxonomy.json) and pass the same `--taxonomy PATH` to preview and inference. It uses `schemaVersion: 1` and catalog version `"1"`; it is not a maintainer-approved catalog. Without it, components are unavailable rather than invented.
 
 Output is Markdown in a terminal and schemaVersion 1 JSON in pipes; `--json` is boolean. Exit 0 means complete live scope, including valid abstentions or zero-call reuse; 1 means partial coverage, failure, deferred work or saved-only `--cached`; 2 means invalid usage/configuration. No exit code authorizes acceptance or GitHub changes.
 
-See [Semantic suggestions](skill-data/core/references/workflows.md#semantic-suggestions) for taxonomy limits, scheduling, review policy, cache provenance and storage behavior. Agents can retrieve it with `issue-graph skills get core --full`.
+See [Semantic suggestions](https://github.com/vercel-labs/issue-graph/blob/main/skill-data/core/references/workflows.md#semantic-suggestions) for taxonomy limits, scheduling, review policy, cache provenance and storage behavior. Agents can retrieve it with `issue-graph skills get core --full`.
 
-## Explore and compare
+## For AI agents
 
-Export a graph and a self-contained HTML explorer:
-
-```bash
-issue-graph 123 --repo owner/repo --depth 1 --max-nodes 12 --no-snapshot --json graph.json --html graph.html
-```
-
-Open `graph.html` in a browser. It includes typed relationships, node evidence, a cleanup checklist, and an Impact view projecting relationships visible in this graph. No server is needed. Impact is not proof of causality.
-
-Graph and reconcile runs save local history under `~/.issue-graph/` by default. Re-running the same graph seeds shows a snapshot diff; reconciliation tracks repository-level action changes. `--no-snapshot` skips saving history but does not prevent explicitly requested JSON or HTML exports. Plan writes no snapshots.
-
-Status history is opt-in:
+Install the agent skill from this repository:
 
 ```bash
-issue-graph status --repo owner/repo --author login,other --save
-issue-graph status --repo owner/repo --author login,other --since last --save
+npx skills@latest add vercel-labs/issue-graph
 ```
 
-Status reports unknown counts as `?` or `null`, never a fabricated zero. Check coverage before using totals. Approval is not merge readiness: status does not inspect CI checks or coding-review threads, and a missing PR is not assumed merged.
-
-## Agents and integrations
-
-Install the CLI with `npm install --global issue-graph@latest`, then install the agent skill separately:
-
-```bash
-npx skills@latest add https://issue-graph.dev
-```
-
-The well-known download, `/skill.md`, and [repository skill](skills/issue-graph/SKILL.md) contain the same canonical discovery guidance. Choose the intended agent and project scope, and compare existing local changes before replacing a skill. Skill installation does not install the CLI or authenticate GitHub; public package and skill installation do not require source repository access.
-
-Before operational commands, load and read the guidance bundled with the installed CLI:
+The skill tells the agent to load the guidance bundled with the installed CLI, so the instructions match its version:
 
 ```bash
 issue-graph skills get core
-issue-graph skills get core --full
 ```
 
-The core provides operational guidance; `--full` adds detailed workflow references. Use `issue-graph skills list` for discovery and command-specific `--help` for syntax. If the executable or guidance is unavailable, stop and report the mismatch rather than inventing instructions or automatically installing/upgrading anything. Ask for an authorized setup correction. See [Agents](apps/docs/content/docs/agents.mdx) for setup and evidence-handling details.
+Plan, query, reconcile, and status print JSON in a pipe, and `issue-graph schema` prints the command contract. See [Agents](https://issue-graph.dev/docs/agents).
 
-Use `--cluster` to print a root-cause clustering task for the calling agent. `--cluster-run claude` or `--cluster-run codex` sends it to an installed headless agent. Review the payload and the agent's permissions and data policy before using private repository evidence; the CLI does not sandbox that process.
+## Commands
 
-Install the published library with `npm install issue-graph@latest`. It separates the runtime-agnostic core (`issue-graph`) from shell (`issue-graph/transport/shell`, using `gh`) and HTTP (`issue-graph/transport/http`, using `fetch` plus a token) transports. See [Library](apps/docs/content/docs/library.mdx) for ESM imports and server-side credential handling.
+Run `issue-graph --help` for the full list, or `issue-graph <command> --help` for one command.
 
-## Documentation
+| Group | Commands | Docs |
+| --- | --- | --- |
+| Map work | `open`, `graph`, `linear` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear) |
+| Prioritize | `rank`, `cluster`, `reconcile`, `plan` | [Backlog](https://issue-graph.dev/docs/backlog), [Agents](https://issue-graph.dev/docs/agents) |
+| Dashboard | `dashboard`, `query`, `runs`, `config` | [Dashboard](https://issue-graph.dev/docs/dashboard) |
+| Semantic suggestions | `classify` | [Semantic suggestions](#semantic-suggestions) |
+| Pull requests | `status` | [Status](https://issue-graph.dev/docs/status) |
+| Setup | `auth`, `schema`, `skills` | [Reference](https://issue-graph.dev/docs/reference) |
 
-Read the documentation at [issue-graph.dev/docs](https://issue-graph.dev/docs), or browse its source in this checkout:
+## Library
 
-- [Get started](apps/docs/content/docs/get-started.mdx): installation, authentication, and a first result
-- [Graph](apps/docs/content/docs/graph.mdx): depth, caps, snapshots, and HTML
-- [Status](apps/docs/content/docs/status.mdx): counts, coverage, and history
-- [Backlog](apps/docs/content/docs/backlog.mdx): reconcile and plan
-- [Agents](apps/docs/content/docs/agents.mdx): skill setup and optional clustering
-- [Library](apps/docs/content/docs/library.mdx): core, shell, and HTTP integrations
-- [Security](apps/docs/content/docs/security.mdx): permissions and private data
-- [Reference](apps/docs/content/docs/reference.mdx): commands and output contracts
-- [Changelog](https://issue-graph.dev/docs/changelog): release notes
+Install the package as a dependency to use the graph core from your own code:
+
+```bash
+npm install issue-graph@latest
+```
+
+The core runs in any JavaScript runtime. Transports read GitHub through `gh`, or through `fetch` with a token. See [Library](https://issue-graph.dev/docs/library).
 
 ## Limits and privacy
 
-The CLI is read-only **on GitHub**, not side-effect-free locally. Graphs are bounded by depth, node caps, hubs, permissions, and per-node API limits. Shared files or closing targets are candidates for review, not guarantees of duplicate accuracy, correctness, or scope parity. Verify current code and behavior before closing or merging anything.
+Depth, node budgets, permissions, and API limits affect coverage. Check the linked code and current behavior before you close an issue or merge a PR.
 
-Snapshots, exports, logs, and cluster prompts can contain private repository metadata. A self-contained HTML file is portable, not automatically safe to publish. Review content and storage permissions before sharing. See [security guidance](apps/docs/content/docs/security.mdx) and [vulnerability reporting](SECURITY.md).
+Saved runs, HTML exports, and cluster prompts can contain private repository metadata, and anyone with an export can read the data embedded in it. See [Security](https://issue-graph.dev/docs/security) and [vulnerability reporting](SECURITY.md).
 
-## Source development
+## Development
 
-The source repository is INTERNAL and requires repository access; installing the public npm package does not grant that access. For source development, use Node.js 20.19.x or 22.12+ (24 recommended), pnpm, and an authenticated GitHub CLI. For initial setup, follow [Contributing](CONTRIBUTING.md#setup).
-
-From an authorized checkout, after preserving local changes, update a source installation with:
+This repository is a pnpm workspace. The CLI and library are in `src/`, the dashboard is `apps/dashboard/`, and the docs site is `apps/docs/`. Use Node.js 20.19.x or 22.12 and later with pnpm:
 
 ```bash
-git pull --ff-only
 pnpm install --frozen-lockfile
 pnpm build
-pnpm link --global
-```
-
-Contributor checks:
-
-```bash
 pnpm check
 pnpm test:package
 ```
 
-`pnpm build` emits the Node CLI and library in `dist`. By default, package verification builds and exercises a packed local installation; supplied-tarball mode tests an existing archive without rebuilding. Neither is evidence of registry publication. See [Contributing](CONTRIBUTING.md#release-process) for the retained-artifact release process. To compare transports against live GitHub data, use `pnpm exec tsx scripts/verify-transports.ts <number> <owner/repo> <depth>` with appropriate access.
+[Contributing](CONTRIBUTING.md) covers setup, the docs and dashboard dev servers, and the release process. [AGENTS.md](AGENTS.md) lists what to update with each change.
 
-### Local website development
+## Documentation
 
-From the repository root, start the docs website on a fixed local port:
-
-```bash
-pnpm dev:docs --hostname 127.0.0.1 --port 3399
-```
-
-Validate the production build separately. The HTTP suite checks production cache behavior, which differs from the development server:
-
-```bash
-pnpm check:docs
-pnpm build:docs
-pnpm --filter @issue-graph/docs test:ci
-```
-
-The last command starts and stops its own test server. For a manual browser session or audit, stop the development server and run `pnpm --filter @issue-graph/docs start --hostname 127.0.0.1 --port 3399`. In another terminal:
-
-```bash
-DOCS_TEST_URL=http://127.0.0.1:3399 pnpm test:docs:routes
-DOCS_TEST_URL=http://127.0.0.1:3399 pnpm audit:docs
-```
-
-The agent-readability audit may follow production canonical URLs even when started against localhost. Before deployment, those requests can fail or inspect a different deployment; a local audit is not necessarily local-only. [is-agentic.com](https://is-agentic.com) requires a publicly reachable URL, not localhost. Audit scores are diagnostic signals, not certification of agent compatibility, accessibility, security, or production readiness.
+- [issue-graph.dev](https://issue-graph.dev/docs): get started, commands, dashboard, and Linear
+- [Changelog](https://issue-graph.dev/docs/changelog)
 
 ## License
 

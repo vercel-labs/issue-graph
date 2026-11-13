@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
+import { stateHome } from "./local-store.js";
 import type { ReconcileAction, ReconcileHistory, ReconcileReport } from "./reconcile.js";
 import type { GraphNode, NodeKey, Snapshot } from "./types.js";
 
@@ -15,12 +15,12 @@ export interface ReconcileSnapshot {
 /** Per-seed-set directory under ~/.issue-graph where snapshots are persisted. */
 export function snapshotDir(owner: string, repo: string, seedKeys: NodeKey[]): string {
   const id = `${owner}-${repo}-${seedKeys.map((k) => k.split("#")[1]).join("_")}`.slice(0, 80);
-  return path.join(os.homedir(), ".issue-graph", id.replace(/[^\w.-]/g, "_"));
+  return path.join(stateHome(), id.replace(/[^\w.-]/g, "_"));
 }
 
 export function reconcileSnapshotDir(owner: string, repo: string): string {
   const id = `reconcile-${owner}-${repo}`.replace(/[^\w.-]/g, "_");
-  return path.join(os.homedir(), ".issue-graph", id);
+  return path.join(stateHome(), id);
 }
 
 /** Prior snapshot filenames for a seed set, oldest first. */
@@ -176,4 +176,85 @@ export function diffSnapshots(prev: Snapshot, now: Snapshot): string {
     for (const n of removed) out.push(`- ${n.key} — ${n.title}`);
   }
   return `${out.join("\n")}\n`;
+}
+
+/** Where each repository's latest explorer model is kept for `issue-graph dashboard`. */
+export function dashboardDir(): string {
+  return path.join(stateHome(), "dashboard");
+}
+
+/** Save one run's explorer model, replacing the previous one for that repository. */
+export function writeDashboardModel(repo: string, model: unknown): string {
+  const dir = dashboardDir();
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  fs.writeFileSync(file, JSON.stringify(model), { mode: 0o600 });
+  return file;
+}
+
+/** Every saved model, most recently written first; unreadable files are skipped. */
+export function readDashboardModels<T>(): T[] {
+  const dir = dashboardDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => path.join(dir, f))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
+    .flatMap((file) => {
+      try {
+        return [JSON.parse(fs.readFileSync(file, "utf8")) as T];
+      } catch {
+        return [];
+      }
+    });
+}
+
+/** Saved runs with enough detail to list them: repository, item count, and save time. */
+export function listDashboardRuns(): Array<{
+  repo: string;
+  nodes: number;
+  savedAt: string;
+  file: string;
+}> {
+  const dir = dashboardDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .flatMap((f) => {
+      const file = path.join(dir, f);
+      try {
+        const m = JSON.parse(fs.readFileSync(file, "utf8")) as { repo?: string; nodes?: object };
+        return [
+          {
+            repo: m.repo ?? f.replace(/\.json$/, ""),
+            nodes: Object.keys(m.nodes ?? {}).length,
+            savedAt: fs.statSync(file).mtime.toISOString(),
+            file,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    })
+    .sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+}
+
+/** Delete one repository's saved run; false when there was none. */
+export function removeDashboardRun(repo: string): boolean {
+  const file = path.join(dashboardDir(), `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  if (!fs.existsSync(file)) return false;
+  fs.rmSync(file);
+  return true;
+}
+
+/** One repository's saved run, or undefined when there is none or it cannot be read. */
+export function readDashboardModel<T>(repo: string): T | undefined {
+  const file = path.join(dashboardDir(), `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+  } catch {
+    return undefined;
+  }
 }

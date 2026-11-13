@@ -1,6 +1,54 @@
+import type { OpenItemCount } from "./dashboard-types.js";
 import { extractClosingRefs, extractRefs } from "./refs.js";
 import type { GhTransport } from "./transport.js";
 import type { Edge, GraphNode, NodeKey, Via } from "./types.js";
+
+export const REPOSITORY_OPEN_QUERY = `query IssueGraphRepositoryOpen($owner:String!,$repo:String!){
+  repository(owner:$owner,name:$repo){
+    nameWithOwner
+    issues(states:OPEN){totalCount}
+    pullRequests(states:OPEN){totalCount}
+  }
+}`;
+
+export async function repositoryOpenCount(
+  transport: Pick<GhTransport, "graphql">,
+  owner: string,
+  repo: string,
+): Promise<OpenItemCount> {
+  const response = (await transport.graphql(REPOSITORY_OPEN_QUERY, { owner, repo })) as {
+    data?: {
+      repository?: {
+        nameWithOwner?: string;
+        issues?: { totalCount?: number };
+        pullRequests?: { totalCount?: number };
+      };
+    };
+    errors?: unknown[];
+  };
+  const found = response?.data?.repository;
+  const issues = found?.issues?.totalCount;
+  const pullRequests = found?.pullRequests?.totalCount;
+  if (
+    response?.errors?.length ||
+    found?.nameWithOwner?.toLowerCase() !== `${owner}/${repo}`.toLowerCase() ||
+    typeof issues !== "number" ||
+    typeof pullRequests !== "number" ||
+    !Number.isSafeInteger(issues) ||
+    !Number.isSafeInteger(pullRequests) ||
+    issues < 0 ||
+    pullRequests < 0 ||
+    !Number.isSafeInteger(issues + pullRequests)
+  )
+    throw new Error("Repository open totals unavailable");
+  return {
+    value: issues + pullRequests,
+    issues,
+    pullRequests,
+    complete: true,
+    observedAt: new Date().toISOString(),
+  };
+}
 
 /** One call: node state + title + body + comments + structural edges. */
 export const NODE_QUERY = `query($owner:String!,$repo:String!,$n:Int!){
@@ -22,7 +70,7 @@ export const NODE_QUERY = `query($owner:String!,$repo:String!,$n:Int!){
         isDraft reviewDecision mergeable createdAt mergedAt updatedAt additions deletions changedFiles
         reactions{ totalCount }
         participants(first:1){ totalCount }
-        files(first:100){ nodes{ path } }
+        files(first:100){ nodes{ path changeType } }
         comments(first:100){ totalCount nodes{ body author{login} } }
         closingIssuesReferences(first:50){ nodes{ number repository{owner{login} name} } }
         timelineItems(first:100, itemTypes:[CROSS_REFERENCED_EVENT,CONNECTED_EVENT]){ nodes{ __typename
@@ -55,7 +103,7 @@ export interface RawNodeItem {
   additions?: number;
   deletions?: number;
   changedFiles?: number;
-  files?: { nodes?: Array<{ path?: string }> };
+  files?: { nodes?: Array<{ path?: string; changeType?: string }> };
   reactions?: { totalCount?: number };
   participants?: { totalCount?: number };
   comments?: { totalCount?: number; nodes?: Array<{ body?: string; author?: { login?: string } }> };
@@ -94,6 +142,12 @@ function blankNode(owner: string, repo: string, number: number, depth: number): 
     fetched: false,
   };
 }
+
+/**
+ * Change types whose path must already exist on the base branch. Added,
+ * copied, and renamed files report a path the base does not have yet.
+ */
+const BASE_CHANGE_TYPES = new Set(["MODIFIED", "CHANGED", "DELETED"]);
 
 /**
  * Turn one GraphQL node payload into a GraphNode. Pure — no I/O, no transport,
@@ -137,6 +191,10 @@ export function parseNodeResponse(
       deletions: item.deletions ?? 0,
       changedFiles: item.changedFiles ?? 0,
       files: (item.files?.nodes ?? [])
+        .map((f) => f.path ?? "")
+        .filter((p): p is string => p.length > 0),
+      baseFiles: (item.files?.nodes ?? [])
+        .filter((f) => BASE_CHANGE_TYPES.has(f.changeType ?? ""))
         .map((f) => f.path ?? "")
         .filter((p): p is string => p.length > 0),
     };

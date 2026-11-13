@@ -1,5 +1,6 @@
 import type { PriorityRow } from "./priority.js";
 import type { ReconcileAction, ReconcileItem, ReconcileReport } from "./reconcile.js";
+import { renderSweep, type SweepGroup } from "./sweep.js";
 import type { GraphNode, NodeKey } from "./types.js";
 
 export const PLAN_SCHEMA_VERSION = 1 as const;
@@ -73,6 +74,8 @@ export interface PlanReport {
   queue: PlanItem[];
   investigation: PlanItem[];
   blocked: PlanItem[];
+  /** Groups one decision can resolve together. See `buildSweep`. */
+  sweep: SweepGroup[];
   guardrails: string[];
 }
 
@@ -322,6 +325,7 @@ export function buildPlanReport(
   reconcile: ReconcileReport,
   nodes: Map<NodeKey, GraphNode>,
   priorities: PriorityRow[],
+  sweep: SweepGroup[] = [],
 ): PlanReport {
   const ranked = priorityMap(priorities);
   const unresolved = new Set([...reconcile.limits.fetchFailures, ...reconcile.limits.cappedOut]);
@@ -371,6 +375,7 @@ export function buildPlanReport(
     queue,
     investigation,
     blocked,
+    sweep,
     guardrails,
   };
 }
@@ -421,6 +426,7 @@ export function renderPlan(report: PlanReport): string {
     out.push("- No ready action. Investigate or unblock the remaining items.");
   }
   if (report.decision) out.push("", ...renderDecision(report.decision));
+  if (report.sweep.length) out.push("", ...renderSweep(report.sweep));
   if (!report.coverageComplete) {
     out.push(
       "",

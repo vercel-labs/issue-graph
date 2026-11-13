@@ -6,7 +6,8 @@ import Home, { metadata } from "../src/app/page";
 import { CopyCommand } from "../src/components/copy-command";
 import { GraphProof } from "../src/components/graph-proof";
 import { InstallSelector } from "../src/components/install-selector";
-import { landingTitle, workflows } from "../src/lib/landing-content";
+import { TerminalPresentation } from "../src/components/terminal-output";
+import { clusterCommands, landingTitle, providerCommands } from "../src/lib/landing-content";
 import { agentSetupPrompt, plannedInstallCommand, siteName } from "../src/lib/site";
 import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
 
@@ -21,14 +22,16 @@ describe("launch feedback", () => {
     expect(layout).not.toContain("LogoVercelLabs");
   });
 
-  test("renders one canonical headline without periods or forced line breaks", () => {
+  test("keeps the canonical headline with a line break after work", () => {
     const html = renderToStaticMarkup(createElement(Home));
     const headings = html.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/g);
     expect(landingTitle).toBe("Find related work before you start");
     expect(metadata.title).toEqual({ absolute: `${siteName} | ${landingTitle}` });
-    expect(headings).toEqual([`<h1 id="hero-title">${landingTitle}</h1>`]);
+    expect(headings).toEqual(['<h1 id="hero-title">Find related work<br/>before you start</h1>']);
+    expect(headings?.[0]?.replace(/<br\s*\/?>(?:\s*)/g, " ").replace(/<[^>]+>/g, "")).toBe(
+      landingTitle,
+    );
     expect(headings?.[0]).not.toContain(".");
-    expect(headings?.[0]).not.toMatch(/<br\b/);
   });
 
   test("removes the hero eyebrow and exposes the audience selector", () => {
@@ -40,14 +43,17 @@ describe("launch feedback", () => {
     expect(html).toContain("For agents");
   });
 
-  test("uses native Geistdocs code blocks for the three workflows and final install", () => {
+  test("uses native Geistdocs code blocks for providers, clustering, and final install", () => {
     const html = renderToStaticMarkup(createElement(Home));
-    expect(html.match(/data-geist-code-block=""/g)).toHaveLength(4);
-    expect(html.match(/data-section="tabs"/g)).toHaveLength(4);
-    expect(html.match(/data-section="content"/g)).toHaveLength(4);
+    expect(html.match(/data-geist-code-block=""/g)).toHaveLength(5);
+    expect(html.match(/data-section="tabs"/g)).toHaveLength(5);
+    expect(html.match(/data-section="content"/g)).toHaveLength(5);
     const codes = html.match(/<code\b[^>]*>[\s\S]*?<\/code>/g) ?? [];
     for (const command of [
-      ...workflows.map((workflow) => workflow.command),
+      providerCommands.github,
+      providerCommands.linear,
+      providerCommands.model,
+      clusterCommands,
       plannedInstallCommand,
     ]) {
       expect(
@@ -75,8 +81,8 @@ describe("launch feedback", () => {
     expect(plannedInstallCommand).toBe("npm install -g issue-graph@latest");
   });
 
-  test("agent setup uses release-aware docs rather than an unavailable source skill", () => {
-    expect(agentSetupPrompt).toBe("npx skills@latest add https://issue-graph.dev");
+  test("agent setup uses the repository shorthand and retains public discovery", () => {
+    expect(agentSetupPrompt).toBe("npx skills@latest add vercel-labs/issue-graph");
     const index = JSON.parse(read("../public/.well-known/skills/index.json"));
     expect(index.skills[0]).toMatchObject({ name: "issue-graph", files: ["SKILL.md"] });
     expect(agentSetupPrompt.length).toBeLessThan(60);
@@ -96,29 +102,32 @@ describe("launch feedback", () => {
     expect(html).toContain('aria-label="Copy prompt"');
   });
 
-  test("server-renders the catalog's three static terminal examples without replay chrome or metadata", () => {
+  test("server-renders the catalog's semantic examples in Home without raw or replay chrome", () => {
     const html = renderToStaticMarkup(createElement(GraphProof));
+    const home = renderToStaticMarkup(createElement(Home));
     expect(html).toContain('aria-label="issue-graph terminal examples"');
     expect(html.match(/role="tab"/g)).toHaveLength(3);
     expect(html.match(/role="tabpanel"/g)).toHaveLength(3);
     expect(html.match(/hidden=""/g)).toHaveLength(2);
-    const panels = html.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+    const panels = html.split(/(?=<div\b[^>]*role="tabpanel")/).slice(1);
     for (const [index, example] of terminalExampleCatalog.map(toTerminalExample).entries()) {
       expect(html).toContain(`>${example.label}</button>`);
-      const code = panels[index]?.match(/<pre><code>[\s\S]*?<\/code><\/pre>/)?.[0];
-      expect(code).toBeDefined();
-      expect(renderToStaticMarkup(createElement(Home))).toContain(code);
-      expect(code?.replace(/<\/?span\b[^>]*>/g, "")).toBe(
-        renderToStaticMarkup(
-          createElement(
-            "pre",
-            null,
-            createElement("code", null, `$ ${example.command}\n\n${example.output}`),
-          ),
-        ),
+      const content = renderToStaticMarkup(
+        createElement(TerminalPresentation, {
+          output: example.output,
+          exampleId: example.id,
+        }),
       );
+      expect(panels[index]).toContain(content);
+      expect(home).toContain(content);
+      const command = panels[index]?.match(/<div class="ig-demo-command">[\s\S]*?<\/div>/)?.[0];
+      expect(command).toBeDefined();
+      expect(home).toContain(command);
     }
-    expect(html).toContain("Approval does not imply merge readiness.");
+    expect(html).not.toMatch(
+      /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
+    );
+    expect(html).toContain("Heat measures discussion, not severity.");
     expect(html).not.toMatch(/Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
     expect(html).not.toMatch(/stdoutSha256|excerptSha256|receiptFile|lineRanges|captureStartedAt/);
     expect(html).not.toContain("not a live feed");

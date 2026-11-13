@@ -1,74 +1,87 @@
 ---
-title: Reconcile and plan
-description: Turn a bounded open-backlog inventory into verification actions and deterministic execution, investigation, and blocked queues.
-lastModified: 2026-09-18
+title: Reconcile a backlog and plan reviews
+navTitle: Reconcile and plan
+description: Find backlog items to verify, review suggested actions, check coverage, compare competing PRs, and get an ordered queue of reviews.
+lastModified: 2026-09-27
 ---
 
 ## Reconcile an open backlog
 
-Reconcile discovers open issues and PRs without requiring labels, crawls their reference neighborhoods, and assigns evidence-backed actions:
+`reconcile` finds a repository's open issues and PRs, follows their references, and suggests an action for each item. The repository doesn't need labels.
 
 ```bash
-issue-graph reconcile --repo owner/repo --format markdown
-issue-graph reconcile --repo owner/repo --format json --no-snapshot
+issue-graph reconcile owner/repo --format markdown
+issue-graph reconcile owner/repo --format json --no-save
 ```
 
-Replace `owner/repo` with a repository you can read. Default `--format auto` chooses Markdown for a terminal and JSON for a pipe. Use an explicit format in integrations.
+Replace `owner/repo` with a repository you can read. Without `--format`, output is Markdown in a terminal and JSON in a pipe.
 
-The versioned report includes counts, ordered items, structured evidence, crawl limits, repository-level history when available, and contextual next steps. Evidence entries contain `code`, `summary`, and `related` node keys, so an agent can branch on stable reasons instead of parsing prose.
+The report lists counts, ordered items, supporting evidence, crawl limits, history, and next steps. Each evidence entry has a stable `code`, a `summary`, and `related` node keys that scripts can read.
 
-## Treat actions as a verification queue
+## Review suggested actions
 
-| Action | What to inspect before acting |
+| Action | What to check |
 | --- | --- |
-| `verify-completed` | Current code, acceptance criteria, and live behavior for an issue linked to merged work |
-| `close-superseded` | Scope parity with merged work and contributor credit |
-| `verify-superseded` | Both implementations and whether the newer merged work covers the older PR |
-| `resolve-competing` | Competing PRs, their differences, and the contributors involved |
-| `repair-closing-link` | A closing claim without the expected GitHub relationship |
-| `review-open-pr` | The exact PR head through the repository's review gate |
+| `verify-completed` | Current behavior and acceptance criteria for an issue linked to merged work |
+| `close-superseded` | Scope coverage and contributor credit |
+| `verify-superseded` | Whether the merged implementation covers the older PR |
+| `resolve-competing` | Differences between competing PRs |
+| `repair-closing-link` | A closing claim missing its GitHub relationship |
+| `review-open-pr` | Code and checks on the latest PR head |
 | `keep-linked` | Related work still active |
-| `keep-untracked` | Reproduction and investigation before prioritizing implementation |
+| `keep-untracked` | Reproduction and evidence needed to prioritize the issue |
 
-These are recommendations, not GitHub mutations. No issue is closed, PR merged, or comment posted by reconcile. A merged relationship is not proof of working behavior.
+Reconcile only reads GitHub and builds this review queue. You close issues, merge PRs, and post comments yourself after you verify each item.
 
-## Check inventory coverage
+## Check coverage
 
-Seed discovery paginates GitHub search, bounded by `--max-nodes` and the 1000-result search ceiling. The default node cap is 80; `--max-nodes` accepts 1 to 1000. Depth, hub, concurrency, and per-node limits still apply to the resulting graph.
+Seed discovery paginates GitHub search until it reaches `--budget` or GitHub's 1000-result search ceiling. The node cap defaults to 80, and you can set it from 1 to 1000. Depth, hub, concurrency, and per-node limits also apply.
 
-Inspect `limits.seedLimitReached`, `limits.cappedOut`, and `limits.fetchFailures`. A report with these limits is not proof of a fully reconciled backlog. Increase the budget, re-seed an omitted neighborhood, or retry access failures as appropriate. A successful process exit does not certify full reconciliation coverage.
+Inspect `limits.seedLimitReached`, `limits.cappedOut`, and `limits.fetchFailures` before you trust the queue. Depending on which limit you hit, increase the budget, re-seed the missing neighborhood, or retry the access failure. See [Graph](/docs/graph) for the per-node limits that apply at every node cap.
 
-See [Graph](/docs/graph) for limits that cannot be removed simply by increasing the node cap.
+## Compare history
 
-## Compare repository history
+Reconcile saves each report under `~/.issue-graph/reconcile-owner-repo/`. History is keyed by repository, so it can track changes even when the open seed list changes or becomes empty.
 
-Reconcile normally saves under `~/.issue-graph/reconcile-owner-repo/`. Unlike graph history, the comparison is keyed by repository rather than the current open seed list, so it can track action changes even when the backlog changes or becomes empty.
-
-History reports added, changed, and resolved actions plus coverage regressions and recoveries. Incomplete coverage suppresses unsafe new/resolved claims. `--no-snapshot` prevents saving a new report but does not prevent reading an existing baseline.
+Each comparison lists added, changed, and resolved actions, plus coverage changes. When coverage is incomplete, the comparison leaves out new or resolved claims it can't support. `--no-save` skips saving the new report but still compares against an existing baseline.
 
 ## Plan the next action
 
 ```bash
-issue-graph plan --repo owner/repo --format markdown
-issue-graph plan --repo owner/repo --format json
+issue-graph plan owner/repo --format markdown
+issue-graph plan owner/repo --format json
 ```
 
-Plan reuses live reconciliation and discussion signals to produce:
+`plan` runs reconciliation and groups the results into:
 
-- A ready execution queue.
-- An investigation queue for items needing evidence.
-- Blocked work, such as draft or conflicting PRs and issues with active related work.
-- A single `next` recommendation when coverage permits.
-- A structured `decision` for the observed next-action neighborhood.
+- ready actions
+- items needing investigation
+- blocked work, including drafts, conflicts, and active related work
 
-Cleanup and verification precede implementation review. Within lanes, ordering uses readiness, discussion heat, and visible inbound references. The rules are deterministic for the same captured evidence and evaluation time; changing live data can change the queue.
+When coverage permits, it selects one `next` action and adds a structured `decision` for that item and its related work.
 
-Missing open seeds or capped neighborhoods make the queue provisional and suppress `next`. Failed neighbor references are quarantined to affected items so unrelated work can remain actionable. Do not hide these uncertainties from the consumer.
+Cleanup and verification come before implementation review. Within each group, readiness, discussion activity, and visible inbound references set the order. The same evidence and evaluation time always produce the same order.
 
-## Compare competing PRs without selecting a winner
+If open seeds are missing or a neighborhood hit the node cap, the queue is provisional and `plan` omits `next`. A failed neighbor reference affects only the items related to it.
 
-For competing PRs, `decision` labels relationships and compares draft state, review state, mergeability, diff size, file counts, and update times. `reviewFirst` orders inspection only. It does not prove correctness, merge readiness, or which implementation should win.
+## Compare competing PRs
 
-`blockedBy` comes from visible active GitHub relationships. Plan does not infer product dependencies from issue prose. Re-run after a merge or closure to refresh the queue, and use separate review and authorization before changing GitHub.
+For competing PRs, `decision` compares draft state, reviews, mergeability, diff size, file counts, and update times. `reviewFirst` names a PR to start inspecting. Check the code, CI, and review threads before you choose an implementation.
 
-Plan writes no snapshots and does not support HTML export. Use `--format json` for its machine report, not graph's `--json PATH`. See [Reference](/docs/reference) for command-specific output contracts.
+`blockedBy` uses the GitHub relationships visible in the capture. Run `plan` again after a merge or closure to refresh the queue.
+
+## Find work one fix resolves
+
+The plan's `sweep` groups list open work that one decision can resolve together:
+
+- `competing`: an issue with two or more open closing PRs
+- `stale`: an open PR whose modified files are all gone from the default branch
+- `overlap`: each open PR paired with the PR it shares the most source files with, when the two close no common issue. Shared files weigh more when fewer other open PRs touch them.
+
+Each PR reports `staleBase`, which is `true` when every file it modifies or deletes is gone from the default branch. Use `--budget 1000` to include older backlog items.
+
+Each group names its `next` step: `verify` to run the issue's repro on the current release, `choose` to pick one implementation, or `compare` to read both PRs. `verify` groups, where every PR is stale, come first because they usually need verification on the current release rather than new code.
+
+Treat a group as a lead to investigate. Reproduce the issue on the current release before you close anything.
+
+`plan` saves no snapshots. Use `--format json` for structured output. HTML export is available in graph mode. See [Command reference](/docs/reference) for output formats.

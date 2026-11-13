@@ -6,6 +6,7 @@ import { docsSlugs, markdownPath } from "../src/lib/docs-paths";
 import { landingTitle } from "../src/lib/landing-content";
 import { canonicalUrl, repositoryUrl } from "../src/lib/site";
 import { terminalExampleCatalog, toTerminalExample } from "../src/lib/terminal-examples";
+import { statusPresentation, terminalPresentation } from "../src/lib/terminal-presentation";
 import { testUrl } from "./test-url";
 
 const origin = testUrl();
@@ -45,12 +46,17 @@ function htmlAttribute(html: string, tag: string, key: string, value: string, at
 }
 
 function staticTerminal(html: string) {
-  const terminal = html.match(/<section\b[^>]*class="ig-demo"[^>]*>[\s\S]*?<\/section>/)?.[0];
+  const terminal = html
+    .match(/<section\b[^>]*class="ig-demo"[^>]*>[\s\S]*?<\/section>/)?.[0]
+    ?.replace(/<!--[\s\S]*?-->/g, "");
   assert.ok(terminal, "Terminal examples are present in the server HTML");
   assert.match(terminal, /aria-label="issue-graph terminal examples"/);
   assert.equal((terminal.match(/role="tablist"/g) ?? []).length, 1, "One terminal tablist");
   const tabs = terminal.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
-  const panels = terminal.match(/<div\b[^>]*role="tabpanel"[^>]*>[\s\S]*?<\/div>/g) ?? [];
+  const panels = terminal.split(/(?=<div\b[^>]*role="tabpanel")/).slice(1);
+  const commands = terminalExampleCatalog.map((example) => example.command);
+  const escaped = (value: string) =>
+    renderToStaticMarkup(createElement("span", null, value)).replace(/<\/?span>/g, "");
   assert.equal(tabs.length, 3, "Three terminal tabs");
   assert.equal(panels.length, 3, "Three server-rendered panels");
   const ids = new Set<string>();
@@ -72,26 +78,114 @@ function staticTerminal(html: string) {
       `Inactive panel hidden: ${example.id}`,
     );
     assert.ok(tab.includes(`>${example.label}</button>`), `Tab label: ${example.id}`);
-    const code = panel.match(/<pre><code>[\s\S]*?<\/code><\/pre>/)?.[0];
-    assert.ok(code, `SSR pre/code: ${example.id}`);
     assert.equal(
-      code.replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?span\b[^>]*>/g, ""),
-      renderToStaticMarkup(
-        createElement(
-          "pre",
-          null,
-          createElement("code", null, `$ ${example.command}\n\n${example.output}`),
-        ),
-      ),
-      `Complete captured excerpt, not an animated prefix: ${example.id}`,
+      htmlAttribute(panel, "div", "role", "tabpanel", "tabindex"),
+      index === 0 ? "0" : "-1",
     );
+    const command = panel.match(/<div class="ig-demo-command">[\s\S]*?<\/div>/)?.[0];
+    assert.ok(command, `Immediate display command: ${example.id}`);
+    assert.equal(
+      command.replace(/<\/?span\b[^>]*>/g, ""),
+      renderToStaticMarkup(
+        createElement("div", { className: "ig-demo-command" }, `$ ${commands[index]}`),
+      ),
+      `Approved shortened command: ${example.id}`,
+    );
+    const text = panel.replace(/<[^>]+>/g, "");
+    const contains = (value: string) =>
+      assert.ok(text.includes(escaped(value)), `Immediate ${example.id} content: ${value}`);
+    if (example.id === "status") {
+      const status = statusPresentation(example.output);
+      assert.ok(status, "Captured status is recognized");
+      const tables = panel.match(/<table\b[^>]*>[\s\S]*?<\/table>/g) ?? [];
+      assert.equal(
+        tables.length,
+        status.projects.reduce((count, project) => count + (project.authors.length ? 1 : 0) + 1, 0),
+      );
+      assert.equal((panel.match(/<h3>/g) ?? []).length, status.projects.length);
+      for (const project of status.projects) {
+        assert.ok(panel.includes(renderToStaticMarkup(createElement("h3", null, project.name))));
+        contains(`${project.open} open PR${project.open === "1" ? "" : "s"}`);
+        for (const [label, countLabel, rows] of [
+          ["Author", "Open PRs", project.authors],
+          ["Review state", "PRs", project.reviews],
+        ] as const) {
+          if (!rows.length) continue;
+          const name = `${project.name} ${label}`;
+          const table = tables.find(
+            (value) => htmlAttribute(value, "table", "aria-label", name, "aria-label") === name,
+          );
+          assert.ok(table, `Separate SSR table: ${name}`);
+          const cells = (table.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) ?? []).map((row) =>
+            Array.from(
+              row.matchAll(/<(?:th|td)\b[^>]*>([^<]*)<\/(?:th|td)>/g),
+              (match) => match[1],
+            ),
+          );
+          assert.deepEqual(
+            cells,
+            [[label, countLabel], ...rows.map((row) => [escaped(row.label), escaped(row.value)])],
+            `Captured cells: ${name}`,
+          );
+        }
+        contains(`${project.conflicts} conflicts`);
+      }
+      for (const flag of status.flags) contains(`${flag.value} ${flag.label}`);
+      contains(status.capture);
+      contains(`Coverage ${status.coverage}`);
+      for (const caveat of status.caveats.split("\n")) contains(caveat);
+    } else if (example.id === "dashboard") {
+      contains(example.output);
+      assert.ok(panel.includes("View full dashboard screenshot"));
+    } else {
+      const rows = terminalPresentation(example.output, example.id);
+      assert.ok(rows, `Captured ${example.id} is recognized`);
+      assert.equal(
+        (panel.match(/class="ig-demo-item-title"/g) ?? []).length,
+        rows.filter((row) => row.kind === "item").length,
+      );
+      for (const row of rows) {
+        if (row.kind === "item") {
+          assert.ok(
+            panel.includes(
+              renderToStaticMarkup(
+                createElement("span", { className: "ig-demo-identity" }, row.reference),
+              ),
+            ),
+          );
+          assert.ok(
+            panel.includes(
+              renderToStaticMarkup(
+                createElement("span", { className: "ig-demo-item-title" }, row.title),
+              ),
+            ),
+          );
+          if (row.state) contains(row.state);
+          for (const detail of row.details) contains(detail);
+          if (row.metrics) {
+            contains(row.metrics);
+            for (const detail of row.details)
+              assert.ok(
+                text.indexOf(escaped(detail)) < text.indexOf(escaped(row.metrics)),
+                "Action precedes secondary metrics",
+              );
+          }
+        } else {
+          for (const value of row.kind === "summary" ? row.text.split(" · ") : [row.text])
+            contains(value);
+        }
+      }
+    }
   }
   assert.equal(ids.size, 6, "Unique tab and panel identifiers");
-  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate Graph takeaway");
+  assert.ok(terminal.includes(terminalExampleCatalog[0].summary), "Immediate capture takeaway");
   assert.match(terminal, /aria-live="polite"/);
-  assert.match(terminal, /Unknown=review unknown; \?=unknown, not zero\./);
-  assert.match(terminal, /Approval does not imply merge readiness\./);
-  assert.match(terminal, /Validate repository-specific behavior before mutating GitHub\./);
+  assert.match(terminal, /Heat measures discussion, not severity\./);
+  assert.doesNotMatch(
+    terminal,
+    /<details\b|Raw captured excerpt|Formatted excerpt|Formatted reading view|ig-demo-raw/,
+  );
+
   assert.doesNotMatch(terminal, /Replay terminal demo|Expand terminal|ig-demo-transcript|Nodes: 5/);
   assert.doesNotMatch(
     terminal,
@@ -212,7 +306,7 @@ for (const path of ["/", ...docsSlugs.map((slug) => (slug ? `/docs/${slug}` : "/
       assert.ok(markdown.body.includes(example.summary));
       assert.ok(markdown.body.includes(example.output));
     }
-    assert.match(markdown.body, /This displayed excerpt omits other captured nodes/);
+    assert.match(markdown.body, /Selected JSON fields from a public CLI capture/);
     assert.doesNotMatch(markdown.body, /All fetched nodes are shown/);
   }
   const after = await request(path);
@@ -348,6 +442,46 @@ assert.match(publicSkill.body, /^---\nname: issue-graph\n/);
 assert.equal(publicSkill.body, skill.body);
 assert.match(publicSkill.body, /issue-graph skills get core/);
 checks += 2;
+const bridge = await request("/api/mcp?webmcp-script", { accept: "*/*" });
+assert.equal(bridge.response.status, 200);
+assert.match(bridge.response.headers.get("content-type") ?? "", /javascript/);
+assert.match(bridge.body, /registerTool/);
+async function rpc(method: string, params: Record<string, unknown>) {
+  const response = await fetch(new URL("/api/mcp", origin), {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  const message = JSON.parse(
+    response.headers.get("content-type")?.includes("text/event-stream")
+      ? (text
+          .split(/\r?\n/)
+          .find((line) => line.startsWith("data:"))
+          ?.slice(5) ?? "")
+      : text,
+  );
+  assert.equal(message.error, undefined);
+  return message.result;
+}
+const { tools } = await rpc("tools/list", {});
+assert.deepEqual(
+  tools.map((tool: { name: string }) => tool.name),
+  ["search_docs"],
+);
+const found = await rpc("tools/call", {
+  name: "search_docs",
+  arguments: { query: "competing PRs", locale: "en" },
+});
+assert.notEqual(found.isError, true);
+const matches = found.content
+  .filter((item: { type: string }) => item.type === "text")
+  .flatMap((item: { text: string }) => JSON.parse(item.text));
+assert.ok(
+  matches.some((item: { url: string }) => item.url === "/docs/backlog#compare-competing-prs"),
+);
+checks += 3;
 console.log(
   `PASS: ${checks} route checks against ${origin.origin}${preview ? " (preview noindex)" : ""}`,
 );

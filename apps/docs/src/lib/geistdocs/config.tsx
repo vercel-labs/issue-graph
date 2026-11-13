@@ -20,7 +20,7 @@ export const config = defineConfig({
   content: [{ id: "docs", label: "Documentation", dir: "content/docs", route: "/docs" }],
   nav: [
     { label: "Docs", href: "/docs" },
-    { label: "For agents", href: "/docs/agents" },
+    { label: "npm", href: "https://www.npmjs.com/package/issue-graph", external: true },
   ],
   ai: { enabled: false },
   feedback: { enabled: false },

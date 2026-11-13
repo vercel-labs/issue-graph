@@ -1,112 +1,194 @@
 ---
-title: Command reference
-description: Current command shapes, supported flags, output formats, local writes, and exit-code limits.
-lastModified: 2026-09-22
+title: CLI command reference and exit codes
+navTitle: Command reference
+description: Look up issue-graph commands, flags, output formats, crawl controls, storage options, and exit codes, plus help and JSON schema output.
+lastModified: 2026-09-27
 ---
 
-## Inspect the installed contract
+## Help and schema
 
-All runtime examples use the installed `issue-graph` command from the published npm package. Follow [Get started](/docs/get-started) to install the latest release, or replace `issue-graph` with `npx issue-graph@latest`. No source checkout is required. Check your installed command's help before relying on features from a newer source checkout; `@latest` selects a published release, not unreleased source capabilities.
+Help output describes the release you have installed. You can also run these commands with `npx issue-graph@latest`.
 
 ```bash
 issue-graph --help
+issue-graph query --help
+issue-graph config --help
 issue-graph status --help
-issue-graph reconcile --help
-issue-graph plan --help
+issue-graph linear --help
 issue-graph schema
 ```
 
-`schema` emits the agent-facing JSON contract, including command formats, `githubMutations`, `localWrites`, defaults, and limits. Its schema version is independent of the package version. Inspect the installed contract before building a durable integration.
+`query` and `config` share one help page, and `status` and `linear` each have their own. Other commands print the main usage.
 
-## Command shapes
+`schema` prints the JSON command contract, including each command's formats, mutation flags such as `githubMutations`, `localWrites`, defaults, and limits. Its `schemaVersion` changes independently of the package version.
+
+## Commands
 
 ```bash
-issue-graph 427 --repo vercel-labs/portless --depth 1 --no-snapshot
-issue-graph https://github.com/vercel-labs/portless/pull/427 --no-snapshot
-issue-graph --seeds 64,246,281 --repo owner/repo --no-snapshot
-issue-graph --label bug --repo owner/repo --prioritize --no-snapshot
-issue-graph status --repo vercel-labs/portless --author ctate,Railly --json
-issue-graph reconcile --repo owner/repo --format json --no-snapshot
-issue-graph plan --repo owner/repo --format json
+issue-graph open owner/repo
+issue-graph graph vercel-labs/portless#427 --depth 1 --no-save
+issue-graph graph https://github.com/vercel-labs/portless/pull/427 --no-save
+issue-graph graph 64 246 281 --repo owner/repo --no-save
+issue-graph rank owner/repo --label bug --no-save
+issue-graph cluster owner/repo
+issue-graph dashboard
+issue-graph runs
+issue-graph auth status
+issue-graph skills get core --full
+issue-graph query github:owner/repo --state open --view rank --json --no-open
+issue-graph config show --provider github --scope owner/repo --json
+issue-graph status vercel-labs/portless --author ctate,Railly --json
+issue-graph linear login
+issue-graph linear ENG-123 --json
+issue-graph reconcile owner/repo --format json --no-save
+issue-graph plan owner/repo --format json
 issue-graph schema
 ```
 
-Graph is the default mode; there is no literal `issue-graph graph` subcommand. Replace `owner/repo`, label names, and seed numbers with your actual scope. Use one seed-selection form per invocation.
+`open`, `rank`, and `cluster` accept a repository scope or items, written as `123`, `#123`, `owner/repo#123`, or a URL. `graph` needs items or `--label`. Live commands infer the repository from the current checkout when you omit it. `status` takes repositories and authors. Offline `query` selects a saved `provider:scope`, and `config` uses `--provider` and `--scope`. `linear` takes a Linear issue URL, identifier, or UUID, or `--project UUID`; see [Linear](/docs/linear) for its flags and authentication.
+
+Running `issue-graph` with no arguments in an interactive terminal inside a GitHub checkout opens the backlog dashboard. In a pipe or CI, it prints usage instead. Older flags still work for one minor release and print their replacement.
 
 ## Graph selection and crawl controls
 
 | Flag | Meaning |
 | --- | --- |
-| `--repo owner/repo` | Required for bare numbers, `--seeds`, `--label`, reconcile, and plan |
-| `--seeds a,b,c` | Explicit comma-separated seeds; multi-seed output includes components |
+| `--repo owner/repo` | Repository for bare numbers when outside its checkout |
 | `--label L` | Seed from labeled open issues, within the discovery budget |
-| `--depth N` | Same-repo recursion depth, default 2; cross-repo references fetched one hop, not expanded |
-| `--max-nodes N` | Total nodes, default 80; integer from 1 to 1000 |
+| `--state open\|all` | For unfiltered `open`, `rank`, or `cluster` repository scopes, seed open items (default) or all states; linked context can have any state |
+| `--depth N` | Same-repo recursion depth, default 2; cross-repository references are fetched one hop |
+| `--budget N` | Total nodes, default 80; unfiltered `open`, `rank`, and `cluster` repository scopes default to 1000; integer from 1 to 1000 |
 | `--hub-threshold N` | Do not expand high-degree non-seed nodes above this number of references, default 12 |
 | `--concurrency N` | Node requests in flight, default 4; integer from 1 to 32 |
-| `--prioritize` | Append the discussion-heat ranking in graph Markdown |
-| `--no-snapshot` | Skip new graph/reconcile history files; not a blanket ban on local I/O |
+| `--no-save` | Skip new run and reconcile history files; `-o` paths still write |
 | `-h`, `--help` | Print usage |
 
-Reconcile and plan normally discover the open backlog from `--repo` and share the crawl controls. Search pages are 100 results, with a 1000-result ceiling. Graph per-node connections are bounded separately; see [Graph](/docs/graph).
+Reconcile and plan discover the open backlog of their repository scope and use the same crawl controls. Search returns 100 results per page, up to 1000 results. Per-node connections in a graph have separate limits, described in [Graph](/docs/graph).
 
 ## Graph exports and clustering
 
 | Flag | Meaning |
 | --- | --- |
-| `--json PATH` | Write a graph JSON file; Markdown remains on stdout |
-| `--html PATH` | Write a self-contained graph HTML explorer |
+| `-o PATH.json`, `--out PATH.json` | Write a graph JSON file; the report remains on stdout |
+| `-o PATH.html`, `--out PATH.html` | Write a static Next.js dashboard with sibling `_next/` assets and font license |
 | `--clusters PATH` | Read cluster/cleanup labels for the HTML explorer |
-| `--cluster` | Print a clustering task for the caller's agent |
-| `--cluster-run claude` | Launch installed Claude headlessly with the clustering task |
-| `--cluster-run codex` | Launch installed Codex headlessly with the clustering task |
+| `cluster` | Print a clustering task for the caller's agent and save the run |
+| `cluster --apply PATH` | Apply the agent's answer (a file, or `-` for stdin) to the saved run |
+| `cluster --agent claude` | Launch installed Claude headlessly with the clustering task |
+| `cluster --agent codex` | Launch installed Codex headlessly with the clustering task |
+| `open --agent none` | Skip the interactive offer to run an installed agent |
 
-Use these export/clustering options with graph mode. Reconcile/plan emit their machine reports using `--format json`, not graph's `--json PATH`. Plan rejects `--html`. `--no-snapshot` does not suppress graph export paths or sandbox external agents.
+A command takes one `.json` and one `.html` output. If you pass more than one path of the same type, the last one wins. Reconcile and plan use `--format json` for structured output. `open` and `cluster` always write an HTML export, even with `--no-save`. Applying clusters always updates the saved model. External agents run with their own permissions.
+
+## Saved runs and authentication
+
+| Command | Behavior |
+| --- | --- |
+| `dashboard [--no-open] [-o PATH.html]` | Export all saved models with a project selector; opens by default in an interactive terminal |
+| `runs [list] [--format json]` | List the latest saved model per repository; text by default, including in pipes |
+| `runs rm owner/repo` | Remove one saved dashboard model; preserve snapshots, captures, history, and exports |
+| `auth [status] [--format json]` | Check GitHub CLI sign-in without printing tokens; exit 1 if unavailable |
+| `skills [list] [--json]` | List bundled guides without network access |
+| `skills get core [--full] [--json]` | Read operational guidance; `--full` includes workflow references |
+
+`auth status` checks the existing login. To sign in, run `gh auth login`. `query`, `config`, and `skills` work without provider authentication. `skills` prints text or Markdown by default, including in pipes. See [Agents and skills](/docs/agents) for setup.
+
+## Saved dashboard queries
+
+`query` works offline and saves immutable captures and query receipts. It opens the Rank view when the provider supports it, and otherwise the provider's first supported view. See [Dashboard and saved queries](/docs/dashboard) for collection, filters, and exact links.
+
+| Option | Meaning |
+| --- | --- |
+| `provider:scope` | Select a saved model; bare `owner/repo` means GitHub; omit only when exactly one model is available |
+| `--input PATH` | Import one normalized dashboard model, not a graph JSON export |
+| `--capture ID` | Query the same full captured data with current defaults and newly supplied filters; conflicts with `--input` |
+| `--history ID` | Replay frozen parameters and saved view; only output format and open controls may accompany it |
+| `--view V` | `explore`, `impact`, `swarm`, or `rank`, subject to provider capabilities |
+| `--state S` | `all`, `open`, `closed`, `merged`, `archived`, or `unavailable` |
+| `--kind K` | `all`, `Issue`, `PullRequest`, or `Unknown` |
+| `--cluster N` | Filter by capture-specific cluster index; repeat for a union |
+| `--heat-min N` | Inclusive nonnegative Heat threshold |
+| `--heat-top N` | Top `10` or `25` percent of open captured project items of the selected kind, including ties; conflicts with `--heat-min` |
+| `--solution S` | `all`, `with`, or `without` an observed closing PR link; issue filter |
+| `--review R` | `all`, `pending`, `approved`, `changes`, `draft`, or `conflicts`; open PR filter |
+| `--search TEXT` | Search key, identifier, title, or author |
+| `--filters JSON` | Dashboard filter object; individual flags override its fields |
+| `--weights NAME=VALUE,...` | Temporary named weight overrides, each from 0 to 10 |
+| `--select KEY` | Select an item in Explore or Impact; Impact requires a matching item |
+| `--focus-cluster N` | Focus one Explore cluster; conflicts with `--select` |
+| `--group G` | Swarm grouping: `cluster`, `state`, `kind`, or `all` |
+| `--metric M` | Swarm metric: `heat`, `links`, `blast`, or `depth`, subject to provider capabilities |
+| `--open`, `--no-open` | Request or suppress opening the exact local `viewUrl`; conflict with each other |
+| `--json` | Structured stdout; also the default in a pipe |
+| `--format human`, `--format json` | Explicit output mode |
+
+Filters default to all items. Heat and review filters match open items, and Rank shows open scored items even without a state filter. A filter the provider does not support fails with an error. `--group` and `--metric` require the Swarm view. `query` requests opening the view automatically only with human output in an interactive terminal outside CI. Use `--json --open` to request it explicitly.
+
+Query JSON has `schemaVersion: 1`, `scoringVersion`, `provider`, `scope`, `captureId`, `historyId`, `query`, `capabilities`, `counts`, `heat`, `items`, `ranking`, `impact`, `selection`, `groups`, `coverage`, `viewUrl`, `opened`, and `nextSteps`. `opened` records whether the CLI requested a browser, and does not confirm that the page loaded. Keep the full `viewUrl`, including its query string and hash.
+
+## Scoring configuration
+
+```bash
+issue-graph config show --json
+issue-graph config show --provider github --scope owner/repo --json
+issue-graph config set --provider github --scope owner/repo --weights reactions=4 --json
+```
+
+`show` returns the config path, saved config, and effective weights. `set` requires `--weights` and merges the named weights into the global, provider, or project defaults. `--scope` requires `--provider`. For `--scope`, use the `scope` from a query result without its provider prefix. Config commands support `--json` and `--format human|json`.
+
+Weights resolve in this order, with later levels overriding earlier ones: built-in, global, provider, project, then command. The built-in values are `comments=3,participants=2,reactions=2,inboundRefs=2,age=1`. Each weight accepts a finite number from 0 to 10. Dashboard sliders and query overrides apply only to that session or command; only `config set` writes `config.json`. Replaying with `--history` uses the weights frozen in that query.
 
 ## Status flags
 
 | Flag | Meaning |
 | --- | --- |
-| `--repo owner/repo` | Required, repeatable repository scope |
+| `owner/repo...` | Repositories; defaults to the current checkout. `--repo owner/repo` also works and can repeat |
 | `--author login[,login]` | Required, repeatable/comma-separated author scope |
-| `--view authors|projects|prs` | Human view, default `authors` |
-| `--format auto|table|markdown|json` | Default `auto`: table in a TTY, JSON in a pipe |
-| `--json` | Boolean stdout JSON shorthand, no filename; conflicts with table/Markdown format |
+| `--view authors\|projects\|prs` | Human view, default `authors` |
+| `--format auto\|human\|markdown\|json` | Default `auto`: table in a TTY, JSON in a pipe |
+| `--json` | Boolean stdout JSON shorthand, no filename; conflicts with human/Markdown format |
 | `--concurrency N` | Concurrent repositories, default 4; integer from 1 to 32 |
 | `--max-pages N` | Pages per connection, default 100; integer from 1 to 1000 |
 | `--save` | Opt into an immutable local capture |
-| `--since last|PATH` | Compare with the latest same-scope capture or an explicit snapshot/export |
-| `--no-snapshot` | Forbid snapshot writes; conflicts with `--save` |
+| `--since last\|PATH` | Compare with the latest same-scope capture or an explicit snapshot/export |
+| `--no-save` | Forbid snapshot writes; conflicts with `--save` |
 | `-h`, `--help` | Print status-specific usage |
 
-Status PR pages contain 50 PRs; assignees and reviewer requests are also paginated. Scope normalization is case-insensitive. `--view` does not remove evidence fields from the JSON report. See [Status](/docs/status) for unknown counts, comparison provenance, and terminal-state verification.
+Status fetches 50 PRs per page and also paginates assignees and reviewer requests. Repository and author scopes are matched case-insensitively. `--view` does not remove evidence fields from the JSON report. See [Status and history](/docs/status) for counts, coverage, and comparisons.
 
 ## Formats and persistence
 
 | Mode | stdout | Local persistence |
 | --- | --- | --- |
-| Graph | Markdown regardless of TTY; graph JSON only via `--json PATH` | Snapshots by default; explicit JSON/HTML paths write independently |
-| Reconcile | `--format auto|json|markdown`; auto is Markdown in TTY, JSON in pipe | Repository history by default unless `--no-snapshot` |
-| Plan | Same format selection as reconcile | No snapshots |
-| Status | `--format auto|table|markdown|json`; auto is table in TTY, JSON in pipe | Only with `--save` |
+| Graph | Formatted in a TTY, Markdown in a pipe; graph JSON only via `-o PATH.json` | History saved by default; dashboard model saved when exporting HTML; `-o` paths write independently |
+| Open and cluster | Human summary in a TTY, JSON in a pipe; `cluster` includes its task | History saved by default; HTML export always writes |
+| Rank | Formatted in a TTY, Markdown in a pipe; `--format json` returns `repo`, `weights`, and `priorities` | History saved by default; dashboard model saved only when exporting HTML |
+| Reconcile | `--format auto\|json\|markdown`; auto is Markdown in TTY, JSON in pipe | Repository history by default unless `--no-save` |
+| Plan | Formatted in a TTY, JSON in a pipe; `--format text\|json\|markdown` | No snapshots |
+| Status | `--format auto\|human\|markdown\|json`; auto is table in TTY, JSON in pipe | Only with `--save` |
+| Query | Short human summary in TTY, JSON in pipe; `--format human\|json` | New queries save captures, receipts, and static views; `--history` reuses them |
+| Config | Human summary in TTY, JSON in pipe; `--format human\|json` | Only `set` writes `config.json` |
 | Schema | JSON | None |
 
-Reconcile, plan, and status reports currently have `schemaVersion: 1`. Graph JSON currently has no report version field. It contains `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Do not assume identical report shapes across modes.
+Graph, rank, and plan accept `--format human` or its alias `text`. Reconcile treats both as Markdown. Status accepts `human` or its alias `table`. For `graph`, the legacy `--format json` still prints Markdown, so use `-o PATH.json` to get graph data.
 
-Status history adds `history` on comparison and `snapshot` on save. Graph/reconcile can read earlier history even with `--no-snapshot`. Progress and file-write notices go to stderr. See [Security](/docs/security) for sensitive-data handling.
+Reconcile, plan, and status reports have `schemaVersion: 1`. Graph JSON has no report version field and contains `seeds`, `depth`, `nodes`, `cappedOut`, `components`, `overlaps`, and `priorities`. Parse each mode's output according to its own schema.
+
+Status reports add a `history` field when comparing and a `snapshot` field when saving. Graph and reconcile read earlier history even with `--no-save`. Progress and file-write notices go to stderr. See [Permissions and privacy](/docs/security) for handling sensitive data.
 
 ## Environment
 
 | Variable | Scope |
 | --- | --- |
-| `NO_COLOR` | Disables status styling |
-| `CI` | Suppresses status color when set |
-| `ISSUE_GRAPH_HOME` | Status storage root; default `~/.issue-graph` |
+| `NO_COLOR` | Disables terminal styling |
+| `TERM=dumb` | Disables terminal styling |
+| `CI` | Suppresses terminal color and automatic browser opening |
+| `ISSUE_GRAPH_HOME` | Shared state root for config, captures, query history, saved models, and graph/status/reconcile history; default `~/.issue-graph` |
 
-Graph/reconcile continue to use `~/.issue-graph/` in the current source. GitHub CLI authentication is handled by `gh`; HTTP library callers supply their own token. No model configuration is required for the deterministic workflows.
+Live GitHub collection authenticates through `gh`, and library callers that use the HTTP transport supply a token. Offline `query` and `config` need no provider authentication. No command calls a model unless you select an external clustering agent, either with `--agent` or by accepting the offer from `open` in an interactive terminal.
 
 ## Exit codes and coverage
 
-The general contract uses `0` for success, `1` for runtime failure, and `2` for usage errors. Status additionally returns `1` for incomplete inventory or comparison, while retaining useful partial evidence when available.
+Commands return `0` for success, `1` for runtime failure, and `2` for usage errors. Status also returns `1` when its inventory or comparison is incomplete, and preserves the partial results it collected.
 
-Graph, reconcile, and plan can emit bounded or incomplete reports without treating coverage loss as a process failure. Inspect graph fetch state and `cappedOut`, reconcile `limits`, and plan's provisional/blocked evidence before making a completeness claim. Exit `0` is not merge readiness or proof that no work was missed.
+Graph, reconcile, and plan can exit successfully with incomplete results. Check graph fetch state and `cappedOut`, reconcile `limits`, and plan's provisional or blocked items before acting.

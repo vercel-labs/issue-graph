@@ -86,6 +86,31 @@ describe("parseNodeResponse", () => {
     expect(node.claimsClose).toEqual(["o/r#42"]);
   });
 
+  test("a PR records only the files its base must already have", () => {
+    const node = parseNodeResponse(
+      {
+        __typename: "PullRequest",
+        title: "t",
+        state: "OPEN",
+        files: {
+          nodes: [
+            { path: "src/edited.ts", changeType: "MODIFIED" },
+            { path: "src/removed.ts", changeType: "DELETED" },
+            { path: "src/new.ts", changeType: "ADDED" },
+            { path: "src/moved.ts", changeType: "RENAMED" },
+            { path: "src/unknown.ts" },
+          ],
+        },
+      },
+      "o",
+      "r",
+      51,
+      0,
+    );
+    expect(node.pr?.baseFiles).toEqual(["src/edited.ts", "src/removed.ts"]);
+    expect(node.pr?.files).toHaveLength(5);
+  });
+
   test("a missing item is NOT_FOUND, not a silently empty node", () => {
     const node = parseNodeResponse(undefined, "o", "r", 1, 0);
     expect(node.state).toBe("NOT_FOUND");
