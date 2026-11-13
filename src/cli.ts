@@ -42,6 +42,7 @@ import { parseSeed } from "./refs.js";
 import { render } from "./render.js";
 import { ISSUE_GRAPH_SCHEMA } from "./schema.js";
 import { inferRepo, parseScope, type Scope } from "./scope.js";
+import { runSemanticCli } from "./semantic-cli.js";
 import { runSkills } from "./skills-cli.js";
 import {
   diffReconcileSnapshots,
@@ -83,6 +84,7 @@ commands
   reconcile [repo]         open-backlog verification queue
   plan [repo]              next backlog action
   status [repo...] --author login[,login]   PR counts by author, project, or review state
+  classify --repo R --dry-run   review-only semantic suggestions for open issues (--help)
   dashboard                every saved run in one explorer, with a project switcher
   runs [list | rm <repo>]  saved runs behind the dashboard
   auth [status]            provider sign-in state
@@ -437,6 +439,20 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       stdout: (value) => process.stdout.write(value),
       stderr: (value) => process.stderr.write(value),
     });
+    return;
+  }
+  if (argv[0] === "classify") {
+    // Semantic capture only reasons about github.com repositories, so the host
+    // is pinned instead of inherited from GH_HOST or gh's config.
+    process.exitCode = await runSemanticCli(
+      argv.slice(1),
+      shellTransport({ hostname: "github.com" }),
+      {
+        isTTY: Boolean(process.stdout.isTTY),
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+      },
+    );
     return;
   }
   if (argv[0] === "status") {

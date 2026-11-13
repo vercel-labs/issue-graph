@@ -376,6 +376,32 @@ try {
   verifyArchive(tarball, sourceManifest, digest);
   const entries = run([tools.tar, "-tzf", tarball], repo, process.env).stdout.trim().split("\n");
   const files = entries.filter((name) => !name.endsWith("/"));
+  const runtimeFiles = readdirSync(join(repo, "src"), { recursive: true, encoding: "utf8" })
+    .filter((name) => /\.(?:ts|js)$/.test(name) && !/\.test\.(?:ts|js)$/.test(name))
+    .flatMap((name) =>
+      ["js", "d.ts"].map(
+        (extension) => `package/dist/${name.slice(0, -3).split(sep).join("/")}.${extension}`,
+      ),
+    );
+  const expectedFiles = [
+    ...runtimeFiles,
+    ...[
+      "package.json",
+      "LICENSE",
+      "README.md",
+      "CHANGELOG.md",
+      "SECURITY.md",
+      "skills/issue-graph/SKILL.md",
+      "skill-data/core/SKILL.md",
+      "skill-data/core/references/workflows.md",
+      "skill-data/core/examples/taxonomy.json",
+    ].map((name) => `package/${name}`),
+  ];
+  assert.deepEqual(
+    files.filter((name) => !name.startsWith("package/dist/dashboard/")).sort(),
+    expectedFiles.sort(),
+    "published contents must match source modules and approved assets",
+  );
   assert.equal(new Set(files).size, files.length, "archive must not contain duplicate files");
   for (const entry of entries) {
     assert.ok(entry.startsWith("package/"), `unexpected archive root: ${entry}`);
@@ -392,7 +418,8 @@ try {
         /^dist\/dashboard\/_next\/static\/[a-zA-Z0-9_./()[\]-]+\.(?:css|woff2)$/.test(name) ||
         name === "skills/issue-graph/SKILL.md" ||
         name === "skill-data/core/SKILL.md" ||
-        name === "skill-data/core/references/workflows.md",
+        name === "skill-data/core/references/workflows.md" ||
+        name === "skill-data/core/examples/taxonomy.json",
       `unexpected published file (source, internal docs, or maps): ${name}`,
     );
     assert.ok(
@@ -692,6 +719,19 @@ try {
     invoke([...statusArgs, "--save"], 1, { ISSUE_GRAPH_HOME: join(blocker, "status") }).stderr,
     /ENOTDIR|EEXIST|not a directory/i,
   );
+  const classify = run(
+    [
+      node,
+      "--import",
+      import.meta.resolve("tsx"),
+      join(repo, "tests/verify-classify.ts"),
+      installed,
+    ],
+    consumer,
+    { ...env, NODE_OPTIONS: "" },
+  );
+  assert.match(classify.stdout, /PASS: \d+ classify\/legacy\/package checks/);
+  console.log(classify.stdout.trim().split("\n").at(-1));
   const linearHtmlPath = join(consumer, "linear", "graph.html");
   const linearHtml = invoke(
     ["linear", "ENG-1", "--html", linearHtmlPath, "--no-save", "--json"],
@@ -766,7 +806,7 @@ try {
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 58 : 59;
+  const expectedChecks = suppliedTarball ? 59 : 60;
   assert.equal(
     checks,
     expectedChecks,

@@ -5,7 +5,7 @@ description: Status-first routing, bounded evidence collection, and safety guida
 
 # issue-graph core
 
-Use issue-graph to collect GitHub evidence, inspect related work, and prioritize review. Rankings and classifications guide inspection; verify code and behavior before acting.
+Use issue-graph to collect GitHub evidence, inspect related work, and prioritize review. Rankings and classifications guide inspection; verify code and behavior before acting. Counts, graph classification, and rankings need no model; semantic `classify` inference can incur charges.
 
 Run the CLI with Node.js 20 or later. Check `issue-graph auth status` before live queries. GitHub collection uses authenticated `gh`; offline queries, config, and skill loading need no provider credentials. Never request tokens in chat.
 
@@ -33,6 +33,7 @@ If a command or asset is missing, report the CLI/skill mismatch and observed err
 | Linear issue or project relationships | `issue-graph linear <issue>`, or `issue-graph linear --project UUID` |
 | Next backlog action | `issue-graph plan owner/repo` |
 | Find work one fix resolves together | `issue-graph plan owner/repo --budget 1000 --format json`, then read `sweep` |
+| Semantic request/component suggestions | Preview `issue-graph classify --repo owner/repo --dry-run` after reading the full workflow |
 
 For counts, skip graph discovery. Resolve repositories and authors from the request and available context; never silently enumerate an organization or guess members. Status accepts repeated repositories and repeated/comma-separated authors, with case-insensitive matching. Ask only if scope remains unresolved.
 
@@ -95,15 +96,28 @@ After reporting results, offer a useful next command from the printed next steps
 | Status | JSON | Only with `--save` |
 | Query | JSON | Immutable captures, query receipts, and views |
 | Config | JSON | Only `set` persists weights |
+| Classify | JSON | Evidence, cache, and receipts under `classify/` unless `--dry-run`, `--cached`, or `--no-snapshot` |
 | Runs, auth, skills | Text or Markdown | `runs rm` deletes one dashboard model |
 
 Terminal output is human-readable. Reconcile uses Markdown and accepts `--format human` as an alias. Graph's legacy `--format json` still prints Markdown. Status uses `--format human|markdown|json`; `table` is an alias for `human`. Runs and auth require `--format json` for JSON; skills use `--json`. Styling is disabled by `NO_COLOR`, `CI`, or `TERM=dumb`.
 
 `--no-save` skips new graph/reconcile history and saved dashboard models. It still allows history reads, exports, and temporary HTML from `open` or `cluster`. Applying clusters always saves the answer. Status saves only with `--save`, when the user wants local history; it conflicts with `--no-save`. Query always saves new queries. `--no-open` only suppresses the browser opener.
 
-`ISSUE_GRAPH_HOME` overrides the shared state root, default `~/.issue-graph/`. `dashboard` exports the latest saved models; `runs` lists them. `runs rm owner/repo` removes only that model, preserving snapshots, captures, history, and exports. Keep the HTML, sibling `_next/` directory, and `font-LICENSE.txt` together.
+`ISSUE_GRAPH_HOME` overrides the shared state root, default `~/.issue-graph/`. `dashboard` exports the latest saved models; `runs` lists them. `runs rm owner/repo` removes only that model, preserving snapshots, captures, history, and exports. Keep the HTML, sibling `_next/` directory, and `font-LICENSE.txt` together. `ISSUE_GRAPH_HOME` also scopes classify evidence, cache, and receipts under `classify/`.
 
 Older flags such as `--max-nodes` and `--no-snapshot` still work and print their replacement. Use the new forms. Read `issue-graph schema` for formats, defaults, and local writes.
+
+## Semantic suggestions
+
+Read [Semantic suggestions](references/workflows.md#semantic-suggestions) via `issue-graph skills get core --full` before using `classify`. Preview first:
+
+```bash
+issue-graph classify --repo owner/repo --dry-run --limit 1 --max-calls 1
+```
+
+Preview queries GitHub but makes no Gateway calls, reads no key and writes nothing. Only explicitly authorized inference may send public issue/comment text to Gateway and incur charges. Routing is fixed to Jev (`typesafe-ai/jev`) through Vercel AI Gateway with no provider/model fallback. Use environment `AI_GATEWAY_API_KEY` and an account spending limit; `--max-calls` is an attempt cap, not a monetary cap.
+
+`--max-calls 0` still queries GitHub and may save public evidence. `--cached` is a read-only saved view, not live verification, and exits 1. Inspect coverage, cache status, costs and exclusions; never bypass unknown-outcome locks or unsafe storage. Evidence snapshots contain public bodies/comments, which can still be sensitive. Use an explicit reviewed `--taxonomy PATH` for components; do not invent a catalog. All suggestions require review. Probabilities are uncalibrated, reported impact is not verified severity, and errors are not categories. No result authorizes a fix, acceptance or GitHub mutation.
 
 ## GitHub safety and privacy
 

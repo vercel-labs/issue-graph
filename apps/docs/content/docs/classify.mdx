@@ -1,0 +1,129 @@
+---
+title: Suggest issue classifications with a model
+navTitle: Semantic suggestions
+description: Preview evidence and cache eligibility for classify, authorize model inference with explicit limits, and read every suggestion as review-required.
+lastModified: 2026-11-13
+---
+
+## Preview before inference
+
+`classify` asks `typesafe-ai/jev` for a request type, a component, and the impact that each open issue reports. It reads one public repository on github.com and never changes GitHub. Every suggestion requires human review: probabilities are uncalibrated, reported impact is not verified severity, and errors are not categories.
+
+Start with a preview. It queries GitHub, prepares the Gateway requests, and reports cache eligibility for each issue. It reads no Gateway key, makes no Gateway call, and writes nothing:
+
+```bash
+issue-graph classify --repo owner/repo --dry-run --limit 5 --format json
+```
+
+Replace `owner/repo` with a public repository. The preview reports coverage, exclusions, planned calls, request sizes, and cache state. It does not show predictions, including for issues that would reuse a cached answer.
+
+## Choose a run mode
+
+| Mode | Command | What it does |
+| --- | --- | --- |
+| Preview | `issue-graph classify --repo owner/repo --dry-run` | Queries GitHub and reads cache; no Gateway key, call, or write |
+| Allow inference | `issue-graph classify --repo owner/repo --max-calls 5` | Reuses cache hits and may pay for eligible misses |
+| Reuse only | `issue-graph classify --repo owner/repo --max-calls 0` | Queries GitHub for current evidence; misses, expiry, and refresh defer |
+| Saved view | `issue-graph classify --repo owner/repo --cached` | No network, key access, or writes; not live verification |
+| Refresh | `issue-graph classify --repo owner/repo --refresh` | Captures evidence again and ignores saved answers without deleting them |
+
+New inference needs the `AI_GATEWAY_API_KEY` environment variable. Low limits make the first paid run small and keep failures cheap to inspect.
+
+## Flags
+
+| Flag | Default | Values |
+| --- | --- | --- |
+| `--repo owner/repo` | Required | One public github.com repository |
+| `--limit N` | `50` | 1 to 500 open issues |
+| `--max-calls N` | `50` | 0 to 500 HTTP attempts, including retries and all workers |
+| `--concurrency N` | `1` | 1 to 4 workers |
+| `--max-retries N` | `0` | 0 to 3 retries for known HTTP 429 responses |
+| `--min-interval-ms N` | `0` | 0 to 60000 milliseconds between requests |
+| `--taxonomy PATH` | None | Explicit JSON file; no default is loaded |
+| `--format FORMAT` | `auto` | `auto`, `json`, or `markdown` |
+| `--json` | Off | Boolean JSON output on stdout; takes no filename |
+
+`--cached` conflicts with `--dry-run`, `--refresh`, `--no-snapshot`, and a positive `--max-calls`. `--no-snapshot` keeps receipts in memory, which removes crash recovery, and still checks `classify/STOP`.
+
+## What leaves your machine
+
+Capture runs `gh` against github.com and requires the repository URL returned by the API to be the github.com URL. A repository on another host fails with `repository-identity-unverified`, so an Enterprise server selected by `GH_HOST` cannot have its issue text sent to Gateway.
+
+Active inference sends the title, body, and captured comments of each eligible issue to `https://ai-gateway.vercel.sh/v1/evaluate`. Routing is fixed to model `typesafe-ai/jev` with provider `typesafe-ai` and no fallback.
+
+| Limit | Value |
+| --- | --- |
+| Request body | 24,000 UTF-8 bytes; oversized issues defer instead of truncating |
+| Deadline | 30 seconds, including the response read |
+| Response body | 256 KiB |
+| Comments per issue | 300, captured across 4 pages of 10, 100, 100, and 90 |
+
+Incomplete comment coverage never proves that an issue lacks information. Reads are read-only, and no flag changes GitHub.
+
+To block new calls, create an `STOP` file under the state root:
+
+```bash
+mkdir -p ~/.issue-graph/classify && touch ~/.issue-graph/classify/STOP
+```
+
+STOP blocks new inference in every mode, including `--no-snapshot` runs. It does not cancel a request that is already in flight, and valid cache hits still return.
+
+## Cache, receipts, and locks
+
+Saved evidence, answers, receipts, and locks live under `ISSUE_GRAPH_HOME/classify/`. The default root is `~/.issue-graph`. Set `ISSUE_GRAPH_HOME` to move it.
+
+| Path | Contents |
+| --- | --- |
+| `evidence/<scope-hash>/` | Captured public issue titles, bodies, and comments |
+| `cache/<input-hash>/` | Answers, hashes, and timestamps for one prepared request |
+| `receipts/<date>/<request-id>/` | Pending and final receipts for one Gateway attempt |
+| `locks/<input-hash>.json` | A pending or unknown outcome that blocks the same request |
+
+Answers are reusable for 24 hours after evaluation. Before reusing one, the command rechecks the input identity, receipts, locks, and current policy. The evidence snapshot holds public issue text, and the answer cache and receipts hold hashes, metadata, and answers rather than that text.
+
+The state root must be owned by you and not group or world writable. The command creates `0700` directories and regular `0600` files and rejects symlinks. Permissions are not encryption.
+
+A pending or unknown outcome leaves a lock when snapshots are enabled, and later runs block the same request instead of paying for it again. Inspect the receipts before you delete a lock, and do not rerun an unknown request blindly. Response cache or final receipt persistence failures keep the pending state on purpose.
+
+## Billing
+
+`--max-calls` caps HTTP attempts, not spending. One cold evaluation without retries uses one attempt per eligible issue, and retries or several workers add attempts. Reported cost can be unknown, a cached historical cost is separate from current spending, and an aborted or STOP-blocked run does not prove that no charge occurred.
+
+Set a spending limit on the AI Gateway account that owns the key. Treat `--max-calls` as a request cap and the account limit as the monetary boundary.
+
+## Output and exit codes
+
+A terminal gets Markdown and a pipe gets schemaVersion 1 JSON. `--format` chooses explicitly, and `--json` implies `json`.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Complete live scope, including valid abstentions and zero-call reuse |
+| `1` | Incomplete coverage, failure, deferred work, an unknown outcome, or `--cached` |
+| `2` | Invalid arguments or local configuration |
+
+No exit code authorizes accepting a suggestion or changing GitHub.
+
+## Component taxonomy
+
+Without `--taxonomy`, components are reported as unavailable (`taxonomy-missing`) rather than invented. Supply a JSON file to classify components against your own catalog:
+
+```json
+{
+  "schemaVersion": 1,
+  "repo": "owner/repo",
+  "version": "1",
+  "components": [
+    {
+      "id": "proxy",
+      "description": "Local proxy, port allocation, and TLS trust.",
+      "examples": ["The dev server listens on a different port than the proxy expects."]
+    }
+  ]
+}
+```
+
+`schemaVersion` must be `1`, and `repo` must match `--repo`. The file holds 1 to 64 components, each with an `id`, a `description` of 1 to 2000 characters, and up to 5 `examples` of 1 to 500 characters. IDs match `[a-z][a-z0-9-]{0,47}`, must be unique, and cannot be `multiple`, `new`, `insufficient`, `constructor`, or `prototype`. The file is limited to 64 KiB, and unknown fields fail validation.
+
+The repository includes a fictional [taxonomy example](https://github.com/vercel-labs/issue-graph/blob/main/skill-data/core/examples/taxonomy.json). Adapt it and pass the same path to the preview and the paid run so both use one catalog.
+
+Read [Permissions and privacy](/docs/security) before you store or share saved evidence.

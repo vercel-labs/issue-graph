@@ -13,7 +13,7 @@ Find related issues and pull requests before you start work. For humans and agen
   <img alt="issue-graph: open issues and pull requests from vercel-labs/portless grouped into five root-cause clusters, such as proxy port allocation and TLS trust" src="https://issue-graph.dev/readme-hero-light.png">
 </picture>
 
-issue-graph reads GitHub issues and pull requests, or Linear issues, and follows the references between them: closing links, mentions, cross-references, and Linear relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub and Linear.
+issue-graph reads GitHub issues and pull requests, or Linear issues, and follows the references between them: closing links, mentions, cross-references, and Linear relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub and Linear. Crawling, graph classification, and ranking need no model; semantic `classify` inference can incur charges, so preview it first with `--dry-run`.
 
 ## Install
 
@@ -59,6 +59,37 @@ The dashboard groups items into connected components by default. Your agent can 
 
 Runs save locally under `~/.issue-graph/`, and `issue-graph dashboard` shows every saved run with a project switcher. `issue-graph query` filters a saved capture from the CLI and returns a link to the exact dashboard view. See [Dashboard](https://issue-graph.dev/docs/dashboard).
 
+## Semantic suggestions
+
+`classify` suggests request types, components and reported signals for open issues in one public repository. Every suggestion requires human review; probabilities are uncalibrated, reported impact is not verified severity, and errors are not categories. It never changes GitHub.
+
+Preview evidence, taxonomy and cache eligibility before authorizing inference. Preview queries GitHub but makes no Gateway calls, reads no Gateway key and writes nothing:
+
+```bash
+issue-graph classify --repo owner/repo --dry-run --limit 1 --max-calls 1 --format json
+```
+
+After review, explicitly allow a small number of new calls, or reuse results without new inference:
+
+```bash
+issue-graph classify --repo owner/repo --limit 1 --max-calls 1 --format json
+issue-graph classify --repo owner/repo --limit 1 --max-calls 0 --format json
+issue-graph classify --repo owner/repo --limit 1 --cached --format json
+```
+
+- New inference needs environment `AI_GATEWAY_API_KEY`. Never put keys in commands or chat. `--max-calls` caps HTTP attempts, not spending; configure an account spending limit. Unknown costs are not zero, and historical cache costs are separate from current spending.
+- Routing is fixed: `https://ai-gateway.vercel.sh/v1/evaluate`, model `typesafe-ai/jev`, `providerOptions.gateway.only: ["typesafe-ai"]`. There is no provider/model fallback. Requests are capped at 24,000 UTF-8 bytes, with a 30-second deadline and 256 KiB response cap; oversized evidence is not truncated.
+- `--max-calls 0` still queries GitHub and can save eligible public evidence. `--cached` uses the same saved repository and limit without network, keys or writes. It is not live verification and exits 1 even when all saved answers hit. Missing evidence fails without network fallback.
+- Response reuse expires 24 hours after evaluation and rechecks input identity, receipts, locks and current policy. `--refresh` requests fresh evidence/evaluation but cannot bypass locks or unsafe storage. Do not blindly retry unknown outcomes or delete locks.
+- Active inference sends titles, bodies and comments to Gateway. Local evidence snapshots also contain public text; reports, receipts and response cache exclude raw bodies/comments. Review provider policy and local retention. `ISSUE_GRAPH_HOME` defaults to `~/.issue-graph` and must be owned by you and not group- or world-writable; `classify/` uses owned `0700` directories and regular single-link `0600` files, no symlinks. Permissions are not encryption.
+- `--no-snapshot` disables evidence/cache/receipt storage and durable locks, not the `classify/STOP` check. It has no crash recovery and is not a safe bypass for unknown requests. STOP blocks new calls, not valid hits or in-flight completion.
+
+For component suggestions, adapt the fictional [taxonomy example](https://github.com/vercel-labs/issue-graph/blob/main/skill-data/core/examples/taxonomy.json) and pass the same `--taxonomy PATH` to preview and inference. It uses `schemaVersion: 1` and catalog version `"1"`; it is not a maintainer-approved catalog. Without it, components are unavailable rather than invented.
+
+Output is Markdown in a terminal and schemaVersion 1 JSON in pipes; `--json` is boolean. Exit 0 means complete live scope, including valid abstentions or zero-call reuse; 1 means partial coverage, failure, deferred work or saved-only `--cached`; 2 means invalid usage/configuration. No exit code authorizes acceptance or GitHub changes.
+
+See [Semantic suggestions](https://github.com/vercel-labs/issue-graph/blob/main/skill-data/core/references/workflows.md#semantic-suggestions) for taxonomy limits, scheduling, review policy, cache provenance and storage behavior. Agents can retrieve it with `issue-graph skills get core --full`.
+
 ## For AI agents
 
 Install the agent skill from this repository:
@@ -84,6 +115,7 @@ Run `issue-graph --help` for the full list, or `issue-graph <command> --help` fo
 | Map work | `open`, `graph`, `linear` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear) |
 | Prioritize | `rank`, `cluster`, `reconcile`, `plan` | [Backlog](https://issue-graph.dev/docs/backlog), [Agents](https://issue-graph.dev/docs/agents) |
 | Dashboard | `dashboard`, `query`, `runs`, `config` | [Dashboard](https://issue-graph.dev/docs/dashboard) |
+| Semantic suggestions | `classify` | [Semantic suggestions](https://issue-graph.dev/docs/classify) |
 | Pull requests | `status` | [Status](https://issue-graph.dev/docs/status) |
 | Setup | `auth`, `schema`, `skills` | [Reference](https://issue-graph.dev/docs/reference) |
 
