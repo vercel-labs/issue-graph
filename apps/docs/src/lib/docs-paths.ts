@@ -6,6 +6,7 @@ export const docsSlugs = [
   "linear",
   "status",
   "backlog",
+  "classify",
   "agents",
   "library",
   "security",

@@ -115,7 +115,7 @@ Run `issue-graph --help` for the full list, or `issue-graph <command> --help` fo
 | Map work | `open`, `graph`, `linear` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear) |
 | Prioritize | `rank`, `cluster`, `reconcile`, `plan` | [Backlog](https://issue-graph.dev/docs/backlog), [Agents](https://issue-graph.dev/docs/agents) |
 | Dashboard | `dashboard`, `query`, `runs`, `config` | [Dashboard](https://issue-graph.dev/docs/dashboard) |
-| Semantic suggestions | `classify` | [Semantic suggestions](#semantic-suggestions) |
+| Semantic suggestions | `classify` | [Semantic suggestions](https://issue-graph.dev/docs/classify) |
 | Pull requests | `status` | [Status](https://issue-graph.dev/docs/status) |
 | Setup | `auth`, `schema`, `skills` | [Reference](https://issue-graph.dev/docs/reference) |
 
