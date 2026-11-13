@@ -23,7 +23,7 @@ import {
 
 const MAX_METADATA_BYTES = 8192;
 const HINT =
-  "Inspect classify receipts and locks manually before taking action. Do not rerun a paid request.";
+  "Inspect classify receipts and locks manually before taking action. ISSUE_GRAPH_HOME must be owned by you and not group- or world-writable; classify/ needs 0700 directories and 0600 files. Do not rerun a paid request.";
 const PENDING_KEYS = [
   "schemaVersion",
   "requestId",
@@ -158,6 +158,15 @@ function safeStat(stat: Stats, directory: boolean): void {
     fail("receipt-invalid");
 }
 
+/** The state root is shared with other commands, so it only has to be owned and not writable by others. */
+function rootStat(stat: Stats): boolean {
+  return (
+    stat.isDirectory() &&
+    (stat.mode & 0o022) === 0 &&
+    (!process.getuid || stat.uid === process.getuid())
+  );
+}
+
 async function maybeStat(path: string): Promise<Stats | null> {
   try {
     return await lstat(path);
@@ -167,7 +176,7 @@ async function maybeStat(path: string): Promise<Stats | null> {
   }
 }
 
-async function directory(path: string, create: boolean): Promise<void> {
+async function directory(path: string, create: boolean, root = false): Promise<void> {
   if (create) {
     try {
       await mkdir(path, { mode: 0o700 });
@@ -175,7 +184,9 @@ async function directory(path: string, create: boolean): Promise<void> {
       if (fsCode(error) !== "EEXIST") throw error;
     }
   }
-  safeStat(await lstat(path), true);
+  const stat = await lstat(path);
+  if (!root) safeStat(stat, true);
+  else if (!rootStat(stat)) fail("receipt-invalid");
 }
 
 async function homeDirectory(path: string, create: boolean): Promise<string> {
@@ -186,7 +197,7 @@ async function homeDirectory(path: string, create: boolean): Promise<string> {
     await homeDirectory(parent, true);
   }
   const canonical = join(await realpath(parent), basename(path));
-  await directory(canonical, create);
+  await directory(canonical, create, true);
   if (create) await syncDirectory(dirname(canonical));
   return canonical;
 }
@@ -668,10 +679,11 @@ function cacheChecksum(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-async function cacheDirectory(path: string): Promise<boolean> {
+async function cacheDirectory(path: string, root = false): Promise<boolean> {
   const stat = await maybeStat(path);
   if (!stat) return false;
-  safeStat(stat, true);
+  if (!root) safeStat(stat, true);
+  else if (!rootStat(stat)) cacheFail();
   return true;
 }
 
@@ -790,7 +802,7 @@ export function createSemanticCacheStore(options?: {
         cacheFail();
       home = resolve(configured);
     }
-    if (!(await cacheDirectory(home))) return null;
+    if (!(await cacheDirectory(home, true))) return null;
     home = await homeDirectory(home, false);
     const path = join(home, "classify");
     return (await cacheDirectory(path)) ? path : null;

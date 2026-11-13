@@ -276,6 +276,36 @@ test("comment-only version drift invalidates one issue while incomplete evidence
   ).rejects.toMatchObject({ code: "evidence-invalid" });
 });
 
+test("a state root created 0755 by other commands still stores private classify state", async () => {
+  await fs.chmod(home, 0o755);
+  const cold = await run([], { gatewayFetch: gateway() });
+  expect(cold.exit).toBe(0);
+  expect((await evidence().read("o/r", 50))?.items).toHaveLength(1);
+  expect((await fs.stat(join(home, "classify"))).mode & 0o777).toBe(0o700);
+  clock = new Date(Date.parse(TIME) + 3600000).toISOString();
+  const warm = await run(["--max-calls", "0"], readOnly());
+  expect(warm.report.totals).toMatchObject({ cacheHits: 1, evaluated: 0 });
+  expect((await fs.stat(home)).mode & 0o777).toBe(0o755);
+});
+
+test("a group-writable state root is rejected with a permissions hint", async () => {
+  const cold = await run([], { gatewayFetch: gateway() });
+  const pending = cold.report.items[0].receipt?.pending;
+  assert(pending);
+  await fs.chmod(home, 0o775);
+  await expect(evidence().read("o/r", 50)).rejects.toMatchObject({
+    code: "evidence-invalid",
+    hint: expect.stringContaining("not group- or world-writable"),
+  });
+  await expect(
+    createSemanticReceiptStore(settings()).begin({
+      inputHash: pending.inputHash,
+      modelRequested: pending.modelRequested,
+      adapterVersion: pending.adapterVersion,
+    }),
+  ).rejects.toMatchObject({ code: "receipt-invalid" });
+});
+
 test.each([
   "evidence checksum",
   "cache checksum",

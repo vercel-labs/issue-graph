@@ -34,7 +34,7 @@ function fail(code = "evidence-invalid"): never {
   throw new SemanticError(
     code,
     "Private semantic evidence operation blocked.",
-    "Inspect classify/evidence permissions and data. Saved evidence is not live verification.",
+    "Inspect permissions and data: ISSUE_GRAPH_HOME (default ~/.issue-graph) must be owned by you and not group- or world-writable; classify/ needs 0700 directories and 0600 files. Saved evidence is not live verification.",
   );
 }
 
@@ -322,6 +322,16 @@ function safeStat(stat: Stats, directory: boolean): void {
     fail();
 }
 
+/** The state root is shared with other commands, so it only has to be owned and not writable by others. */
+function rootStat(stat: Stats): void {
+  if (
+    !stat.isDirectory() ||
+    (stat.mode & 0o022) !== 0 ||
+    (process.getuid && stat.uid !== process.getuid())
+  )
+    fail();
+}
+
 async function maybeStat(path: string): Promise<Stats | null> {
   try {
     return await lstat(path);
@@ -331,12 +341,16 @@ async function maybeStat(path: string): Promise<Stats | null> {
   }
 }
 
-async function syncDirectory(path: string, privateDirectory = true): Promise<void> {
+async function syncDirectory(
+  path: string,
+  check: "private" | "root" | "none" = "private",
+): Promise<void> {
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const stat = await handle.stat();
     if (!stat.isDirectory()) fail();
-    if (privateDirectory) safeStat(stat, true);
+    if (check === "private") safeStat(stat, true);
+    else if (check === "root") rootStat(stat);
     await handle.sync();
   } catch (error) {
     if (!["EINVAL", "ENOTSUP", "ENOSYS"].includes(fsCode(error) ?? "")) throw error;
@@ -365,8 +379,9 @@ async function tree(home: string, scope: Scope, create: boolean): Promise<string
       safeStat(stat, true);
     }
     if (!stat.isDirectory() || stat.isSymbolicLink()) fail();
-    if (path === home || created) safeStat(stat, true);
-    if (created) await syncDirectory(parent, false);
+    if (created) safeStat(stat, true);
+    else if (path === home) rootStat(stat);
+    if (created) await syncDirectory(parent, "none");
   }
   if (home === root) fail();
   for (const part of ["classify", "evidence", digest(scope)]) {
@@ -375,7 +390,7 @@ async function tree(home: string, scope: Scope, create: boolean): Promise<string
     if (create) {
       try {
         await mkdir(path, { mode: 0o700 });
-        await syncDirectory(parent);
+        await syncDirectory(parent, parent === home ? "root" : "private");
       } catch (error) {
         if (fsCode(error) !== "EEXIST") throw error;
       }

@@ -238,9 +238,10 @@ Neither known subtotal is a complete bill; abort does not prove no charge.
 
 ### Storage, receipts and stop control
 
-`ISSUE_GRAPH_HOME` defaults to `~/.issue-graph`. All managed directories, including home,
-must be owned `0700` directories; files must be owned regular single-link `0600` files,
-with no symlinks. Reads create nothing. Unsafe permissions/corruption fail closed without
+`ISSUE_GRAPH_HOME` defaults to `~/.issue-graph`. Other commands share that home, so it
+only has to be an owned directory that is not group- or world-writable, such as `0755`.
+Directories under `classify/` must be owned `0700` directories; files must be owned
+regular single-link `0600` files, with no symlinks. Reads create nothing. Unsafe permissions/corruption fail closed without
 chmod or recovery; choose a dedicated private home if existing permissions are incompatible.
 Permissions are not encryption. Do not persist credentials/provider keys.
 
