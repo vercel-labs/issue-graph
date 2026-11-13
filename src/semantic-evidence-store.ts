@@ -19,8 +19,6 @@ export interface SemanticEvidenceStore {
 const MAX_BYTES = 16 * 1024 * 1024;
 const UUID_FILE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.json$/;
 const HASH = /^[0-9a-f]{64}$/;
-const SECRET =
-  /(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|\bsk-[A-Za-z0-9_-]{20,}|\bAKIA[A-Z0-9]{16}\b|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)/;
 
 type Scope = { repo: string; limit: number };
 type Snapshot = Scope & {
@@ -81,7 +79,7 @@ function array(value: unknown, maximum: number): unknown[] {
 
 function text(value: unknown): string {
   if (typeof value !== "string" || Buffer.byteLength(value, "utf8") > MAX_BYTES) fail();
-  if (Buffer.from(value, "utf8").toString("utf8") !== value || SECRET.test(value)) fail();
+  if (Buffer.from(value, "utf8").toString("utf8") !== value) fail();
   return value;
 }
 

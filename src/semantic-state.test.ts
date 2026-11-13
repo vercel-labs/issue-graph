@@ -276,6 +276,19 @@ test("comment-only version drift invalidates one issue while incomplete evidence
   ).rejects.toMatchObject({ code: "evidence-invalid" });
 });
 
+test("public text that looks like a credential is saved and read back", async () => {
+  const cold = await run([], { gatewayFetch: gateway() });
+  expect(cold.exit).toBe(0);
+  const saved = await evidence().read("o/r", 50);
+  assert(saved);
+  const quoted = structuredClone(saved);
+  quoted.items[0].title = `Example key sk-${"a".repeat(24)} in the docs`;
+  quoted.items[0].body = `Pasted log: ghp_${"b".repeat(36)}\n-----BEGIN RSA PRIVATE KEY-----`;
+  for (const comment of quoted.items[0].comments) comment.body = `AKIA${"C".repeat(16)}`;
+  await evidence().write("o/r", 50, quoted);
+  expect(await evidence().read("o/r", 50)).toEqual(quoted);
+});
+
 test("a state root created 0755 by other commands still stores private classify state", async () => {
   await fs.chmod(home, 0o755);
   const cold = await run([], { gatewayFetch: gateway() });
