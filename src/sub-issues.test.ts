@@ -4,7 +4,9 @@ import { fillMentionedBy } from "./classify.js";
 import { runCli } from "./cli.js";
 import { crawl } from "./crawl.js";
 import { type FetchNode, NODE_QUERY, parseNodeResponse, type RawNodeItem } from "./github.js";
+import { buildPlanReport } from "./plan.js";
 import { prioritize } from "./priority.js";
+import { buildReconcileReport } from "./reconcile.js";
 import { shellTransport } from "./transports/shell.js";
 import type { Edge, GraphNode, NodeKey } from "./types.js";
 
@@ -225,6 +227,74 @@ describe("crawling sub-issue links", () => {
     const { nodes } = await crawlFrom("o/r#10", fetch);
     expect(nodes.get("a/b#7")?.depth).toBe(2);
     expect(fetched).not.toContain("a/b#8");
+  });
+});
+
+describe("plan", () => {
+  const now = new Date("2026-01-01");
+  const node = (n: number, edges: Edge[], extra: Partial<GraphNode> = {}): GraphNode => ({
+    key: `o/r#${n}`,
+    owner: "o",
+    repo: "r",
+    number: n,
+    kind: "Issue",
+    title: `Issue ${n}`,
+    state: "OPEN",
+    url: "",
+    depth: 0,
+    edges,
+    externalLinks: [],
+    fetched: true,
+    ...extra,
+  });
+  const plan = (values: GraphNode[], cappedOut: NodeKey[]) => {
+    const nodes = new Map(values.map((n) => [n.key, n]));
+    const reconcile = buildReconcileReport(nodes, {
+      repo: "o/r",
+      seeds: values.filter((n) => n.state === "OPEN").map((n) => n.key),
+      seedLimit: 80,
+      nodeCap: 80,
+      cappedOut,
+      generatedAt: now.toISOString(),
+    });
+    const report = buildPlanReport(reconcile, nodes, prioritize(nodes, now));
+    return (key: NodeKey) =>
+      [...report.queue, ...report.investigation, ...report.blocked].find((i) => i.key === key);
+  };
+  const failed = node(13, [], { state: "FETCH_ERROR", fetched: false });
+
+  test("a sub-issue past the node cap or unfetched does not block either end of the link", () => {
+    const item = plan(
+      [
+        node(10, [{ to: "o/r#11", via: "parent-of" }]),
+        node(12, [{ to: "o/r#13", via: "child-of" }]),
+        failed,
+      ],
+      ["o/r#11"],
+    );
+    for (const key of ["o/r#10", "o/r#12"]) {
+      expect(item(key)?.status).toBe("needs-investigation");
+      expect(item(key)?.blockedBy).toEqual([]);
+      expect(item(key)?.reasons.map((r) => r.code)).not.toContain("unresolved-reference");
+    }
+  });
+
+  test("a mention beside the link still blocks on the unresolved item", () => {
+    const item = plan(
+      [
+        node(12, [
+          { to: "o/r#13", via: "text" },
+          { to: "o/r#13", via: "child-of" },
+        ]),
+        failed,
+      ],
+      [],
+    );
+    expect(item("o/r#12")?.status).toBe("blocked");
+    expect(item("o/r#12")?.blockedBy).toEqual(["o/r#13"]);
+    expect(item("o/r#12")?.reasons.find((r) => r.code === "unresolved-reference")?.related).toEqual(
+      ["o/r#13"],
+    );
   });
 });
 

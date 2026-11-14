@@ -82,7 +82,7 @@ After reporting results, offer a useful next command from the printed next steps
 - Timestamps describe a collection window. A vanished PR is MERGED/CLOSED only after an explicit lookup. Incomplete captures cannot prove additions or transitions. Preserve reconstructed provenance and unknowns; do not backfill historical facts or attribute reviewer actions without evidence.
 - Report failed nodes, node caps, unexpanded hubs, and per-node API limits. Cross-repository references are fetched one hop. Use printed hub re-seed commands to investigate omissions.
 - `parent-of` and `child-of` edges are the two ends of a GitHub sub-issue link. They show structure, not a closing link or shipped work. They add no heat, but dashboard `links`, `blast`, and Impact count them as connections. Report sub-issues past the 50 limit and sub-issues that returned no data.
-- Superseded, competing, shared-file overlap, and missing closing-link flags identify inspection candidates. Verify implementation, scope, and current behavior before recommending closure. `reviewFirst` orders inspection; `blockedBy` uses visible links.
+- Superseded, competing, shared-file overlap, and missing closing-link flags identify inspection candidates. Verify implementation, scope, and current behavior before recommending closure. `reviewFirst` orders inspection; `blockedBy` uses visible links, and an unresolved sub-issue link never blocks an item.
 
 ## Output and storage
 
