@@ -62,7 +62,7 @@ When coverage permits, it selects one `next` action and adds a structured `decis
 
 Cleanup and verification come before implementation review. Within each group, readiness, discussion activity, and visible inbound references set the order. The same evidence and evaluation time always produce the same order.
 
-If open seeds are missing or a neighborhood hit the node cap, the queue is provisional and `plan` omits `next`. A failed neighbor reference affects only the items related to it.
+If open seeds are missing or a neighborhood hit the node cap, the queue is provisional and `plan` omits `next`. A failed neighbor reference affects only the items related to it. A sub-issue link is structure, not a reference, so a parent or sub-issue whose other end failed or hit the node cap stays in its lane.
 
 ## Compare competing PRs
 

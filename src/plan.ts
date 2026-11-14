@@ -1,7 +1,7 @@
 import type { PriorityRow } from "./priority.js";
 import type { ReconcileAction, ReconcileItem, ReconcileReport } from "./reconcile.js";
 import { renderSweep, type SweepGroup } from "./sweep.js";
-import type { GraphNode, NodeKey } from "./types.js";
+import { type GraphNode, isHierarchyVia, type NodeKey } from "./types.js";
 
 export const PLAN_SCHEMA_VERSION = 1 as const;
 
@@ -168,8 +168,8 @@ function planItem(
     );
   }
   const unresolvedReferences = (node?.edges ?? [])
+    .filter((edge) => !isHierarchyVia(edge.via) && unresolved.has(edge.to))
     .map((edge) => edge.to)
-    .filter((key) => unresolved.has(key))
     .sort();
   if (unresolvedReferences.length) {
     lane = "blocked";

@@ -12,7 +12,7 @@ import { fileOverlaps } from "./overlaps.js";
 import { prioritize } from "./priority.js";
 import type { Weights } from "./scoring.js";
 import type { SweepGroup } from "./sweep.js";
-import type { GraphNode, NodeKey } from "./types.js";
+import { type GraphNode, isHierarchyVia, linkCount, type NodeKey } from "./types.js";
 
 /** Optional semantic clustering supplied by the calling agent (`--clusters`). */
 export interface ClusterInput {
@@ -165,6 +165,7 @@ function buildModel(
   const inbound = new Map<NodeKey, Array<{ from: NodeKey; via: string; by?: string }>>();
   for (const n of nodes.values())
     for (const e of n.edges) {
+      if (isHierarchyVia(e.via)) continue;
       const list = inbound.get(e.to) ?? [];
       list.push({ from: n.key, via: e.via, by: e.by });
       inbound.set(e.to, list);
@@ -228,10 +229,29 @@ function buildModel(
             }
           : undefined;
       })(),
-      out: n.edges.map((e) => ({ to: e.to, via: e.via, by: e.by, at: e.at })),
+      out: n.edges
+        .filter((e) => !isHierarchyVia(e.via))
+        .map((e) => ({ to: e.to, via: e.via, by: e.by, at: e.at })),
       in: inbound.get(n.key) ?? [],
       overlaps: overlapsBy.get(n.key) ?? [],
     };
+  }
+
+  // Either end of a sub-issue link may report it. Keep one directed parent -> child
+  // entry per pair; an end outside the graph stays on the end that reported it.
+  const subIssueLinks = new Map<string, [parent: NodeKey, child: NodeKey]>();
+  for (const n of nodes.values())
+    for (const e of n.edges) {
+      const pair: [NodeKey, NodeKey] | null =
+        e.via === "parent-of" ? [n.key, e.to] : e.via === "child-of" ? [e.to, n.key] : null;
+      if (pair) subIssueLinks.set(JSON.stringify(pair), pair);
+    }
+  for (const [parent, child] of subIssueLinks.values()) {
+    const p = clientNodes[parent];
+    const c = clientNodes[child];
+    if (p) p.out.push({ to: child, via: "parent of", undirected: false });
+    if (p && c) c.in.push({ from: parent, via: "child of" });
+    else if (c) c.out.push({ to: parent, via: "child of", undirected: false });
   }
 
   // groups: agent clusters if supplied, else deterministic connected components
@@ -255,7 +275,7 @@ function buildModel(
         .map((k) => nodes.get(k))
         .filter((n): n is GraphNode => !!n)
         .sort((a, b) => a.depth - b.depth || a.key.localeCompare(b.key));
-      const hub = members.slice().sort((a, b) => b.edges.length - a.edges.length)[0];
+      const hub = members.slice().sort((a, b) => linkCount(b) - linkCount(a))[0];
       return {
         label: `Component ${i + 1}`,
         subtitle: hub ? `hub ${shortKey(hub.key)} — ${hub.title}` : "",

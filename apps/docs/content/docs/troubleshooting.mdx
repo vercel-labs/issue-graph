@@ -41,8 +41,10 @@ For `linear`, `coverageComplete` is false when a node cannot be read, a connecti
 `graph`, `open`, and `rank` print partial results without changing the exit code. Check the report instead:
 
 - `## Not crawled (node cap N reached)` lists nodes beyond the `--budget` cap. Raise `--budget`, up to 1000.
-- `## Hubs not expanded` lists nodes with more references than `--hub-threshold`, each with a `--depth 1` command that starts a new crawl from that hub.
+- `## Hubs not expanded` lists nodes linked to more items than `--hub-threshold`, sub-issues included and each item counted once, each with a `--depth 1` command that starts a new crawl from that hub.
 - Unfetched nodes, with `fetched: false` in JSON, are reads that failed.
+- `sub-issues: N more not read (first 50 per node)` under an issue means it has more than 50 sub-issues and the rest are missing from the graph. Start a new crawl from a missing sub-issue to see it.
+- `sub-issues: N returned no data` under an issue means GitHub listed sub-issues your token cannot read. Check access to their repositories as described in [GitHub requests fail](#github-requests-fail).
 - Same-repository references stop at `--depth`, and cross-repository references stop after one hop.
 
 ## Linear is not connected

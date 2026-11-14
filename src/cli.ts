@@ -65,7 +65,7 @@ import { runStatus } from "./status-cli.js";
 import { buildSweep, missingBasePaths, sweepBasePaths } from "./sweep.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
-import type { NodeKey, Seed } from "./types.js";
+import { linkCount, type NodeKey, type Seed } from "./types.js";
 
 const USAGE = `usage: issue-graph [command] [scope...] [options]
 
@@ -108,7 +108,7 @@ options
 advanced
   --budget N               stop after N items (80; 1000 for unfiltered open/rank/cluster repos)
   --depth N                same-repository reference depth (default 2)
-  --hub-threshold N        fetch but do not expand an item with more references (default 12)
+  --hub-threshold N        fetch but do not expand an item linked to more items (default 12)
   --concurrency N          GitHub requests in flight (default 4, max 32)
 
 Older flags still work for one minor release and print their replacement.
@@ -627,7 +627,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (hubs.length) {
     md += "\n## Hubs not expanded — re-seed to explore\n\n";
     for (const h of hubs) {
-      md += `- ${h.key} (${h.edges.length} refs) → \`issue-graph graph ${h.owner}/${h.repo}#${h.number} --depth 1\`\n`;
+      md += `- ${h.key} (${linkCount(h)} refs) → \`issue-graph graph ${h.owner}/${h.repo}#${h.number} --depth 1\`\n`;
     }
   }
 

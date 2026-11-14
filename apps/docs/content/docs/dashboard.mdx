@@ -29,6 +29,8 @@ Run `issue-graph dashboard` to browse the latest saved models with a project sel
 | Swarm | Compare items grouped by cluster, state, kind, or all together |
 | Rank | Order open items by discussion Heat and adjust scoring weights |
 
+Impact and the Swarm `links` and `blast` metrics count every relationship in the graph, parent and sub-issue links included, so an epic with open sub-issues lists them as follow-ups. Heat counts inbound references only, and sub-issue links are not references.
+
 The compact Filters menu applies across views. It filters by state, item kind, clusters, Heat, and search, plus solution and review filters where the provider supports them. Context items can stay visible when they don't match a filter.
 
 For GitHub, the project selector shows a separately fetched total of open issues and PRs when available. Other providers supply their own count and coverage. In query output, `counts.captured`, `matched`, `visible`, and `ranked` describe the saved graph and the current view. Inspect `coverage` before you interpret them.
