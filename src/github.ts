@@ -60,6 +60,7 @@ export const NODE_QUERY = `query($owner:String!,$repo:String!,$n:Int!){
         reactions{ totalCount }
         participants(first:1){ totalCount }
         comments(first:100){ totalCount nodes{ body author{login} } }
+        parent{ number repository{owner{login} name} } subIssues(first:50){ totalCount nodes{ number repository{owner{login} name} } }
         timelineItems(first:100, itemTypes:[CROSS_REFERENCED_EVENT,CONNECTED_EVENT]){ nodes{ __typename
           ... on CrossReferencedEvent{ createdAt actor{login} source{ __typename ... on Issue{number repository{owner{login} name}} ... on PullRequest{number repository{owner{login} name}} } }
           ... on ConnectedEvent{ createdAt actor{login} subject{ __typename ... on Issue{number repository{owner{login} name}} ... on PullRequest{number repository{owner{login} name}} } }
@@ -108,6 +109,9 @@ export interface RawNodeItem {
   participants?: { totalCount?: number };
   comments?: { totalCount?: number; nodes?: Array<{ body?: string; author?: { login?: string } }> };
   closingIssuesReferences?: { nodes?: RefNode[] };
+  /** Issue-only. GitHub returns a null node for a sub-issue the token cannot read. */
+  parent?: RefNode | null;
+  subIssues?: { totalCount?: number; nodes?: Array<RefNode | null> };
   timelineItems?: {
     nodes?: Array<{
       createdAt?: string;
@@ -209,10 +213,23 @@ export function parseNodeResponse(
     if (!to || to === node.key || edgeMap.has(to)) return; // first edge to a target wins
     edgeMap.set(to, { to, via, by, at });
   };
+  // Sub-issue links sit beside references, so linking two issues never hides a
+  // mention, cross-reference or connection between them.
+  const hierarchy = new Map<NodeKey, Edge>();
+  const addLink = (to: NodeKey | null, via: "parent-of" | "child-of") => {
+    if (to && to !== node.key && !hierarchy.has(to)) hierarchy.set(to, { to, via });
+  };
 
   // structural edges, attributed to the actor who made the reference
   for (const n of item.closingIssuesReferences?.nodes ?? [])
     addEdge(refKey(n), "closes", node.author);
+  addLink(refKey(item.parent), "child-of");
+  const page = item.subIssues?.nodes ?? [];
+  for (const child of page) addLink(refKey(child), "parent-of");
+  const pastLimit = (item.subIssues?.totalCount ?? page.length) - page.length;
+  if (pastLimit > 0) node.subIssuesPastLimit = pastLimit;
+  const unreadable = page.filter((child) => !refKey(child)).length;
+  if (unreadable) node.subIssuesUnreadable = unreadable;
   for (const tl of item.timelineItems?.nodes ?? []) {
     if (tl.source) addEdge(refKey(tl.source), "cross-ref", tl.actor?.login, tl.createdAt);
     if (tl.subject) addEdge(refKey(tl.subject), "connected", tl.actor?.login, tl.createdAt);
@@ -230,7 +247,7 @@ export function parseNodeResponse(
     for (const e of ext) external.add(e);
   }
 
-  node.edges = [...edgeMap.values()];
+  node.edges = [...edgeMap.values(), ...hierarchy.values()];
   node.externalLinks = [...external];
   return node;
 }

@@ -1,16 +1,17 @@
 import type { FetchNode } from "./github.js";
-import type {
-  CrawlEdge,
-  CrawlNode,
-  CrawlOptions,
-  CrawlResult,
-  GraphCrawlOptions,
-  GraphCrawlResult,
-  GraphFetchNode,
-  GraphNode,
-  GraphSeed,
-  NodeKey,
-  Seed,
+import {
+  type CrawlEdge,
+  type CrawlNode,
+  type CrawlOptions,
+  type CrawlResult,
+  type GraphCrawlOptions,
+  type GraphCrawlResult,
+  type GraphFetchNode,
+  type GraphNode,
+  type GraphSeed,
+  linkCount,
+  type NodeKey,
+  type Seed,
 } from "./types.js";
 
 export async function mapConcurrent<T, R>(
@@ -95,7 +96,7 @@ export async function crawlGraph<TNode extends CrawlNode>(
       }
       nodes.set(current.key, node);
       if (current.depth >= opts.maxDepth) continue;
-      if (!seedKeys.has(current.key) && node.edges.length > opts.hubThreshold) {
+      if (!seedKeys.has(current.key) && linkCount(node) > opts.hubThreshold) {
         node.hub = true;
         continue;
       }

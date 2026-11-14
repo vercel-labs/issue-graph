@@ -27,7 +27,9 @@ Replace `owner/repo` and the seed numbers with your own. A run with several seed
 
 ## Read the graph
 
-Nodes represent issues and PRs. Edges come from mentions in bodies and comments, timeline cross-references, connected events, and closing references. Each node records its fetched state and any available author, discussion, and PR metadata. Each edge records its source and, when available, its actor and date.
+Nodes represent issues and PRs. Edges come from mentions in bodies and comments, timeline cross-references, connected events, closing references, and sub-issue links. Each node records its fetched state and any available author, discussion, and PR metadata. Each edge records its source and, when available, its actor and date.
+
+A GitHub sub-issue link appears on both issues: the parent has a `parent-of` edge to the sub-issue, and the sub-issue has a `child-of` edge to the parent. The crawl follows the link from either end under the same depth, budget, and hub rules as other edges. The report labels the edges `parent of` and `child of`, and the dashboard draws one arrow from parent to sub-issue. Sub-issue links describe structure, so they never count as closing links or as inbound references in `rank`. In the dashboard they do count as connections, as Linear parent and sub-issue relationships do: Impact lists an epic's open sub-issues as its follow-ups, and the `links` and `blast` metrics count them. When one issue also mentions, cross-references, or connects the other, that reference keeps its own edge beside the sub-issue link, so it still counts in `rank` and in `mentionedBy`.
 
 The report flags competing PRs, shared changed files, possibly superseded work, and closing claims that lack a GitHub closing link. Use these signals to choose what to inspect, and check the implementations and scope before you recommend closing anything.
 
@@ -39,12 +41,12 @@ The report flags competing PRs, shared changed files, possibly superseded work, 
 | --- | --- | --- |
 | `--depth N` | `2` | Same-repository recursion from depth-zero seeds |
 | `--budget N` | `80`; `1000` for unfiltered `open`, `rank`, or `cluster` repository scopes | Total node cap, from 1 to 1000 |
-| `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it above this reference count |
+| `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it when it links to more items than this. An item that is both mentioned and linked as a sub-issue counts once |
 | `--concurrency N` | `4` | Concurrent node requests, from 1 to 32 |
 
 Cross-repository references are fetched one hop deep. The hub threshold does not apply to explicit seeds, so to inspect an unexpanded hub, run the re-seed command the report suggests.
 
-Each node query reads up to 100 comments, 100 timeline items, 100 PR files, and 50 closing references, without paginating past those limits. Search-based seed discovery is limited by the node budget and by GitHub's 1000-result search ceiling.
+Each node query reads up to 100 comments, 100 timeline items, 100 PR files, 50 closing references, and 50 sub-issues, without paginating past those limits. A parent with more than 50 sub-issues gets `subIssuesPastLimit` in JSON and a `sub-issues: N more not read` line in the report. Sub-issues that GitHub returns without data, usually because the token cannot read their repository, are counted separately as `subIssuesUnreadable`. Search-based seed discovery is limited by the node budget and by GitHub's 1000-result search ceiling.
 
 When you interpret the graph, check `cappedOut`, unfetched nodes, and unexpanded hubs. Raising `--budget` does not change the per-node limits.
 

@@ -1,7 +1,7 @@
 import { isSupersededVerdict } from "./classify.js";
 import { components } from "./crawl.js";
 import { fileOverlaps } from "./overlaps.js";
-import type { GraphNode, NodeKey, Via } from "./types.js";
+import { type GraphNode, linkCount, type NodeKey, type Via } from "./types.js";
 
 /** Compact one-line PR triage summary: review state, size, staleness, hazards. */
 export function prSummary(n: GraphNode): string {
@@ -23,7 +23,14 @@ export const kindTag = (k: string): string =>
   k === "PullRequest" ? "PR" : k === "Issue" ? "issue" : k;
 
 export const viaTag = (v: Via | string): string =>
-  ({ closes: "closes", "cross-ref": "cross-ref", connected: "linked", text: "mentions" })[v] ?? v;
+  ({
+    closes: "closes",
+    "cross-ref": "cross-ref",
+    connected: "linked",
+    text: "mentions",
+    "parent-of": "parent of",
+    "child-of": "child of",
+  })[v] ?? v;
 
 /** Render the graph body: header, components (multi-seed), nodes, beyond-depth, orphan checklist. */
 export function render(
@@ -44,7 +51,7 @@ export function render(
     out.push(`## Connected components: ${comps.length}\n`);
     comps.forEach((c, i) => {
       const hub = c.map((k) => nodes.get(k)).filter((n): n is GraphNode => !!n);
-      const top = hub.sort((a, b) => b.edges.length - a.edges.length)[0];
+      const top = hub.sort((a, b) => linkCount(b) - linkCount(a))[0];
       out.push(`- Component ${i + 1} (${c.length} nodes, hub ${top.key} — ${top.title})`);
     });
     out.push("");
@@ -69,6 +76,12 @@ export function render(
       );
     }
     for (const x of n.externalLinks) out.push(`    - external → ${x}`);
+    if (n.subIssuesPastLimit)
+      out.push(`    - sub-issues: ${n.subIssuesPastLimit} more not read (first 50 per node)`);
+    if (n.subIssuesUnreadable)
+      out.push(
+        `    - sub-issues: ${n.subIssuesUnreadable} returned no data (no access or removed)`,
+      );
   }
 
   const uncrawled = new Set<NodeKey>();

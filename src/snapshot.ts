@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { stateHome } from "./local-store.js";
 import type { ReconcileAction, ReconcileHistory, ReconcileReport } from "./reconcile.js";
-import type { GraphNode, NodeKey, Snapshot } from "./types.js";
+import type { Edge, GraphNode, NodeKey, Snapshot } from "./types.js";
 
 export interface ReconcileSnapshot {
   schemaVersion: 1;
@@ -134,6 +134,13 @@ export function diffReconcileSnapshots(
   };
 }
 
+/**
+ * Edge identity for snapshot diffing. A node can hold two edges to the same
+ * target — a sub-issue link beside a reference — so the target alone does not
+ * identify an edge.
+ */
+const edgeId = (e: Edge): string => `${e.via}\0${e.to}`;
+
 /** Markdown diff between two snapshots: new/removed nodes, state changes, new edges. */
 export function diffSnapshots(prev: Snapshot, now: Snapshot): string {
   const prevMap = new Map(prev.nodes.map((n) => [n.key, n]));
@@ -147,9 +154,9 @@ export function diffSnapshots(prev: Snapshot, now: Snapshot): string {
     const p = prevMap.get(n.key);
     if (!p) continue;
     if (p.state !== n.state) stateChanged.push(`${n.key}: ${p.state} → ${n.state}`);
-    const prevTo = new Set(p.edges.map((e) => e.to));
+    const prevEdges = new Set(p.edges.map(edgeId));
     for (const e of n.edges) {
-      if (!prevTo.has(e.to))
+      if (!prevEdges.has(edgeId(e)))
         newEdges.push(`${n.key} —${e.via}→ ${e.to}${e.by ? ` (by @${e.by})` : ""}`);
     }
   }
