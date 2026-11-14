@@ -2,6 +2,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, test } from "vitest";
 import { clusterPayload, clusterPrompt } from "./cluster.js";
 import { createDashboardFilterEngine } from "./dashboard-filters.js";
+import { createGraphMetrics } from "./dashboard-query.js";
 import { dashboardModel, renderDashboard } from "./html.js";
 import { humanPresentation } from "./human-output.js";
 import { render } from "./render.js";
@@ -114,6 +115,21 @@ describe("dashboard", () => {
     const model = dashboardModel(epic(), ["o/r#10"], "o/r");
     const result = createDashboardFilterEngine().evaluate(model, { solution: "with" }, () => 0);
     expect([...result.matches]).toEqual([]);
+  });
+
+  test("open sub-issues count as connections for links, blast and impact", () => {
+    const model = dashboardModel(epic(), ["o/r#10"], "o/r");
+    const graph = createGraphMetrics(model);
+    expect([...graph.neighbors("o/r#10")]).toEqual(["o/r#11", "o/r#12"]);
+    expect([...graph.neighbors("o/r#12")]).toEqual(["o/r#10"]);
+    expect([...graph.blastRadius("o/r#10").followups]).toEqual(["o/r#12"]);
+    expect([...graph.blastRadius("o/r#12").followups]).toEqual(["o/r#10"]);
+    expect(graph.blastRadius("o/r#10").prs.size).toBe(0);
+    expect(graph.impactRows(new Set(Object.keys(model.nodes))).map((r) => [r.k, r.score])).toEqual([
+      ["o/r#10", 1],
+      ["o/r#12", 1],
+    ]);
+    expect(model.nodes["o/r#10"].heat?.inboundRefs).toBe(0);
   });
 
   test("the shipped view labels both ends and draws a single arrow", () => {

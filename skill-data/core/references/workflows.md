@@ -256,7 +256,7 @@ Re-run the plan after each merge or closure; groups change as work lands.
 
 ## How it reads the graph
 
-- **Two edge sources.** Text mentions (body + comments) and structural links (timeline cross-references, connected events, closing refs, sub-issue links) via GraphQL. Structural links catch attached PRs that never appear in the body text, the reason a text grep alone misses orphans. A sub-issue link is a `parent-of` edge on the parent and a `child-of` edge on the sub-issue; it adds no heat, is never a closing link, and sits beside any mention or cross-reference between the same two issues instead of replacing it.
+- **Two edge sources.** Text mentions (body + comments) and structural links (timeline cross-references, connected events, closing refs, sub-issue links) via GraphQL. Structural links catch attached PRs that never appear in the body text, the reason a text grep alone misses orphans. A sub-issue link is a `parent-of` edge on the parent and a `child-of` edge on the sub-issue; it adds no heat but counts as a connection in dashboard Impact, `links`, and `blast`, is never a closing link, and sits beside any mention or cross-reference between the same two issues instead of replacing it.
 - **PR triage metadata.** Each PR node carries `review`, draft/mergeable state, `+adds/-dels across Nf`, `updated <date>` (staleness), and the file paths it touches, all in the one node query, no extra requests.
 - **Heat signals.** Every node also carries comment count, distinct participants, reactions, and createdAt in the same query, the inputs to `issue-graph rank`.
 - **File-overlap detection.** Open PRs whose changed-file sets intersect are paired as possible duplicates/conflicts; a shared closing issue promotes the pair to a likely duplicate.
