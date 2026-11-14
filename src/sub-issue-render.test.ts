@@ -75,6 +75,39 @@ describe("reports", () => {
   });
 });
 
+describe("component hub", () => {
+  /** #10 mentions and links the same two issues; #13 mentions three. */
+  const nodes = () =>
+    new Map(
+      [
+        issue(10, [
+          { to: "o/r#11", via: "text" },
+          { to: "o/r#11", via: "parent-of" },
+          { to: "o/r#12", via: "text" },
+          { to: "o/r#12", via: "parent-of" },
+        ]),
+        issue(11, []),
+        issue(12, []),
+        issue(13, [
+          { to: "o/r#10", via: "text" },
+          { to: "o/r#11", via: "text" },
+          { to: "o/r#12", via: "text" },
+        ]),
+      ].map((n) => [n.key, n]),
+    );
+
+  test("markdown names the item with the most distinct linked items", () => {
+    expect(render(nodes(), ["o/r#10", "o/r#13"], true)).toContain(
+      "- Component 1 (4 nodes, hub o/r#13 — Issue 13)",
+    );
+  });
+
+  test("the dashboard group names the same item", () => {
+    const { groups } = dashboardModel(nodes(), ["o/r#10", "o/r#13"], "o/r");
+    expect(groups.map((g) => g.subtitle)).toEqual(["hub #13 — Issue 13"]);
+  });
+});
+
 describe("dashboard", () => {
   test("the model keeps one parent-to-child entry per pair, whichever end reported it", () => {
     const { nodes } = dashboardModel(epic(), ["o/r#10"], "o/r");

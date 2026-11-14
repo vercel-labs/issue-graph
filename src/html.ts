@@ -12,7 +12,7 @@ import { fileOverlaps } from "./overlaps.js";
 import { prioritize } from "./priority.js";
 import type { Weights } from "./scoring.js";
 import type { SweepGroup } from "./sweep.js";
-import { type GraphNode, isHierarchyVia, type NodeKey } from "./types.js";
+import { type GraphNode, isHierarchyVia, linkCount, type NodeKey } from "./types.js";
 
 /** Optional semantic clustering supplied by the calling agent (`--clusters`). */
 export interface ClusterInput {
@@ -275,7 +275,7 @@ function buildModel(
         .map((k) => nodes.get(k))
         .filter((n): n is GraphNode => !!n)
         .sort((a, b) => a.depth - b.depth || a.key.localeCompare(b.key));
-      const hub = members.slice().sort((a, b) => b.edges.length - a.edges.length)[0];
+      const hub = members.slice().sort((a, b) => linkCount(b) - linkCount(a))[0];
       return {
         label: `Component ${i + 1}`,
         subtitle: hub ? `hub ${shortKey(hub.key)} — ${hub.title}` : "",

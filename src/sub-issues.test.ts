@@ -190,6 +190,33 @@ describe("crawling sub-issue links", () => {
     expect(fetched).toEqual(["o/r#1", "o/r#20"]);
   });
 
+  describe("an epic that also lists its sub-issues in a task list", () => {
+    const kids = [11, 12, 13, 14, 15, 16, 17];
+    const items = {
+      "o/r#1": { body: "blocked on #10" },
+      "o/r#10": {
+        body: kids.map((n) => `- [ ] #${n}`).join("\n"),
+        subIssues: { nodes: kids.map((n) => issueRef(n)) },
+      },
+    };
+
+    test("counts each sub-issue once toward the hub threshold", async () => {
+      const { fetch, fetched } = fixtureFetch(items);
+      const { nodes } = await crawlFrom("o/r#1", fetch, 7);
+      const epic = nodes.get("o/r#10");
+      expect(epic?.edges).toHaveLength(14);
+      expect(epic?.hub).toBeUndefined();
+      expect(fetched).toEqual(["o/r#1", "o/r#10", ...kids.map((n) => `o/r#${n}`)]);
+    });
+
+    test("is a hub once its distinct linked items exceed the threshold", async () => {
+      const { fetch, fetched } = fixtureFetch(items);
+      const { nodes } = await crawlFrom("o/r#1", fetch, 6);
+      expect(nodes.get("o/r#10")?.hub).toBe(true);
+      expect(fetched).toEqual(["o/r#1", "o/r#10"]);
+    });
+  });
+
   test("a sub-issue in another repository is fetched one hop and not expanded", async () => {
     const { fetch, fetched } = fixtureFetch({
       "o/r#10": { subIssues: { nodes: [issueRef(7, "a/b")] } },
@@ -275,6 +302,7 @@ describe("graph command", () => {
     10: { subIssues: { totalCount: 70, nodes: [11, 12, 13].map((n) => issueRef(n)) } },
     11: { parent: issueRef(10) },
     13: {
+      body: "Part of #10, starting with #40",
       parent: issueRef(10),
       subIssues: { totalCount: 5, nodes: [...[40, 41, 42, 43].map((n) => issueRef(n)), null] },
     },
@@ -302,7 +330,7 @@ describe("graph command", () => {
     vi.restoreAllMocks();
   });
 
-  test("prints both ends of each link and counts sub-issues toward the hub list", async () => {
+  test("prints both ends of each link and counts each linked item once in the hub list", async () => {
     await runCli([
       "graph",
       "o/r#10",

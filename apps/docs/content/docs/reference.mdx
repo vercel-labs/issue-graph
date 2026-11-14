@@ -58,7 +58,7 @@ Running `issue-graph` with no arguments in an interactive terminal inside a GitH
 | `--state open\|all` | For unfiltered `open`, `rank`, or `cluster` repository scopes, seed open items (default) or all states; linked context can have any state |
 | `--depth N` | Same-repo recursion depth, default 2; cross-repository references are fetched one hop |
 | `--budget N` | Total nodes, default 80; unfiltered `open`, `rank`, and `cluster` repository scopes default to 1000; integer from 1 to 1000 |
-| `--hub-threshold N` | Do not expand high-degree non-seed nodes above this number of edges, sub-issue links included, default 12 |
+| `--hub-threshold N` | Do not expand non-seed nodes linked to more items than this, sub-issues included and each item counted once, default 12 |
 | `--concurrency N` | Node requests in flight, default 4; integer from 1 to 32 |
 | `--no-save` | Skip new run and reconcile history files; `-o` paths still write |
 | `-h`, `--help` | Print usage |

@@ -15,6 +15,10 @@ export interface CrawlNode {
   hub?: boolean;
 }
 
+/** Distinct items a node links to. A node can hold more than one edge to the same item. */
+export const linkCount = (node: { edges: CrawlEdge[] }): number =>
+  new Set(node.edges.map((edge) => edge.to)).size;
+
 export interface GraphSeed {
   key: NodeKey;
 }

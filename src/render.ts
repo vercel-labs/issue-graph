@@ -1,7 +1,7 @@
 import { isSupersededVerdict } from "./classify.js";
 import { components } from "./crawl.js";
 import { fileOverlaps } from "./overlaps.js";
-import type { GraphNode, NodeKey, Via } from "./types.js";
+import { type GraphNode, linkCount, type NodeKey, type Via } from "./types.js";
 
 /** Compact one-line PR triage summary: review state, size, staleness, hazards. */
 export function prSummary(n: GraphNode): string {
@@ -51,7 +51,7 @@ export function render(
     out.push(`## Connected components: ${comps.length}\n`);
     comps.forEach((c, i) => {
       const hub = c.map((k) => nodes.get(k)).filter((n): n is GraphNode => !!n);
-      const top = hub.sort((a, b) => b.edges.length - a.edges.length)[0];
+      const top = hub.sort((a, b) => linkCount(b) - linkCount(a))[0];
       out.push(`- Component ${i + 1} (${c.length} nodes, hub ${top.key} — ${top.title})`);
     });
     out.push("");

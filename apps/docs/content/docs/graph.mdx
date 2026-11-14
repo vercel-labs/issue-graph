@@ -41,7 +41,7 @@ The report flags competing PRs, shared changed files, possibly superseded work, 
 | --- | --- | --- |
 | `--depth N` | `2` | Same-repository recursion from depth-zero seeds |
 | `--budget N` | `80`; `1000` for unfiltered `open`, `rank`, or `cluster` repository scopes | Total node cap, from 1 to 1000 |
-| `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it above this edge count, sub-issue links included |
+| `--hub-threshold N` | `12` | Fetch a non-seed node but stop expanding it when it links to more items than this. An item that is both mentioned and linked as a sub-issue counts once |
 | `--concurrency N` | `4` | Concurrent node requests, from 1 to 32 |
 
 Cross-repository references are fetched one hop deep. The hub threshold does not apply to explicit seeds, so to inspect an unexpanded hub, run the re-seed command the report suggests.
