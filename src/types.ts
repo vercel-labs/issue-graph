@@ -44,8 +44,13 @@ export interface GraphCrawlResult<TNode extends CrawlNode = CrawlNode> {
   cappedOut: Set<NodeKey>;
 }
 
-/** How one node came to reference another. */
-export type Via = "text" | "cross-ref" | "connected" | "closes";
+/**
+ * How one node came to reference another. `parent-of` and `child-of` are the
+ * two ends of a GitHub sub-issue link: structure, not a reference or a fix.
+ */
+export type Via = "text" | "cross-ref" | "connected" | "closes" | "parent-of" | "child-of";
+
+export const isHierarchyVia = (via: string): boolean => via === "parent-of" || via === "child-of";
 
 /** A directed reference from one node to another, with attribution. */
 export interface Edge {
@@ -131,6 +136,10 @@ export interface GraphNode {
    * links to catch the silent "says it fixes X but won't auto-close" gotcha.
    */
   claimsClose?: NodeKey[];
+  /** Sub-issues after the first 50, which the node query does not read. */
+  subIssuesPastLimit?: number;
+  /** Sub-issues GitHub returned as null within the page read, usually for lack of access. */
+  subIssuesUnreadable?: number;
 }
 
 /** A single seed to start crawling from. */

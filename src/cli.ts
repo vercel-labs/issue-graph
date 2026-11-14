@@ -108,7 +108,7 @@ options
 advanced
   --budget N               stop after N items (80; 1000 for unfiltered open/rank/cluster repos)
   --depth N                same-repository reference depth (default 2)
-  --hub-threshold N        fetch but do not expand an item with more references (default 12)
+  --hub-threshold N        fetch but do not expand an item with more links, sub-issue links included (default 12)
   --concurrency N          GitHub requests in flight (default 4, max 32)
 
 Older flags still work for one minor release and print their replacement.
