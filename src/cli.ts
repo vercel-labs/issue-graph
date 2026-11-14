@@ -35,6 +35,8 @@ import { privateExportPath } from "./local-store.js";
 import { writeNextDashboard } from "./next-dashboard.js";
 import { fileOverlaps } from "./overlaps.js";
 import { buildPlanReport, renderPlan } from "./plan.js";
+import { planeSetupGuide, runPlane } from "./plane-cli.js";
+import { planeDashboardModel } from "./plane-html.js";
 import { prioritize, renderPriority } from "./priority.js";
 import { runQueryCli } from "./query-cli.js";
 import { buildReconcileReport, renderReconcile } from "./reconcile.js";
@@ -73,6 +75,7 @@ Run with no arguments inside a GitHub repository to open its backlog dashboard.
 
 commands
   linear <issue>          read Linear issue relationships or capture --project UUID
+  plane <work-item>       read Plane work item relations or capture --project ID
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
   rank [repo]              what to fix first, by discussion heat
@@ -481,6 +484,56 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
           const model = linearDashboardModel(report, options.clusters);
           const out =
             options.path || privateExportPath(`issue-graph-linear-${report.workspace.id}.html`);
+          writeNextDashboard(out, [model], modelDefaults([model]));
+          process.stderr.write(`wrote ${out}\n`);
+          if (options.save)
+            process.stderr.write(`dashboard run saved: ${writeDashboardModel(model.id, model)}\n`);
+          if (options.open) openInBrowser(out);
+        },
+      },
+    );
+    return;
+  }
+  if (argv[0] === "plane") {
+    process.exitCode = await runPlane(
+      argv.slice(1),
+      async (workspace) => {
+        if (!process.env.PLANE_API_KEY) throw new Error(planeSetupGuide());
+        let paced = false;
+        const { planeReader } = await import("./transports/plane.js");
+        const rate = process.env.PLANE_REQUESTS_PER_MINUTE;
+        if (rate !== undefined && !/^\d+$/.test(rate))
+          throw new Error("PLANE_REQUESTS_PER_MINUTE must be a whole number");
+        return planeReader({
+          apiKey: process.env.PLANE_API_KEY,
+          workspace,
+          apiUrl: process.env.PLANE_API_URL || undefined,
+          webUrl: process.env.PLANE_WEB_URL || undefined,
+          requestsPerMinute: rate === undefined ? undefined : Number(rate),
+          onWait: (ms, reason) => {
+            // Pacing waits come before almost every request once the budget fills; say so once.
+            if (reason === "budget") {
+              if (!paced)
+                process.stderr.write(
+                  `plane: pacing reads to ${rate ?? 50} requests per minute (Plane allows 60)\n`,
+                );
+              paced = true;
+              return;
+            }
+            process.stderr.write(`plane: rate limited, waiting ${Math.ceil(ms / 1000)}s\n`);
+          },
+        });
+      },
+      {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+        defaultWorkspace: process.env.PLANE_WORKSPACE || undefined,
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        github: () => shellTransport(),
+        dashboard: async (report, options) => {
+          const model = planeDashboardModel(report, options.clusters);
+          const out =
+            options.path || privateExportPath(`issue-graph-plane-${report.workspace.slug}.html`);
           writeNextDashboard(out, [model], modelDefaults([model]));
           process.stderr.write(`wrote ${out}\n`);
           if (options.save)
@@ -1060,6 +1113,12 @@ function runAuth(a: Args): void {
             ? "linear login"
             : linear.variable,
       fix: linear.kind === "none" ? "issue-graph linear login" : "",
+    },
+    {
+      provider: "plane",
+      signedIn: Boolean(process.env.PLANE_API_KEY),
+      via: "PLANE_API_KEY",
+      fix: process.env.PLANE_API_KEY ? "" : "export PLANE_API_KEY=...",
     },
   ];
   if (a.format === "json") console.log(JSON.stringify(rows, null, 2));

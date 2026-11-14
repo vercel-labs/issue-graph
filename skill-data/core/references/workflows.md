@@ -298,3 +298,19 @@ Read coverage before making completeness claims: node/page limits and read failu
 can make the graph partial. Text mentions and non-GitHub attachment targets are not
 crawled, and GitHub targets are never expanded past one hop.
 The HTML is a static capture; regenerate it to refresh.
+
+## Plane captures
+
+Use `issue-graph plane --help` before a Plane workflow. Run `issue-graph auth status`
+first; if Plane is not signed in, ask the user to export `PLANE_API_KEY` (and
+`PLANE_WORKSPACE`). The command sends only GET requests and never mutates Plane.
+
+- `issue-graph plane ENG-123 --workspace example --json` reads a bounded neighborhood.
+- `issue-graph plane --project ENG --html project.html` reads non-archived work items in
+  one project and saves it for `issue-graph dashboard`.
+- `--cluster`, `--clusters PATH`, and `--github` behave as they do for Linear.
+
+The command reads the workspace work item list first, then about two requests per work
+item. Plane Cloud allows 60 requests per minute per key, so the reader paces itself and
+prints when it waits. A workspace larger than `--max-pages` pages of 100 falls back to
+per-item lookups and is marked in the report's `index` coverage.

@@ -26,6 +26,10 @@
     "./transport/linear": {
       "types": "./dist/transports/linear.d.ts",
       "import": "./dist/transports/linear.js"
+    },
+    "./transport/plane": {
+      "types": "./dist/transports/plane.d.ts",
+      "import": "./dist/transports/plane.js"
     }
   },
   "main": "./dist/index.js",

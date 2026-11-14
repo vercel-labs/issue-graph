@@ -13,7 +13,7 @@ Find related issues and pull requests before you start work. For humans and agen
   <img alt="issue-graph: open issues and pull requests from vercel-labs/portless grouped into five root-cause clusters, such as proxy port allocation and TLS trust" src="https://issue-graph.dev/readme-hero-light.png">
 </picture>
 
-issue-graph reads GitHub issues and pull requests, or Linear issues, and follows the references between them: closing links, mentions, cross-references, and Linear relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub and Linear.
+issue-graph reads GitHub issues and pull requests, or Linear and Plane issues, and follows the references between them: closing links, mentions, cross-references, and Linear and Plane relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub, Linear, and Plane.
 
 ## Install
 
@@ -49,6 +49,14 @@ issue-graph linear ENG-123 --workspace your-workspace --open
 issue-graph linear --project <project-uuid> --open
 ```
 
+For Plane, set an API key, then capture a work item neighborhood or a whole project:
+
+```bash
+export PLANE_API_KEY=plane_api_...
+issue-graph plane ENG-123 --workspace your-workspace --open
+issue-graph plane --project ENG --workspace your-workspace --open
+```
+
 The full walkthrough is in [Get started](https://issue-graph.dev/docs/get-started).
 
 ## How it works
@@ -81,7 +89,7 @@ Run `issue-graph --help` for the full list, or `issue-graph <command> --help` fo
 
 | Group | Commands | Docs |
 | --- | --- | --- |
-| Map work | `open`, `graph`, `linear` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear) |
+| Map work | `open`, `graph`, `linear`, `plane` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear), [Plane](https://issue-graph.dev/docs/plane) |
 | Prioritize | `rank`, `cluster`, `reconcile`, `plan` | [Backlog](https://issue-graph.dev/docs/backlog), [Agents](https://issue-graph.dev/docs/agents) |
 | Dashboard | `dashboard`, `query`, `runs`, `config` | [Dashboard](https://issue-graph.dev/docs/dashboard) |
 | Pull requests | `status` | [Status](https://issue-graph.dev/docs/status) |
