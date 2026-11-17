@@ -6,6 +6,7 @@ export const landingDescription =
 export const providerCommands = {
   github: "issue-graph open vercel-labs/portless",
   linear: "issue-graph linear ENG-123 --workspace your-workspace --open",
+  jira: "issue-graph jira ABC-123 --site your-site --open",
   model: "issue-graph query --input model.json --open",
 } as const;
 

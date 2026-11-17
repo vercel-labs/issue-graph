@@ -75,9 +75,12 @@ export const ISSUE_GRAPH_SCHEMA = {
     },
     jira: {
       remoteMutations: false,
-      localWrites: [],
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest site and seed-project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+      ],
       outputSchemaVersion: 1,
-      formats: ["markdown", "json"],
+      formats: ["markdown", "json", "html"],
       authentication:
         "the twg session from `twg login`; issue-graph reads and stores no Atlassian credential",
       transport:
@@ -90,7 +93,9 @@ export const ISSUE_GRAPH_SCHEMA = {
       hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
       concurrency: { default: 4, minimum: 1, maximum: 16 },
       relationships: ["issuelinks", "parent", "subtasks", "remoteLinks"],
-      crossProject: "links into other projects are read one hop and not expanded",
+      crossProject: "links into other projects are read at the next depth and not expanded",
+      dashboard:
+        "--html PATH or --open writes the explorer and saves model jira:<site>:project:<KEY> for dashboard and query; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
       exclusions: [
         "text mentions",
         "fetching remote link targets",
@@ -102,7 +107,7 @@ export const ISSUE_GRAPH_SCHEMA = {
       exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
       jsonFlag: "--json emits the report on stdout; takes no path",
       description:
-        "Read a bounded Jira neighborhood through the Atlassian Teamwork Graph CLI with site-scoped identities, native link direction, and explicit coverage gaps.",
+        "Read a bounded Jira neighborhood through the Atlassian Teamwork Graph CLI with site-scoped identities, native link direction, and explicit coverage gaps, and save it to the dashboard.",
     },
     query: {
       providerMutations: false,

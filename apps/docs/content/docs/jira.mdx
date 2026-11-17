@@ -1,58 +1,94 @@
 ---
 title: Jira
-description: Read explicit Jira issue links through the Atlassian Teamwork Graph CLI with site-scoped identity and visible coverage limits.
+description: Map Jira issue links, parents, subtasks, and remote links through the Atlassian Teamwork Graph CLI (twg), then open the run in the dashboard.
 ---
 
-Start from one Jira issue to see what it blocks, what blocks it, its duplicates and related work, its parent and subtasks, and its remote links. issue-graph reads Jira through the [Atlassian Teamwork Graph CLI](https://github.com/atlassian/twg-cli) (`twg`), so your Atlassian session stays in `twg`.
+`issue-graph jira` starts from one Jira issue and maps what it blocks, what blocks it, its duplicates and related work, its parent and subtasks, and its remote links. It reads Jira through the [Atlassian Teamwork Graph CLI](https://github.com/atlassian/twg-cli) (`twg`), so your Atlassian session stays in `twg`, and it saves the run to the same dashboard as GitHub and Linear.
 
 ## Connect Jira
 
-Install `twg` 1.4 or later and sign in with it once. Follow the install steps in the [twg repository](https://github.com/atlassian/twg-cli), then run:
+`issue-graph jira` needs `twg` 1.4 or later on your `PATH`. Install it from the [twg repository](https://github.com/atlassian/twg-cli), then sign in once:
 
 ```bash
 twg login
 ```
 
-issue-graph doesn't install `twg`, start its login, or read its credentials. It runs the `twg` on your `PATH` and reports a missing binary as `TWG_NOT_FOUND`.
+issue-graph doesn't install `twg`, start its login, or read its credentials. When `twg` isn't on your `PATH`, the command fails with `TWG_NOT_FOUND`.
+
+## Map an issue neighborhood
+
+Pass an issue key with `--site`, or a browse URL, which names the site for you:
 
 ```bash
-issue-graph jira ABC-123 --site your-site --depth 1
+issue-graph jira ABC-123 --site your-site --open
 ```
-
-You can also pass a browse URL, which names the site:
 
 ```bash
 issue-graph jira https://your-site.atlassian.net/browse/ABC-123 --json
 ```
 
-`--site` accepts a site prefix, a domain, or a cloud ID, the same values `twg --site` accepts. Without `--site` or a browse URL, `twg` uses its default site. A `--site` domain must equal the site of every issue `twg` returns, and a prefix must be its first label, so `--site acme` matches `acme.atlassian.net`. A cloud ID doesn't name a host: with a browse URL, the site in the `twg` response for the first issue must match it. The report takes its site from the web URL `twg` returns for the first issue, or from its REST `self` link when that link is on the site, so every node key has the form `jira:<site>:<KEY>` and keys from different sites can't collide.
+The report prints as Markdown by default, and `--json` prints the versioned JSON report instead. `--open` writes an HTML explorer, opens it in your browser, and saves the run to the dashboard. `--html PATH` writes the explorer to a path you choose and also saves the run.
+
+## Open Jira runs in the dashboard
+
+Jira runs open in the same explorer as GitHub and Linear, with the Jira mark, native status names, and the Explore and Swarm views. issue-graph saves one model per site and seed project, with an ID such as `jira:your-site.atlassian.net:project:ABC`. A new run from the same project replaces the saved model.
+
+- `issue-graph dashboard` lists the Jira project next to your other saved runs in the project switcher.
+- `issue-graph query jira:your-site.atlassian.net:project:ABC` filters the saved run without calling `twg`.
+- `--no-save` writes the explorer without saving the run.
+- `--cluster` prints a thematic clustering task for the calling agent, and `--clusters PATH` applies its proposed themes to `--html` or `--open`.
+
+The command writes local files only with `--html` or `--open`. Status categories map to dashboard states, so `done` is closed and `new` or `indeterminate` is open.
+
+## Choose the site
+
+`--site` accepts a site prefix, a domain, or a cloud ID, the same values `twg --site` accepts. Without `--site` or a browse URL, `twg` uses its default site.
+
+| `--site` value | Example | How issue-graph checks it |
+| --- | --- | --- |
+| Domain | `your-site.atlassian.net` | Must equal the site of every issue `twg` returns |
+| Prefix | `your-site` | Must be the first label of every issue's site |
+| Cloud ID | `00000000-0000-4000-8000-000000000001` | With a browse URL, the first issue's site must match the URL |
+
+A browse URL and a `--site` value that name different sites fail before any read. Node keys have the form `jira:<site>:<KEY>`, with the site taken from the web URL `twg` returns for the first issue, so keys from different sites can't collide.
 
 ## What the graph includes
 
-- Issue links in both directions, with the native link type, such as `Blocks`, `Duplicate`, `Relates`, or `Cloners`. `Relates` is undirected.
-- Parent and subtask relationships. Children of an epic or another issue above the sub-task level aren't listed by Jira's `subtasks` field, so the command doesn't read them from the parent. An issue like this is partial when the command expands it, and a depth boundary when it sits at the `--depth` limit. An issue whose type has no `hierarchyLevel`, or whose `subtasks` field is missing or null, is treated the same way unless its type is a sub-task. Each child still shows its parent when you start from the child.
+- Issue links in both directions with their native type, such as `Blocks`, `Duplicate`, `Relates`, or `Cloners`. `Relates` is undirected.
+- Parent and subtask relationships.
 - HTTP and HTTPS remote links with their titles, such as linked pull requests.
 - Native status, status category, issue type, and update time.
 
-Links between issues in the seed's project recurse up to `--depth`. A link into another project is read one hop and isn't expanded. The command lists remote link targets without fetching them, and it doesn't collect issue keys mentioned in summaries, descriptions, or comments, so text such as `UTF-8` never turns into a read.
+Links between issues in the seed's project recurse up to `--depth`. A link into another project is read at the next depth and isn't expanded, so the `--max-nodes` cap reaches direct neighbors in other projects before deeper work in the seed's project.
 
-Output is Markdown by default. `--json` prints the versioned report on stdout. Neither writes local files, and Jira runs don't appear in the dashboard.
+issue-graph lists remote link targets without fetching them. It doesn't collect issue keys mentioned in summaries, descriptions, or comments, so text such as `UTF-8` never turns into a read.
 
-## How issues are read
+### Why epic children aren't listed
 
-Each issue is one `twg` process, run without a shell:
+Jira's `subtasks` field lists only sub-task children, so the command doesn't read the children of an epic or of another issue above the sub-task level. An issue like this is partial when the command expands it, and a depth boundary when the command doesn't. An issue whose type has no `hierarchyLevel`, or whose `subtasks` field is missing or null, is treated the same way unless its type is a sub-task. Start from a child issue to see its parent.
+
+## How issue-graph reads Jira
+
+issue-graph runs one `twg` process per issue, without a shell:
 
 ```bash
 twg jira workitem get ABC-123 --fields summary,status,issuetype,project,parent,subtasks,issuelinks,updated --remote-links --output json --output-summary=none --site your-site
 ```
 
-`--output-summary=none` keeps raw JSON on stdout even when `twg` runs with agent output defaults. `--concurrency` bounds how many `twg` processes run at once, from 1 to 16 with a default of 4.
+`--output-summary=none` keeps raw JSON on stdout even when `twg` runs with agent output defaults. `--concurrency` sets how many `twg` processes run at once, from 1 to 16, with a default of 4.
 
-## Coverage
+## Coverage and exit codes
 
-The command exits with `0` when coverage is complete within the requested scope, `1` when it's partial or the first issue can't be read, and `2` for invalid arguments.
+The command exits with `0` when coverage is complete within the requested scope, `1` when coverage is partial or the first issue can't be read, and `2` for invalid arguments.
 
-A linked issue that can't be read stays in the graph as unavailable with an error code, such as the code `twg` reports, `IDENTITY_MISMATCH` when `twg` returns a different key because the issue moved, or `SITE_MISMATCH` when it belongs to another site. If the first issue can't be read, the command prints the error code on stderr, prints no report, and exits 1. A `twg` warning, such as a failed remote-link read, or a `twg` response that reports partial coverage marks the issue as partial, and so does an expanded issue whose children aren't read: one above the sub-task level, or one with no hierarchy level or no `subtasks` field. The `--max-nodes` cap and an unexpanded hub also make coverage partial. Depth boundaries are listed in the coverage but don't make it partial.
+These conditions make coverage partial:
+
+- A linked issue that can't be read. It stays in the graph as unavailable with an error code, such as the code `twg` reports, `IDENTITY_MISMATCH` when the issue moved to another key, or `SITE_MISMATCH` when it belongs to another site.
+- A `twg` warning, such as a failed remote-link read, or a `twg` response that reports partial coverage or truncation.
+- An expanded issue whose children aren't listed, as described in [Why epic children aren't listed](#why-epic-children-arent-listed).
+- The `--max-nodes` cap or an unexpanded hub.
+
+When the first issue can't be read, the command prints the error code on stderr, prints no report, and exits with `1`. Depth boundaries appear in the coverage but don't make it partial.
 
 | Flag | Default | Range |
 | --- | --- | --- |

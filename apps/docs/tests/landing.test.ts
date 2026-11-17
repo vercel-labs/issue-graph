@@ -45,13 +45,14 @@ describe("launch feedback", () => {
 
   test("uses native Geistdocs code blocks for providers, clustering, and final install", () => {
     const html = renderToStaticMarkup(createElement(Home));
-    expect(html.match(/data-geist-code-block=""/g)).toHaveLength(5);
-    expect(html.match(/data-section="tabs"/g)).toHaveLength(5);
-    expect(html.match(/data-section="content"/g)).toHaveLength(5);
+    expect(html.match(/data-geist-code-block=""/g)).toHaveLength(6);
+    expect(html.match(/data-section="tabs"/g)).toHaveLength(6);
+    expect(html.match(/data-section="content"/g)).toHaveLength(6);
     const codes = html.match(/<code\b[^>]*>[\s\S]*?<\/code>/g) ?? [];
     for (const command of [
       providerCommands.github,
       providerCommands.linear,
+      providerCommands.jira,
       providerCommands.model,
       clusterCommands,
       plannedInstallCommand,

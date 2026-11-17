@@ -70,10 +70,9 @@ export default function Home() {
         <div className="ig-section-intro">
           <h2 id="providers-title">Bring every tracker into one graph</h2>
           <p>
-            Each provider follows the references its tracker records and keeps native states. GitHub
-            and Linear are built in, Jira issues print a linked report through twg, and other
-            trackers can import the same normalized model. Saved runs open in one dashboard with a
-            project switcher.
+            Each provider follows the references its tracker records and keeps native states.
+            GitHub, Linear, and Jira are built in, and other trackers can import the same normalized
+            model. Saved runs open in one dashboard with a project switcher.
           </p>
         </div>
         <ProviderCards />

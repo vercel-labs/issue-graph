@@ -1,11 +1,14 @@
 import {
   buildJiraGraph,
   type JiraReader,
+  type JiraReport,
   jiraSiteConflicts,
   parseJiraLocator,
   parseJiraSite,
   renderJira,
 } from "./jira.js";
+import { jiraDashboardModel } from "./jira-html.js";
+import { parseWorkClusters, workClusterPrompt } from "./work-clusters.js";
 
 export const JIRA_USAGE = `usage: issue-graph jira <issue-key|browse-url> [options]
 
@@ -18,11 +21,16 @@ Atlassian Teamwork Graph CLI (twg).
   --hub-threshold N     stop expanding non-seed hubs, 1..1000 (default 12)
   --concurrency N       twg reads in flight, 1..16 (default 4)
   --json                print JSON to stdout
+  --html PATH           write an HTML explorer and save this project to the dashboard
+  --open                open the HTML explorer (creates a temporary file if needed)
+  --no-save             do not save this run to the dashboard
+  --cluster             print a thematic clustering task for the calling agent
+  --clusters PATH       apply proposed themes from JSON to --html or --open
   -h, --help            show help without running twg
 
 Install twg 1.4 or later and sign in with \`twg login\` first. Each issue is one
-\`twg jira workitem get\` read; nothing is written to Jira or to local files, and
-no Atlassian credential is read or stored.
+\`twg jira workitem get\` read. Nothing is written to Jira, local files are written
+only with --html or --open, and no Atlassian credential is read or stored.
 A browse URL names the site. A --site domain must equal each issue's site and a
 prefix must be its first label; a cloud ID with a browse URL is checked against
 the site twg reports for the first issue.
@@ -37,6 +45,11 @@ Exit codes: 0 complete within scope, 1 partial or failed, 2 invalid usage.`;
 export interface JiraIO {
   stdout(value: string): void;
   stderr(value: string): void;
+  dashboard?(
+    report: JiraReport,
+    options: { path?: string; open: boolean; save: boolean; clusters?: unknown },
+  ): Promise<void>;
+  readClusters?(path: string): Promise<unknown>;
 }
 
 export async function runJira(
@@ -58,11 +71,27 @@ export async function runJira(
   let seed: string | undefined;
   let site: string | undefined;
   let json = false;
+  let htmlPath: string | undefined;
+  let open = false;
+  let save = true;
+  let cluster = false;
+  let clustersPath: string | undefined;
   try {
     for (let index = 0; index < argv.length; index++) {
       const arg = argv[index];
       if (arg === "--json") json = true;
-      else if (arg === "--site") {
+      else if (arg === "--open") open = true;
+      else if (arg === "--no-save") save = false;
+      else if (arg === "--cluster") cluster = true;
+      else if (arg === "--clusters") {
+        const value = argv[++index];
+        if (!value || value.startsWith("-")) throw new Error("--clusters requires a JSON path");
+        clustersPath = value;
+      } else if (arg === "--html") {
+        const value = argv[++index];
+        if (!value || value.startsWith("-")) throw new Error("--html requires an output path");
+        htmlPath = value;
+      } else if (arg === "--site") {
         const value = argv[++index];
         if (!value || value.startsWith("-")) throw new Error("--site requires a Jira site");
         site = parseJiraSite(value);
@@ -78,6 +107,8 @@ export async function runJira(
       else seed = arg;
     }
     if (!seed) throw new Error("Specify a Jira issue key or browse URL");
+    if (clustersPath && !htmlPath && !open) throw new Error("--clusters requires --html or --open");
+    if (cluster && json) throw new Error("--cluster cannot be combined with --json");
     const locator = parseJiraLocator(seed);
     if (locator.site && site && jiraSiteConflicts(locator.site, site))
       throw new Error("Jira URL and --site disagree");
@@ -87,8 +118,21 @@ export async function runJira(
     return 2;
   }
   try {
+    let clusters: unknown;
+    if (clustersPath) {
+      if (!io.readClusters) throw new Error("Cluster file input is unavailable in this caller");
+      clusters = parseWorkClusters(await io.readClusters(clustersPath));
+    }
     const report = await buildJiraGraph(await reader(site), seed, { ...options, site });
+    if (htmlPath || open) {
+      if (!io.dashboard) throw new Error("HTML output is unavailable in this caller");
+      await io.dashboard(report, { path: htmlPath, open, save, clusters });
+    }
     io.stdout(json ? `${JSON.stringify(report, null, 2)}\n` : renderJira(report));
+    if (cluster)
+      io.stdout(
+        `\n${workClusterPrompt(jiraDashboardModel(report).label ?? report.site, report.nodes)}\n`,
+      );
     return report.coverageComplete ? 0 : 1;
   } catch (error) {
     io.stderr(`${error instanceof Error ? error.message : "Jira read failed"}\n`);

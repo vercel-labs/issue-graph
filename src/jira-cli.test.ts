@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { JiraReadError, type JiraReader } from "./jira.js";
-import { runJira } from "./jira-cli.js";
+import { type JiraIO, runJira } from "./jira-cli.js";
 
 const root = {
   apiVersion: "v2",
@@ -32,7 +32,7 @@ function fixture(sites: Array<string | undefined> = []): (site?: string) => Jira
   };
 }
 
-async function invoke(args: string[], factory = fixture()) {
+async function invoke(args: string[], factory = fixture(), extra: Partial<JiraIO> = {}) {
   let stdout = "";
   let stderr = "";
   const code = await runJira(args, factory, {
@@ -42,6 +42,7 @@ async function invoke(args: string[], factory = fixture()) {
     stderr: (value) => {
       stderr += value;
     },
+    ...extra,
   });
   return { code, stdout, stderr };
 }
@@ -66,6 +67,9 @@ test("help and invalid arguments never start twg", async () => {
     ["https://acme.atlassian.net/browse/ABC-1", "--site", "other.atlassian.net"],
     ["https://acme.atlassian.net/browse/ABC-1", "--site", "other"],
     ["https://[::1]/browse/ABC-1"],
+    ["ABC-1", "--html"],
+    ["ABC-1", "--clusters", "themes.json"],
+    ["ABC-1", "--cluster", "--json"],
   ])
     expect((await invoke(args, unused)).code, args.join(" ")).toBe(2);
 });
@@ -110,4 +114,30 @@ test("a failed seed read prints the reason and exits 1", async () => {
   expect(result.code).toBe(1);
   expect(result.stdout).toBe("");
   expect(result.stderr).toContain("NOT_FOUND");
+});
+
+test("--html and --open hand the report to the dashboard and save unless --no-save", async () => {
+  const calls: Array<{ path?: string; open: boolean; save: boolean }> = [];
+  const dashboard: JiraIO["dashboard"] = async (_report, options) => {
+    calls.push(options);
+  };
+  expect(
+    (await invoke(["ABC-1", "--site", "acme", "--depth", "0"], fixture(), { dashboard })).code,
+  ).toBe(0);
+  expect(calls).toEqual([]);
+  await invoke(["ABC-1", "--site", "acme", "--depth", "0", "--html", "out.html"], fixture(), {
+    dashboard,
+  });
+  await invoke(["ABC-1", "--site", "acme", "--depth", "0", "--open", "--no-save"], fixture(), {
+    dashboard,
+  });
+  expect(calls).toEqual([
+    { path: "out.html", open: false, save: true, clusters: undefined },
+    { path: undefined, open: true, save: false, clusters: undefined },
+  ]);
+});
+
+test("--cluster prints a clustering task after the report", async () => {
+  const result = await invoke(["ABC-1", "--site", "acme", "--depth", "0", "--cluster"]);
+  expect(result.stdout).toContain("Propose thematic clusters for acme.atlassian.net / ABC.");
 });

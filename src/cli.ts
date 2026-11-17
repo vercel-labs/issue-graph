@@ -462,6 +462,18 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       {
         stdout: (value) => process.stdout.write(value),
         stderr: (value) => process.stderr.write(value),
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        dashboard: async (report, options) => {
+          const { jiraDashboardModel } = await import("./jira-html.js");
+          const model = jiraDashboardModel(report, options.clusters);
+          const name = model.id.replace(/[^a-z0-9.-]+/gi, "-");
+          const out = options.path || privateExportPath(`issue-graph-${name}.html`);
+          writeNextDashboard(out, [model], modelDefaults([model]));
+          process.stderr.write(`wrote ${out}\n`);
+          if (options.save)
+            process.stderr.write(`dashboard run saved: ${writeDashboardModel(model.id, model)}\n`);
+          if (options.open) openInBrowser(out);
+        },
       },
     );
     return;

@@ -57,8 +57,8 @@ describe("ISSUE_GRAPH_SCHEMA", () => {
   test("publishes the read-only Jira contract", () => {
     const jira = ISSUE_GRAPH_SCHEMA.commands.jira;
     expect(jira.remoteMutations).toBe(false);
-    expect(jira.localWrites).toEqual([]);
-    expect(jira.formats).toEqual(["markdown", "json"]);
+    expect(jira.localWrites.join(" ")).toContain("--no-save");
+    expect(jira.formats).toEqual(["markdown", "json", "html"]);
     expect(jira.transport).toContain("--output-summary=none");
     expect(jira.exclusions).toContain("text mentions");
     expect(jira.exclusions.join(" ")).toContain("subtasks field is missing or null");
