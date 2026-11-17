@@ -60,7 +60,7 @@ export default function Home() {
           <p className="ig-hero-description">{landingDescription}</p>
           <div className="ig-hero-action">
             <InstallSelector />
-            <span className="ig-hero-note">Read-only access to GitHub and Linear.</span>
+            <span className="ig-hero-note">Read-only access to GitHub, Linear, and Jira.</span>
           </div>
         </div>
         <ClusterFigure />
@@ -71,8 +71,9 @@ export default function Home() {
           <h2 id="providers-title">Bring every tracker into one graph</h2>
           <p>
             Each provider follows the references its tracker records and keeps native states. GitHub
-            and Linear are built in, and other trackers can import the same normalized model. Saved
-            runs open in one dashboard with a project switcher.
+            and Linear are built in, Jira issues print a linked report through twg, and other
+            trackers can import the same normalized model. Saved runs open in one dashboard with a
+            project switcher.
           </p>
         </div>
         <ProviderCards />
@@ -131,7 +132,7 @@ export default function Home() {
         <div className="ig-agent-contract">
           <div>
             <span className="ig-contract-label">Collect</span>
-            <p>The CLI reads GitHub and Linear references and reports missing data.</p>
+            <p>The CLI reads GitHub, Linear, and Jira references and reports missing data.</p>
           </div>
           <div>
             <span className="ig-contract-label">Inspect</span>
@@ -156,7 +157,10 @@ export default function Home() {
 
       <section className="ig-closing" aria-labelledby="install-title">
         <h2 id="install-title">Map your backlog before the next fix</h2>
-        <p>Requires Node.js 20 or later. Sign in with the GitHub CLI or connect Linear.</p>
+        <p>
+          Requires Node.js 20 or later. Sign in with the GitHub CLI, connect Linear, or sign in to
+          twg for Jira.
+        </p>
         <CodeBlock title="Terminal" className="ig-closing-command">
           <code>{renderTerminalCommand(plannedInstallCommand)}</code>
         </CodeBlock>

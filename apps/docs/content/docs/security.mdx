@@ -25,6 +25,10 @@ For the HTTP library transport, store the token on your server and grant it only
 
 `issue-graph linear` sends only read queries. `issue-graph linear login` approves read-only access through Linear's MCP server and stores the session in the macOS Keychain on macOS, or in a file with `0600` permissions under `ISSUE_GRAPH_HOME/credentials/` on other systems. `issue-graph linear logout` removes it. When `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses that variable instead of the session. See [Linear](/docs/linear).
 
+## Jira access
+
+`issue-graph jira` runs `twg jira workitem get` for each issue and never creates, edits, transitions, or comments on Jira work items. It uses the session you created with `twg login` and doesn't read or store Atlassian credentials. Each `twg` process runs without a shell, and issue keys and sites are validated before they become arguments. See [Jira](/docs/jira).
+
 ## Local files
 
 | Command | Default storage | Controls |
@@ -34,6 +38,7 @@ For the HTTP library transport, store the token on your server and grant it only
 | Cluster with `--apply` | Updates the saved model and writes an HTML export | Applying an answer always saves it |
 | Linear | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set |
 | Linear login | Session in the macOS Keychain or under `credentials/` | `linear logout` removes it |
+| Jira | None | Report on stdout; the `twg` session is managed by `twg` |
 | Dashboard | HTML export of saved models | Temporary file by default; `-o PATH.html` chooses its location |
 | Runs | None when listing | `runs rm owner/repo` deletes that saved dashboard model only |
 | Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-save` skips new snapshots |

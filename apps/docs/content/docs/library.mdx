@@ -19,8 +19,28 @@ The package ships ESM imports with TypeScript declarations and declares Node.js 
 | `issue-graph/transport/shell` | Node-compatible child processes and an authenticated `gh` |
 | `issue-graph/transport/http` | `fetch` and a GitHub token |
 | `issue-graph/transport/linear` | `fetch` and a Linear API key or OAuth access token |
+| `issue-graph/transport/twg` | Node-compatible child processes and a signed-in `twg` |
 
 The core exports exclude CLI snapshot storage and the headless agent runner. Your application handles persistence and agent execution. For the Linear reader, see [Linear](/docs/linear).
+
+## Read Jira through twg
+
+`buildJiraGraph` reads a bounded Jira neighborhood through any `JiraReader`. `twgJiraReader` runs the `twg` on your `PATH`:
+
+```ts
+import { buildJiraGraph, renderJira } from "issue-graph";
+import { twgJiraReader } from "issue-graph/transport/twg";
+
+const report = await buildJiraGraph(twgJiraReader({ site: "your-site" }), "ABC-123", {
+  site: "your-site",
+  maxDepth: 1,
+  maxNodes: 80,
+  hubThreshold: 12,
+});
+console.log(renderJira(report));
+```
+
+Pass the same `site` to the reader and the options, or omit both to use the `twg` default site. A reader you write yourself returns `twg jira workitem get --output json` payloads, or the bare work item. See [Jira](/docs/jira) for what the graph includes.
 
 ## Crawl with HTTP
 
@@ -136,7 +156,7 @@ console.log({
 
 `normalize` fills in defaults and rejects unsupported filters or views. `evaluate` returns the matching keys and the ranked open items. Neither function touches the network or the filesystem. Library calls use the built-in weights unless you pass overrides, and they do not read the CLI configuration.
 
-The package also exports the types `Model`, `ProviderDescriptor`, `DashboardFilters`, `DashboardQuery`, `Weights`, and `HeatSignals`. `scoring` exposes the versioned Heat formula, and `createGraphMetrics(model)` computes the observed relationships that Impact and Swarm use. Live collectors exist for GitHub and Linear. Other providers must supply a normalized model and its capabilities.
+The package also exports the types `Model`, `ProviderDescriptor`, `DashboardFilters`, `DashboardQuery`, `Weights`, and `HeatSignals`. `scoring` exposes the versioned Heat formula, and `createGraphMetrics(model)` computes the observed relationships that Impact and Swarm use. Live collectors build models for GitHub and Linear. `buildJiraGraph` returns a report, not a model. Other providers must supply a normalized model and its capabilities.
 
 The CLI writes static Next.js exports. The library's `renderHtml` and `renderDashboard` return HTML strings from the shared renderer and do not write Next.js assets or query history.
 

@@ -1,0 +1,62 @@
+---
+title: Jira
+description: Read explicit Jira issue links through the Atlassian Teamwork Graph CLI with site-scoped identity and visible coverage limits.
+---
+
+Start from one Jira issue to see what it blocks, what blocks it, its duplicates and related work, its parent and subtasks, and its remote links. issue-graph reads Jira through the [Atlassian Teamwork Graph CLI](https://github.com/atlassian/twg-cli) (`twg`), so your Atlassian session stays in `twg`.
+
+## Connect Jira
+
+Install `twg` 1.4 or later and sign in with it once. Follow the install steps in the [twg repository](https://github.com/atlassian/twg-cli), then run:
+
+```bash
+twg login
+```
+
+issue-graph doesn't install `twg`, start its login, or read its credentials. It runs the `twg` on your `PATH` and reports a missing binary as `TWG_NOT_FOUND`.
+
+```bash
+issue-graph jira ABC-123 --site your-site --depth 1
+```
+
+You can also pass a browse URL, which names the site:
+
+```bash
+issue-graph jira https://your-site.atlassian.net/browse/ABC-123 --json
+```
+
+`--site` accepts a site prefix, a domain, or a cloud ID, the same values `twg --site` accepts. Without `--site` or a browse URL, `twg` uses its default site. When the browse URL and `--site` both name a domain, they must agree. With a prefix or cloud ID, the site in the `twg` response for the first issue must match the browse URL. The report takes its site from the web URL `twg` returns for the first issue, or from its REST `self` link when that link is on the site, so every node key has the form `jira:<site>:<KEY>` and keys from different sites can't collide.
+
+## What the graph includes
+
+- Issue links in both directions, with the native link type, such as `Blocks`, `Duplicate`, `Relates`, or `Cloners`. `Relates` is undirected.
+- Parent and subtask relationships. Children of an epic or another issue above the sub-task level aren't listed by Jira's `subtasks` field, so the command doesn't read them from the parent. An issue like this is partial when the command expands it, and a depth boundary when it sits at the `--depth` limit. An issue whose type has no `hierarchyLevel`, or whose `subtasks` field is missing or null, is treated the same way unless its type is a sub-task. Each child still shows its parent when you start from the child.
+- HTTP and HTTPS remote links with their titles, such as linked pull requests.
+- Native status, status category, issue type, and update time.
+
+Links between issues in the seed's project recurse up to `--depth`. A link into another project is read one hop and isn't expanded. The command lists remote link targets without fetching them, and it doesn't collect issue keys mentioned in summaries, descriptions, or comments, so text such as `UTF-8` never turns into a read.
+
+Output is Markdown by default. `--json` prints the versioned report on stdout. Neither writes local files, and Jira runs don't appear in the dashboard.
+
+## How issues are read
+
+Each issue is one `twg` process, run without a shell:
+
+```bash
+twg jira workitem get ABC-123 --fields summary,status,issuetype,project,parent,subtasks,issuelinks,updated --remote-links --output json --output-summary=none --site your-site
+```
+
+`--output-summary=none` keeps raw JSON on stdout even when `twg` runs with agent output defaults. `--concurrency` bounds how many `twg` processes run at once, from 1 to 16 with a default of 4.
+
+## Coverage
+
+The command exits with `0` when coverage is complete within the requested scope, `1` when it's partial or the first issue can't be read, and `2` for invalid arguments.
+
+An issue that can't be read stays in the graph as unavailable with an error code, such as the code `twg` reports, `IDENTITY_MISMATCH` when `twg` returns a different key because the issue moved, or `SITE_MISMATCH` when it belongs to another site. A `twg` warning, such as a failed remote-link read, marks the issue as partial, and so does an expanded issue whose children aren't read: one above the sub-task level, or one with no hierarchy level or no `subtasks` field. The `--max-nodes` cap and an unexpanded hub also make coverage partial. Depth boundaries are listed in the coverage but don't make it partial.
+
+| Flag | Default | Range |
+| --- | --- | --- |
+| `--depth` | 1 | 0 to 8 |
+| `--max-nodes` | 80 | 1 to 1000 |
+| `--hub-threshold` | 12 | 1 to 1000 |
+| `--concurrency` | 4 | 1 to 16 |
