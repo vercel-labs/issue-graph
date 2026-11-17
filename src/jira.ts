@@ -4,6 +4,8 @@ import type { ReadCoverage, WorkEdge, WorkNode } from "./work-types.js";
 
 const KEY = /^([A-Z][A-Z0-9_]*)-([1-9]\d*)$/;
 const SITE = /^[a-z0-9][a-z0-9.-]*$/;
+const CLOUD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const SUBTASK_TYPE = /^sub-?task$/i;
 
 export interface JiraLocator {
   key: string;
@@ -21,7 +23,8 @@ export function parseJiraLocator(input: string): JiraLocator {
       !url.username &&
       !url.password &&
       match &&
-      KEY.test(match[1].toUpperCase())
+      KEY.test(match[1].toUpperCase()) &&
+      SITE.test(url.hostname.toLowerCase())
     )
       return { key: match[1].toUpperCase(), site: url.hostname.toLowerCase() };
   } catch {}
@@ -43,9 +46,14 @@ export function parseJiraSite(input: string): string {
   return value;
 }
 
-/** A host and a site disagree only when the site is a domain; a prefix or cloud ID is not a host. */
+/**
+ * A domain must equal the host and a prefix must be its first label. A cloud ID names no host,
+ * so twg resolving it is the only check.
+ */
 export function jiraSiteConflicts(host: string, site: string): boolean {
-  return site.includes(".") && host !== site;
+  if (site.includes(".")) return host !== site;
+  if (CLOUD_ID.test(site)) return false;
+  return host.split(".")[0] !== site;
 }
 
 export function jiraNodeKey(site: string, key: string): string {
@@ -82,7 +90,7 @@ export interface JiraNode extends Omit<WorkNode, "externalLinks"> {
   externalLinks: JiraLink[];
 }
 
-export interface JiraGraphOptions extends Omit<GraphCrawlOptions, "depthForEdge"> {
+export interface JiraGraphOptions extends Omit<GraphCrawlOptions, "depthForEdge" | "expand"> {
   site?: string;
   generatedAt?: string;
 }
@@ -163,6 +171,18 @@ interface Decoded {
   item: RecordValue;
   fields: RecordValue;
   warnings: string[];
+  incomplete: boolean;
+}
+
+/** twg `meta`: `partial`, `evidence.coverage.status`, or `evidence.truncation.truncated`. */
+function metaIncomplete(value: unknown): boolean {
+  const meta = record(value);
+  const evidence = record(meta?.evidence);
+  return (
+    meta?.partial === true ||
+    record(evidence?.coverage)?.status === "partial" ||
+    record(evidence?.truncation)?.truncated === true
+  );
 }
 
 function rejectError(value: RecordValue): void {
@@ -198,7 +218,8 @@ function decode(payload: unknown): Decoded {
   const warnings = [
     ...new Set([...strings(outer.warnings), ...(body === outer ? [] : strings(body.warnings))]),
   ];
-  return { item, fields: record(item.fields) ?? item, warnings };
+  const incomplete = metaIncomplete(outer.meta) || (body !== outer && metaIncomplete(body.meta));
+  return { item, fields: record(item.fields) ?? item, warnings, incomplete };
 }
 
 /** The browse URL: the item's web `url`, or one derived from a site-hosted REST `self` link. */
@@ -225,11 +246,15 @@ function relation(name: string): Pick<WorkEdge, "relation"> & { undirected?: boo
  * `hierarchyLevel` above 0) has children that are not read. An unknown level, or a missing or
  * null `subtasks` field on an issue that is not itself a sub-task, counts as unlisted.
  */
-function childrenUnlisted(issueType: RecordValue | undefined, subtasksListed: boolean): boolean {
+function childrenUnlisted(
+  issueType: RecordValue | undefined,
+  typeName: string | undefined,
+  subtasksListed: boolean,
+): boolean {
   const level = issueType?.hierarchyLevel;
   if (typeof level === "number" && Number.isInteger(level))
     return level > 0 || (level === 0 && !subtasksListed);
-  return issueType?.subtask !== true;
+  return issueType?.subtask !== true && !SUBTASK_TYPE.test(typeName ?? "");
 }
 
 function normalize(
@@ -238,7 +263,7 @@ function normalize(
   site: string,
   depth: number,
 ): JiraNode & { webHost?: string; childrenUnlisted: boolean } {
-  const { item, fields, warnings } = decode(payload);
+  const { item, fields, warnings, incomplete } = decode(payload);
   const key = issueKey(item);
   if (key !== requested) throw new JiraReadError("IDENTITY_MISMATCH");
   const edges: WorkEdge[] = [];
@@ -294,10 +319,16 @@ function normalize(
   const status = object(fields.status);
   const reported = webUrl(item, key);
   const url = reported ?? (site.includes(".") ? `https://${site}/browse/${key}` : "");
-  const coverage: ReadCoverage[] = warnings.length
-    ? [{ source: "twg warnings", pages: 1, complete: false, reason: "read-failed" }]
-    : [];
+  const coverage: ReadCoverage[] = [
+    ...(warnings.length
+      ? [{ source: "twg warnings", pages: 1, complete: false, reason: "read-failed" as const }]
+      : []),
+    ...(incomplete
+      ? [{ source: "twg coverage", pages: 1, complete: false, reason: "read-failed" as const }]
+      : []),
+  ];
   const issueType = record(fields.issuetype);
+  const typeName = optionalText(issueType?.name) ?? optionalText(fields.issuetype);
   const byIdentity = new Map(
     edges.map((edge) => [
       `${edge.to}\0${edge.relation}\0${edge.direction}\0${edge.evidence.id}`,
@@ -312,7 +343,7 @@ function normalize(
     kind: "issue",
     identifier: key,
     projectKey: optionalText(record(fields.project)?.key)?.toUpperCase() ?? projectOf(key),
-    issueType: optionalText(issueType?.name) ?? optionalText(fields.issuetype),
+    issueType: typeName,
     title: text(fields.summary),
     url,
     state: {
@@ -329,7 +360,7 @@ function normalize(
     externalLinks: [...new Map(externalLinks.map((link) => [link.evidence.id, link])).values()],
     coverage,
     webHost: hostOf(reported),
-    childrenUnlisted: childrenUnlisted(issueType, subtasks !== undefined),
+    childrenUnlisted: childrenUnlisted(issueType, typeName, subtasks !== undefined),
   };
 }
 
@@ -394,12 +425,12 @@ export async function buildJiraGraph(
   if (locator.site && requested && jiraSiteConflicts(locator.site, requested))
     throw new Error("Jira URL and --site disagree");
   const given = locator.site ?? requested;
-  // The seed's web URL names the site authoritatively; a prefix or cloud ID cannot be compared.
+  // The seed's web URL names the site authoritatively; a cloud ID can only be confirmed by it.
   const payload = await reader.issue(locator.key);
   const probe = normalize(payload, locator.key, given ?? "pending", 0);
   if (given && probe.webHost && jiraSiteConflicts(probe.webHost, given))
     throw new JiraReadError("SITE_MISMATCH", `${locator.key} belongs to ${probe.webHost}`);
-  if (locator.site && requested && requested !== locator.site && !probe.webHost)
+  if (locator.site && requested && CLOUD_ID.test(requested) && !probe.webHost)
     throw new JiraReadError(
       "SITE_UNKNOWN",
       `twg did not confirm that ${requested} is ${locator.site}`,
@@ -416,11 +447,12 @@ export async function buildJiraGraph(
   };
   const prefix = `jira:${site}:`;
   const seedProject = first.projectKey;
+  const expandable = (key: string) => projectOf(key.slice(prefix.length)) === seedProject;
   const unlistedChildren = new Set<string>();
-  // Unlisted children make an expanded issue partial; at the depth limit they are a boundary.
+  // Unlisted children make an expanded issue partial; on an unexpanded issue they are a boundary.
   const finish = (node: Normalized, depth: number): JiraNode => {
     if (node.childrenUnlisted) {
-      if (depth < limits.maxDepth)
+      if (depth < limits.maxDepth && expandable(node.key))
         node.coverage.push({ source: "child issues", pages: 0, complete: false });
       else unlistedChildren.add(node.key);
     }
@@ -430,10 +462,10 @@ export async function buildJiraGraph(
     [{ key: firstPayloadKey }],
     {
       ...limits,
-      depthForEdge: ({ edge, sourceDepth, maxDepth }) => {
-        if (!edge.to.startsWith(prefix)) return null;
-        return projectOf(edge.to.slice(prefix.length)) === seedProject ? sourceDepth + 1 : maxDepth;
-      },
+      // Links into other projects sit one hop out, read but not expanded.
+      expand: expandable,
+      depthForEdge: ({ edge, sourceDepth }) =>
+        edge.to.startsWith(prefix) ? sourceDepth + 1 : null,
     },
     async (key, depth) => {
       if (key === firstPayloadKey) return finish(first, depth);
@@ -460,7 +492,8 @@ export async function buildJiraGraph(
       .filter(
         (node) =>
           unlistedChildren.has(node.key) ||
-          (node.depth === limits.maxDepth && node.edges.some((e) => !nodes.has(e.to))),
+          ((node.depth === limits.maxDepth || !expandable(node.key)) &&
+            node.edges.some((e) => !nodes.has(e.to))),
       )
       .map((node) => node.key),
   };
@@ -495,7 +528,7 @@ function strip(node: Normalized): JiraNode {
 }
 
 function markdown(value: string): string {
-  return value.replace(/\p{Cc}/gu, " ").replace(/[\\`*_[\]<>|]/g, "\\$&");
+  return value.replace(/\p{Cc}/gu, " ").replace(/[\\`*_[\]<>|#]/g, "\\$&");
 }
 
 export function renderJira(report: JiraReport): string {

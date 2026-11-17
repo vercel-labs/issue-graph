@@ -76,6 +76,7 @@ describe("Jira locators", () => {
       "ftp://acme.atlassian.net/browse/ABC-1",
       "https://user:pw@acme.atlassian.net/browse/ABC-1",
       "https://acme.atlassian.net/projects/ABC",
+      "https://[::1]/browse/ABC-1",
     ])
       expect(() => parseJiraLocator(input), input).toThrow(/Jira issue/);
   });
@@ -227,7 +228,50 @@ describe("buildJiraGraph", () => {
       { ...options, maxDepth: 2, site: SITE },
     );
     expect(calls.sort()).toEqual(["ABC-1", "ABC-2", "ABC-3", "XYZ-1"]);
-    expect(report.nodes.find((node) => node.identifier === "XYZ-1")?.depth).toBe(2);
+    expect(report.nodes.find((node) => node.identifier === "XYZ-1")?.depth).toBe(1);
+    expect(report.coverage.depthBoundaries).toEqual([jiraNodeKey(SITE, "XYZ-1")]);
+  });
+
+  test("the node cap reads a one-hop project link before deeper same-project work", async () => {
+    const calls: string[] = [];
+    const report = await buildJiraGraph(
+      reader(
+        {
+          "ABC-1": envelope(
+            item("ABC-1", {
+              issuelinks: [
+                link("1", "Relates", "outwardIssue", "ABC-2"),
+                link("2", "Relates", "outwardIssue", "XYZ-1"),
+              ],
+            }),
+          ),
+          "ABC-2": envelope(
+            item("ABC-2", { issuelinks: [link("3", "Relates", "outwardIssue", "ABC-3")] }),
+          ),
+          "ABC-3": envelope(item("ABC-3")),
+          "XYZ-1": envelope(item("XYZ-1")),
+        },
+        calls,
+      ),
+      "ABC-1",
+      { ...options, maxDepth: 3, maxNodes: 3, site: SITE },
+    );
+    expect(calls.sort()).toEqual(["ABC-1", "ABC-2", "XYZ-1"]);
+    expect(report.coverage.cappedOut).toEqual([jiraNodeKey(SITE, "ABC-3")]);
+  });
+
+  test("an epic in another project is a boundary, not partial", async () => {
+    const report = await buildJiraGraph(
+      reader({
+        "ABC-1": envelope(
+          item("ABC-1", { issuelinks: [link("1", "Relates", "outwardIssue", "XYZ-1")] }),
+        ),
+        "XYZ-1": envelope(item("XYZ-1", { issuetype: { name: "Epic", hierarchyLevel: 1 } })),
+      }),
+      "ABC-1",
+      { ...options, maxDepth: 2, site: SITE },
+    );
+    expect(report.coverageComplete).toBe(true);
     expect(report.coverage.depthBoundaries).toEqual([jiraNodeKey(SITE, "XYZ-1")]);
   });
 
@@ -338,6 +382,30 @@ describe("buildJiraGraph", () => {
       );
       expect(report.nodes[0].issueType).toBe("Epic");
     });
+  });
+
+  test.each(["Sub-task", "Subtask"])("a string issue type %s is a sub-task", async (issuetype) => {
+    const report = await buildJiraGraph(
+      reader({ "ABC-1": envelope(item("ABC-1", { issuetype })) }),
+      "ABC-1",
+      { ...options, site: SITE },
+    );
+    expect(report.coverageComplete).toBe(true);
+    expect(report.coverage.partial).toEqual([]);
+  });
+
+  test.each([
+    ["meta.partial", { partial: true }],
+    ["partial coverage", { evidence: { coverage: { status: "partial" } } }],
+    ["truncation", { evidence: { truncation: { truncated: true } } }],
+  ])("twg %s marks the node partial", async (_name, meta) => {
+    const report = await buildJiraGraph(
+      reader({ "ABC-1": { ...envelope(item("ABC-1")), meta } }),
+      "ABC-1",
+      { ...options, site: SITE },
+    );
+    expect(report.coverageComplete).toBe(false);
+    expect(report.coverage.partial).toEqual([jiraNodeKey(SITE, "ABC-1")]);
   });
 
   test.each([
@@ -538,9 +606,12 @@ describe("buildJiraGraph", () => {
     await expect(
       buildJiraGraph(reader({ "ABC-1": envelope(foreign) }), `https://${SITE}/browse/ABC-1`, {
         ...options,
-        site: "other",
+        site: "acme",
       }),
     ).rejects.toThrow(/SITE_MISMATCH/);
+    await expect(
+      buildJiraGraph(reader({}), `https://${SITE}/browse/ABC-1`, { ...options, site: "other" }),
+    ).rejects.toThrow(/disagree/);
     const unnamed = item("ABC-1", {
       url: undefined,
       self: "https://api.atlassian.com/ex/jira/0000/rest/api/3/issue/1",
@@ -548,9 +619,44 @@ describe("buildJiraGraph", () => {
     await expect(
       buildJiraGraph(reader({ "ABC-1": envelope(unnamed) }), `https://${SITE}/browse/ABC-1`, {
         ...options,
-        site: "acme",
+        site: "00000000-0000-4000-8000-000000000001",
       }),
     ).rejects.toThrow(/SITE_UNKNOWN/);
+    const prefixed = await buildJiraGraph(
+      reader({ "ABC-1": envelope(unnamed) }),
+      `https://${SITE}/browse/ABC-1`,
+      { ...options, site: "acme" },
+    );
+    expect(prefixed.site).toBe(SITE);
+  });
+
+  test("a site prefix without a browse URL must name the site twg reports", async () => {
+    const foreign = item("ABC-1", { url: "https://other.atlassian.net/browse/ABC-1" });
+    await expect(
+      buildJiraGraph(reader({ "ABC-1": envelope(foreign) }), "ABC-1", { ...options, site: "acme" }),
+    ).rejects.toThrow(/SITE_MISMATCH/);
+  });
+
+  test("a linked issue on another site is unavailable when the seed names no host", async () => {
+    const report = await buildJiraGraph(
+      reader({
+        "ABC-1": envelope(
+          item("ABC-1", {
+            url: undefined,
+            self: "https://api.atlassian.com/ex/jira/0000/rest/api/3/issue/1",
+            issuelinks: [link("1", "Relates", "outwardIssue", "ABC-2")],
+          }),
+        ),
+        "ABC-2": envelope(item("ABC-2", { url: "https://other.atlassian.net/browse/ABC-2" })),
+      }),
+      "ABC-1",
+      { ...options, site: "acme" },
+    );
+    expect(report.nodes.find((node) => node.identifier === "ABC-2")).toMatchObject({
+      fetched: false,
+      error: "SITE_MISMATCH",
+    });
+    expect(report.coverageComplete).toBe(false);
   });
 });
 
@@ -629,7 +735,9 @@ describe("twg payloads", () => {
                 summary: "Root",
                 status: { name: "To Do" },
                 project: { key: "ABC" },
+                issuetype: { name: "Task", hierarchyLevel: 0 },
                 issuelinks: [],
+                subtasks: [],
               },
             },
             remoteLinks: [{ id: 1, object: { url: "https://github.com/o/r/pull/1" } }],
@@ -678,7 +786,7 @@ describe("renderJira", () => {
       reader({
         "ABC-1": envelope(
           item("ABC-1", {
-            summary: "Fix [link](javascript:x) <b>*now*</b>\u0007",
+            summary: "Fix [link](javascript:x) <b>*now*</b>\u0007 ###",
             issuelinks: [link("1", "Blocks", "inwardIssue", "ABC-2")],
           }),
         ),
@@ -690,7 +798,9 @@ describe("renderJira", () => {
     const output = renderJira(report);
     expect(output).toContain(`# Jira graph · ${SITE}`);
     expect(output).toContain("Coverage: partial · 2 nodes · depth 1");
-    expect(output).toContain("## ABC-1 · Fix \\[link\\](javascript:x) \\<b\\>\\*now\\*\\</b\\> ");
+    expect(output).toContain(
+      "## ABC-1 · Fix \\[link\\](javascript:x) \\<b\\>\\*now\\*\\</b\\>  \\#\\#\\#",
+    );
     expect(output).toContain("- ← Blocks: ABC-2");
     expect(output).toContain("Read failed: NOT_FOUND");
     expect(output).toContain("Text mentions are not collected.");

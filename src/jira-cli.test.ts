@@ -64,6 +64,8 @@ test("help and invalid arguments never start twg", async () => {
     ["ABC-1", "--site"],
     ["ABC-1", "--site", "--json"],
     ["https://acme.atlassian.net/browse/ABC-1", "--site", "other.atlassian.net"],
+    ["https://acme.atlassian.net/browse/ABC-1", "--site", "other"],
+    ["https://[::1]/browse/ABC-1"],
   ])
     expect((await invoke(args, unused)).code, args.join(" ")).toBe(2);
 });

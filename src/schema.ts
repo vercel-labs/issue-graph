@@ -84,7 +84,7 @@ export const ISSUE_GRAPH_SCHEMA = {
         "twg jira workitem get KEY --fields ... --remote-links --output json --output-summary=none [--site SITE], one process per issue, no shell",
       required: ["Jira issue key (ABC-123) or https://<site>/browse/ABC-123 URL"],
       requires: "twg 1.4 or later",
-      site: "--site prefix, domain, or cloud ID; a browse URL names the site, a --site domain must match it, and a prefix or cloud ID is checked against the site twg reports for the issue; default is the twg default site; node keys use the site from the issue's web url or site-hosted REST self link",
+      site: "--site prefix, domain, or cloud ID; a browse URL names the site; a --site domain must equal each issue's site and a prefix must be its first label; a cloud ID with a browse URL is checked against the site twg reports for the first issue; default is the twg default site; node keys use the site from the issue's web url or site-hosted REST self link",
       maxDepth: { default: 1, minimum: 0, maximum: 8 },
       maxNodes: { default: 80, minimum: 1, maximum: 1000 },
       hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
@@ -98,7 +98,7 @@ export const ISSUE_GRAPH_SCHEMA = {
         "children of an epic or higher-level issue, or of an issue that is not a sub-task and whose type has no hierarchy level or whose subtasks field is missing or null; an expanded issue is marked partial, one at the depth limit is listed as a depth boundary",
       ],
       failures:
-        "unreadable, renamed, or other-site issues stay as unavailable nodes with an error code; TWG warnings mark the issue partial",
+        "unreadable, renamed, or other-site linked issues stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; TWG warnings or partial TWG coverage mark the issue partial",
       exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
       jsonFlag: "--json emits the report on stdout; takes no path",
       description:

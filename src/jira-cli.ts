@@ -23,8 +23,9 @@ Atlassian Teamwork Graph CLI (twg).
 Install twg 1.4 or later and sign in with \`twg login\` first. Each issue is one
 \`twg jira workitem get\` read; nothing is written to Jira or to local files, and
 no Atlassian credential is read or stored.
-A browse URL names the site; a --site domain must match it, and a prefix or cloud
-ID is checked against the site twg reports for the issue.
+A browse URL names the site. A --site domain must equal each issue's site and a
+prefix must be its first label; a cloud ID with a browse URL is checked against
+the site twg reports for the first issue.
 Links into other projects are read one hop and not expanded. Remote link targets
 are reported without fetching. Text mentions are not collected. Children of an
 epic or higher-level issue are not read: an expanded issue with such children is

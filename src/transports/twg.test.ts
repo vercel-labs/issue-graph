@@ -83,6 +83,15 @@ describe("twgJiraReader", () => {
     expect(error.message).toContain("Authentication failed.");
   });
 
+  test("reports a TWG error inside the data array", async () => {
+    const binary = stub(
+      "twg-auth-array",
+      `echo '{"apiVersion":"v2","command":"jira.workitem.get","data":[{"ok":false,"error":{"code":"AUTH_INVALID","message":"Authentication failed."}}]}'\nexit 1`,
+    );
+    const error = await failure(twgJiraReader({ binary }).issue("ABC-1"));
+    expect(error.code).toBe("AUTH_INVALID");
+  });
+
   test("names a missing binary, a timeout, stderr, and non-JSON output", async () => {
     expect(
       (await failure(twgJiraReader({ binary: join(dir, "absent") }).issue("ABC-1"))).code,

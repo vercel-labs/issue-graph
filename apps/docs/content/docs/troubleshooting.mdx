@@ -80,7 +80,7 @@ If `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses it instead of 
 - `TWG_FAILED` or a code reported by `twg`: the command failed, often because you aren't signed in or can't read the issue. Run `twg login`, or check the issue with `twg jira workitem get ABC-123 --site your-site`. A reason that names an unknown option or an invalid `--output-summary` value means `twg` is older than 1.4; update it.
 - `TIMEOUT`: `twg` didn't finish within 60 seconds.
 - `SITE_MISMATCH`: the issue's web URL names a different site than `--site` or the browse URL.
-- `SITE_UNKNOWN`: neither `--site`, a browse URL, nor the `twg` response names the site, or a browse URL is combined with a `--site` prefix or cloud ID and the response doesn't name the site to confirm they match. Pass `--site` with the site's domain.
+- `SITE_UNKNOWN`: neither `--site`, a browse URL, nor the `twg` response names the site, or a browse URL is combined with a `--site` cloud ID and the response doesn't name the site to confirm they match. Pass `--site` with the site's domain.
 - `IDENTITY_MISMATCH`: `twg` returned a different key, usually because the issue moved to another project. Start from the new key.
 
 ## Linear rate limits

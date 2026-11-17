@@ -38,8 +38,9 @@ function failure(error: ExecException, stdout: string, stderr: string) {
     return new JiraReadError("TIMEOUT", "twg did not finish in time");
   try {
     type Failure = { error?: { code?: unknown; message?: unknown } };
-    const body = JSON.parse(stdout) as Failure & { data?: Failure };
-    const error = body.error ?? body.data?.error;
+    const body = JSON.parse(stdout) as Failure & { data?: Failure | Failure[] };
+    const data = Array.isArray(body.data) && body.data.length === 1 ? body.data[0] : body.data;
+    const error = body.error ?? (Array.isArray(data) ? undefined : data?.error);
     const code = error?.code;
     const message = error?.message;
     if (typeof code === "string" && /^[A-Z0-9_]{1,64}$/.test(code))

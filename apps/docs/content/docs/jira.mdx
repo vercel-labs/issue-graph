@@ -25,7 +25,7 @@ You can also pass a browse URL, which names the site:
 issue-graph jira https://your-site.atlassian.net/browse/ABC-123 --json
 ```
 
-`--site` accepts a site prefix, a domain, or a cloud ID, the same values `twg --site` accepts. Without `--site` or a browse URL, `twg` uses its default site. When the browse URL and `--site` both name a domain, they must agree. With a prefix or cloud ID, the site in the `twg` response for the first issue must match the browse URL. The report takes its site from the web URL `twg` returns for the first issue, or from its REST `self` link when that link is on the site, so every node key has the form `jira:<site>:<KEY>` and keys from different sites can't collide.
+`--site` accepts a site prefix, a domain, or a cloud ID, the same values `twg --site` accepts. Without `--site` or a browse URL, `twg` uses its default site. A `--site` domain must equal the site of every issue `twg` returns, and a prefix must be its first label, so `--site acme` matches `acme.atlassian.net`. A cloud ID doesn't name a host: with a browse URL, the site in the `twg` response for the first issue must match it. The report takes its site from the web URL `twg` returns for the first issue, or from its REST `self` link when that link is on the site, so every node key has the form `jira:<site>:<KEY>` and keys from different sites can't collide.
 
 ## What the graph includes
 
@@ -52,7 +52,7 @@ twg jira workitem get ABC-123 --fields summary,status,issuetype,project,parent,s
 
 The command exits with `0` when coverage is complete within the requested scope, `1` when it's partial or the first issue can't be read, and `2` for invalid arguments.
 
-An issue that can't be read stays in the graph as unavailable with an error code, such as the code `twg` reports, `IDENTITY_MISMATCH` when `twg` returns a different key because the issue moved, or `SITE_MISMATCH` when it belongs to another site. A `twg` warning, such as a failed remote-link read, marks the issue as partial, and so does an expanded issue whose children aren't read: one above the sub-task level, or one with no hierarchy level or no `subtasks` field. The `--max-nodes` cap and an unexpanded hub also make coverage partial. Depth boundaries are listed in the coverage but don't make it partial.
+A linked issue that can't be read stays in the graph as unavailable with an error code, such as the code `twg` reports, `IDENTITY_MISMATCH` when `twg` returns a different key because the issue moved, or `SITE_MISMATCH` when it belongs to another site. If the first issue can't be read, the command prints the error code on stderr, prints no report, and exits 1. A `twg` warning, such as a failed remote-link read, or a `twg` response that reports partial coverage marks the issue as partial, and so does an expanded issue whose children aren't read: one above the sub-task level, or one with no hierarchy level or no `subtasks` field. The `--max-nodes` cap and an unexpanded hub also make coverage partial. Depth boundaries are listed in the coverage but don't make it partial.
 
 | Flag | Default | Range |
 | --- | --- | --- |

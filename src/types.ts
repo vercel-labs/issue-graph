@@ -36,6 +36,8 @@ export interface GraphCrawlOptions {
   hubThreshold: number;
   concurrency?: number;
   depthForEdge?: (context: EdgeDepthContext) => number | null;
+  /** False keeps a fetched node's edges unfollowed, as at the depth limit. */
+  expand?: (key: NodeKey) => boolean;
 }
 
 export type GraphFetchNode<TNode extends CrawlNode = CrawlNode> = (
