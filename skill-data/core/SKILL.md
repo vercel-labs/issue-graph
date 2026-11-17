@@ -31,6 +31,7 @@ If a command or asset is missing, report the CLI/skill mismatch and observed err
 | Inspect effective scoring defaults | `issue-graph config show --provider github --scope owner/repo --json` |
 | Backlog verification queue | `issue-graph reconcile owner/repo` |
 | Linear issue or project relationships | `issue-graph linear <issue>`, or `issue-graph linear --project UUID` |
+| Jira issue links, parents, and subtasks | `issue-graph jira <KEY> --site SITE` |
 | Next backlog action | `issue-graph plan owner/repo` |
 | Find work one fix resolves together | `issue-graph plan owner/repo --budget 1000 --format json`, then read `sweep` |
 
@@ -39,6 +40,8 @@ For counts, skip graph discovery. Resolve repositories and authors from the requ
 Live collection supports GitHub. `open`, `rank`, and `cluster` accept a repository or items. `graph` needs items or `--label`. Items can be numbers, `owner/repo#123`, or URLs; bare numbers use `--repo` or the checkout's GitHub remote. Inspect an issue's graph before starting work and credit existing contributors.
 
 Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Add `--github` to read the state of attached GitHub issues and pull requests, which shows whether a blocker's linked work is open, draft, or merged. Read `issue-graph linear --help` for its flags and limits.
+
+Use the dedicated `jira` command for Jira. It reads through the Atlassian TWG CLI (`twg`) and never writes to Jira. If it reports `TWG_NOT_FOUND` or a sign-in failure, ask the user to install `twg` and run `twg login`; never run setup or ask for Atlassian tokens yourself. Links into other projects are read one hop, text mentions are not collected, and an epic's child issues are not read from the epic: an expanded epic, or an issue with an unknown hierarchy level or a missing or null `subtasks` field, is partial, and one at the depth limit is a depth boundary. Read `issue-graph jira --help` for its flags and limits.
 
 ## Query saved data
 
@@ -56,7 +59,7 @@ The link is a local file. If the chat client cannot open it, also give `issue-gr
 
 Weights resolve built-in → global → provider → project → command. Inspect `config show` first. Use `query --weights comments=4,reactions=3` for temporary exploration. Use `config set --weights comments=4` only when the user wants persistent defaults.
 
-Take `--provider` and `--scope` from the query result, without adding the provider prefix to `--scope`. Linear project identity includes workspace and project IDs, such as `linear:WORKSPACE_ID:project:PROJECT_ID`. `query` also reads imported models. Live Linear reads go through `issue-graph linear`; Jira collection is not available.
+Take `--provider` and `--scope` from the query result, without adding the provider prefix to `--scope`. Linear project identity includes workspace and project IDs, such as `linear:WORKSPACE_ID:project:PROJECT_ID`. `query` also reads imported models. Live Linear reads go through `issue-graph linear`, and live Jira reads go through `issue-graph jira`, which saves no model for `query`.
 
 Dashboard sliders affect the URL/session only. Reset weights restores the document's opening weights. Config stores preferences, never credentials.
 

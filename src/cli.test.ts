@@ -1,6 +1,10 @@
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { runNode } from "../tests/node-process.js";
 import { nextSteps, parseArgs, runCli, statusArgs, UsageError } from "./cli.js";
 import { listSnapshots, writeSnapshot } from "./snapshot.js";
 import { shellTransport } from "./transports/shell.js";
@@ -431,4 +435,61 @@ test("--apply takes a file or stdin and only belongs to cluster", () => {
   expect(parseArgs(["cluster", "--apply", "answer.json"]).apply).toBe("answer.json");
   expect(() => parseArgs(["open", "--apply", "-"])).toThrow(/belongs to issue-graph cluster/);
   expect(() => parseArgs(["cluster", "--apply"])).toThrow(/needs a file/);
+});
+
+test("jira runs twg from PATH and reports structured links only", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "issue-graph-cli-twg-"));
+  try {
+    const item = {
+      key: "ABC-1",
+      fields: {
+        summary: "Root",
+        status: { name: "To Do" },
+        issuetype: { name: "Task", hierarchyLevel: 0 },
+        project: { key: "ABC" },
+        subtasks: [],
+        description: "Uses UTF-8, see XYZ-9",
+      },
+    };
+    writeFileSync(join(dir, "twg"), `#!/bin/sh\necho '${JSON.stringify(item)}'\n`);
+    chmodSync(join(dir, "twg"), 0o755);
+    const result = await runNode(
+      ["src/bin.ts", "jira", "ABC-1", "--site", "example.atlassian.net", "--depth", "1", "--json"],
+      { env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}` } },
+    );
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.nodes.map((node: { identifier: string }) => node.identifier)).toEqual(["ABC-1"]);
+    expect(report.nodes[0].edges).toEqual([]);
+    expect(report.coverageComplete).toBe(true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("jira exits 1 for an epic whose issue type has no hierarchy level", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "issue-graph-cli-twg-"));
+  try {
+    const item = {
+      key: "ABC-1",
+      fields: {
+        summary: "Root",
+        status: { name: "To Do" },
+        project: { key: "ABC" },
+        issuetype: { name: "Epic" },
+      },
+    };
+    writeFileSync(join(dir, "twg"), `#!/bin/sh\necho '${JSON.stringify(item)}'\n`);
+    chmodSync(join(dir, "twg"), 0o755);
+    const result = await runNode(
+      ["src/bin.ts", "jira", "ABC-1", "--site", "example.atlassian.net", "--depth", "1"],
+      { env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}` } },
+    );
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("Coverage: partial");
+    expect(result.stdout).toContain("- Incomplete child issues: not read");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

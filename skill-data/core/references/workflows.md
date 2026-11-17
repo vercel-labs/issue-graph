@@ -298,3 +298,15 @@ Read coverage before making completeness claims: node/page limits and read failu
 can make the graph partial. Text mentions and non-GitHub attachment targets are not
 crawled, and GitHub targets are never expanded past one hop.
 The HTML is a static capture; regenerate it to refresh.
+
+## Jira reads
+
+Use `issue-graph jira --help` before a Jira workflow. The command runs `twg jira workitem get` for each issue with the user's `twg` session and never mutates Jira. If `twg` is missing or not signed in, the command fails with `TWG_NOT_FOUND` or the code `twg` reports; ask the user to install `twg` 1.4 or later and run `twg login` rather than running setup yourself.
+
+- `issue-graph jira ABC-123 --site example --json` reads a bounded neighborhood. A browse URL such as `https://example.atlassian.net/browse/ABC-123` names the site; a `--site` domain must equal each issue's site and a prefix its first label; a cloud ID with a browse URL is checked against the site `twg` reports.
+- Links within the seed's project recurse to `--depth`; links into other projects are read at the next depth and not expanded.
+- Remote links are reported without fetching their targets, and issue keys in summaries, descriptions, or comments are not collected.
+- Children of an epic or another issue above the sub-task level are not read from the parent. An expanded issue like this is marked partial; one at the depth limit is listed as a depth boundary. An issue whose type has no hierarchy level, or whose `subtasks` field is missing or null, counts as one unless it is a sub-task. Start from a child to see its parent.
+- `--open` or `--html PATH` writes the explorer and saves the model `jira:<site>:project:<KEY>`, so `query` and `dashboard` work offline like Linear runs. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
+
+Read coverage before making completeness claims: unreadable issues, `twg` warnings, unread children of an expanded epic or of an issue with no `subtasks` field, the node cap, and unexpanded hubs make the graph partial and exit `1`. An unreadable issue is not absent work.
