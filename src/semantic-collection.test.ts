@@ -59,6 +59,21 @@ test("76 issues: 11 cold queries, 11 warm capture plus 4 revalidation queries, s
   expect(warm.transport.search).not.toHaveBeenCalled();
 });
 
+test("a repository with no open issues captures complete zero coverage", async () => {
+  const source = fixture(0);
+  const result = await collectSemanticEvidence(source.transport, OPTIONS);
+  expect(result.items).toEqual([]);
+  expect(result.coverage).toEqual({
+    captured: 0,
+    total: 0,
+    pages: 1,
+    hasNextPage: false,
+    complete: true,
+    reasonCodes: [],
+  });
+  expect(source.calls.filter((call) => call.operation === "Issues")).toHaveLength(1);
+});
+
 const changes = ["updatedAt", "author", "url", "id", "order", "added", "removed"];
 test.each(
   changes,
