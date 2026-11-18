@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -489,6 +489,40 @@ test("jira exits 1 for an epic whose issue type has no hierarchy level", async (
     expect(result.code).toBe(1);
     expect(result.stdout).toContain("Coverage: partial");
     expect(result.stdout).toContain("- Incomplete child issues: not read");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("gitlab runs glab from PATH with read-only GETs", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "issue-graph-cli-glab-"));
+  try {
+    const log = join(dir, "calls.txt");
+    const issue = {
+      id: 1,
+      iid: 1,
+      title: "Root",
+      state: "opened",
+      web_url: "https://gitlab.example.com/acme/api/-/work_items/1",
+    };
+    writeFileSync(
+      join(dir, "glab"),
+      `#!/bin/sh\necho "$@" >> '${log}'\ncase "$6" in\n  */issues/1) echo '${JSON.stringify(issue)}' ;;\n  *) echo '[]' ;;\nesac\n`,
+    );
+    chmodSync(join(dir, "glab"), 0o755);
+    const result = await runNode(
+      ["src/bin.ts", "gitlab", "https://gitlab.example.com/acme/api/-/issues/1", "--json"],
+      { env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}` } },
+    );
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout).nodes[0].identifier).toBe("acme/api#1");
+    const calls = readFileSync(log, "utf8").trim().split("\n");
+    expect(calls).toHaveLength(4);
+    for (const call of calls)
+      expect(call).toMatch(
+        /^api --method GET --hostname gitlab\.example\.com projects\/acme%2Fapi\/issues\/1/,
+      );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

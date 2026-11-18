@@ -5,6 +5,7 @@ export const docsSlugs = [
   "dashboard",
   "linear",
   "jira",
+  "gitlab",
   "status",
   "backlog",
   "agents",

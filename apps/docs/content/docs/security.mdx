@@ -2,7 +2,7 @@
 title: Permissions, local files, and privacy
 navTitle: Permissions and privacy
 description: Configure GitHub access, see which commands save local files or send data to an external agent, and share captured results carefully.
-lastModified: 2026-11-07
+lastModified: 2026-11-18
 ---
 
 ## GitHub access
@@ -29,6 +29,10 @@ For the HTTP library transport, store the token on your server and grant it only
 
 `issue-graph jira` runs `twg jira workitem get` for each issue and never creates, edits, transitions, or comments on Jira work items. It uses the session you created with `twg login` and doesn't read or store Atlassian credentials. Each `twg` process runs without a shell, and issue keys and sites are validated before they become arguments. See [Jira](/docs/jira).
 
+## GitLab access
+
+`issue-graph gitlab` sends only `glab api --method GET` requests and never creates, edits, closes, or comments on GitLab issues or merge requests. It uses the credentials `glab` holds from `glab auth login`, or `GITLAB_TOKEN`, which `glab` sends only to its default host and configured hosts. issue-graph doesn't read or store GitLab credentials. Each `glab` process runs without a shell, and hosts and API paths are validated before they become arguments. See [GitLab](/docs/gitlab).
+
 ## Local files
 
 | Command | Default storage | Controls |
@@ -39,6 +43,7 @@ For the HTTP library transport, store the token on your server and grant it only
 | Linear | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set |
 | Linear login | Session in the macOS Keychain or under `credentials/` | `linear logout` removes it |
 | Jira | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set; `twg` manages its own session |
+| GitLab | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set; `glab` manages its own credentials |
 | Dashboard | HTML export of saved models | Temporary file by default; `-o PATH.html` chooses its location |
 | Runs | None when listing | `runs rm owner/repo` deletes that saved dashboard model only |
 | Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-save` skips new snapshots |
