@@ -141,10 +141,14 @@ describe("buildGitLabGraph", () => {
       [`${base(API, "issue", 1)}/notes`]: [
         note(41, "mentioned in merge request web!8"),
         note(42, "mentioned in commit 0123abc"),
+        note(44, "mentioned in epic acme/platform#6"),
         note(43, "mentioned in merge request !99", false),
       ],
       [base(API, "merge_request", 1)]: item(API, "merge_request", 1, { state: "merged" }),
-      [`${base(API, "merge_request", 1)}/closes_issues`]: [item(API, "issue", 1)],
+      [`${base(API, "merge_request", 1)}/closes_issues`]: [
+        item(API, "issue", 1),
+        { id: "EXT-1", title: "External tracker issue" },
+      ],
       [base(API, "issue", 2)]: item(API, "issue", 2),
       [`${base(API, "issue", 2)}/links`]: [
         { ...item(API, "issue", 1), link_type: "is_blocked_by", issue_link_id: 31 },

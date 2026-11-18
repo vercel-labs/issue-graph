@@ -124,6 +124,7 @@ export const ISSUE_GRAPH_SCHEMA = {
       required: [
         "GitLab issue, work item, or merge request URL, or a group/project#N or group/project!N reference",
       ],
+      requires: "glab 1.126 or later",
       host: "--host HOST; a URL names the host and must agree with --host; default is glab's default host; node keys use the host from the seed's web_url",
       maxDepth: { default: 1, minimum: 0, maximum: 8 },
       maxNodes: { default: 80, minimum: 1, maximum: 1000 },

@@ -2,7 +2,7 @@ import { type ExecException, execFile } from "node:child_process";
 import { GitLabReadError, type GitLabReader, parseGitLabHost } from "../gitlab.js";
 
 export interface GlabGitLabReaderOptions {
-  /** GitLab host, with an optional port. Omit to use glab's default host. */
+  /** GitLab host; a port is dropped, since glab configures it per host. Omit for glab's default. */
   host?: string;
   /** Path or name of the glab executable (default `glab`). */
   binary?: string;
@@ -52,7 +52,9 @@ export function glabGitLabReader(options: GlabGitLabReaderOptions = {}): GitLabR
     label: "glab",
     get(path) {
       if (!READ_PATH.test(path)) return Promise.reject(new GitLabReadError("INVALID_PATH"));
-      const args = ["api", "--method", "GET", ...(host ? ["--hostname", host] : []), path];
+      // glab takes a bare hostname; its host configuration supplies a nondefault API port.
+      const hostname = host?.replace(/:\d+$/, "");
+      const args = ["api", "--method", "GET", ...(hostname ? ["--hostname", hostname] : []), path];
       return new Promise((resolve, reject) => {
         execFile(
           binary,

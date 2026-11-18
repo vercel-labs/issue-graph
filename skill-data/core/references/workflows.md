@@ -313,7 +313,7 @@ Read coverage before making completeness claims: unreadable issues, `twg` warnin
 
 ## GitLab reads
 
-Use `issue-graph gitlab --help` before a GitLab workflow. The command reads through `glab api --method GET` with the user's `glab` credentials and never mutates GitLab. If `glab` is missing or not signed in to the host, the command fails with `GLAB_NOT_FOUND` or `UNAUTHORIZED`, or with `NOT_FOUND` for a private project; ask the user to install `glab` and run `glab auth login --hostname HOST` rather than running setup yourself. `GITLAB_TOKEN` also works, and `glab` sends it only to its default and configured hosts.
+Use `issue-graph gitlab --help` before a GitLab workflow. The command reads through `glab api --method GET` with the user's `glab` credentials and never mutates GitLab. If `glab` is missing or not signed in to the host, the command fails with `GLAB_NOT_FOUND` or `UNAUTHORIZED`, or with `NOT_FOUND` for a private project; ask the user to install `glab` and run `glab auth login --hostname HOST` rather than running setup yourself. `GITLAB_TOKEN` also works, and `glab` 1.126 or later sends it only to its default and configured hosts.
 
 - `issue-graph gitlab https://gitlab.example.com/group/subgroup/project/-/issues/12 --json` reads a bounded neighborhood. A URL names the host; a `group/project#12` or `group/project!12` reference uses `--host` or the `glab` default host.
 - Issues and merge requests with the same number are separate nodes, keyed `gitlab:<host>:<path>#<iid>` and `gitlab:<host>:<path>!<iid>` with the path in lowercase.

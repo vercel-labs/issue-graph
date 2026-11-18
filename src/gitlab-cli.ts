@@ -27,10 +27,11 @@ through the GitLab CLI (glab).
   --clusters PATH       apply proposed themes from JSON to --html or --open
   -h, --help            show help without running glab
 
-Sign in with \`glab auth login\` first, or set GITLAB_TOKEN, which glab sends only
-to its default or configured hosts. Every read is a \`glab api --method GET\` call.
-Nothing is written to GitLab, local files are written only with --html or --open,
-and issue-graph reads or stores no GitLab credential.
+Install glab 1.126 or later and sign in with \`glab auth login\`, or set
+GITLAB_TOKEN, which glab sends only to its default or configured hosts. Every
+read is a \`glab api --method GET\` call. Nothing is written to GitLab, local
+files are written only with --html or --open, and issue-graph reads or stores no
+GitLab credential.
 Issues (#N) and merge requests (!N) are separate nodes. References into other
 projects are read one hop and not expanded. Mentions come from "mentioned in"
 system notes on the item that was mentioned, so an item's own outgoing text

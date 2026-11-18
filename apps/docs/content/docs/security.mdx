@@ -31,7 +31,7 @@ For the HTTP library transport, store the token on your server and grant it only
 
 ## GitLab access
 
-`issue-graph gitlab` sends only `glab api --method GET` requests and never creates, edits, closes, or comments on GitLab issues or merge requests. It uses the credentials `glab` holds from `glab auth login`, or `GITLAB_TOKEN`, which `glab` sends only to its default host and configured hosts. issue-graph doesn't read or store GitLab credentials. Each `glab` process runs without a shell, and hosts and API paths are validated before they become arguments. See [GitLab](/docs/gitlab).
+`issue-graph gitlab` sends only `glab api --method GET` requests and never creates, edits, closes, or comments on GitLab issues or merge requests. It uses the credentials `glab` holds from `glab auth login`, or `GITLAB_TOKEN`, which `glab` 1.126 and later send only to its default host and configured hosts. issue-graph doesn't read or store GitLab credentials. Each `glab` process runs without a shell, and hosts and API paths are validated before they become arguments. See [GitLab](/docs/gitlab).
 
 ## Local files
 

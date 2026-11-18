@@ -7,7 +7,7 @@ const SEGMENT = /^[A-Za-z0-9_][\w.-]*$/;
 const REFERENCE = /^(.*?)([#!])([1-9]\d*)$/;
 const ITEM_PATH =
   /^\/(groups\/)?(.+?)\/-\/(issues(?:\/incident)?|work_items|merge_requests)\/([1-9]\d*)(?:\/.*)?$/;
-const MENTION = /^mentioned in [a-z ]+? ((?:[\w.-]+(?:\/[\w.-]+)*)?[#!][1-9]\d*)$/;
+const MENTION = /^mentioned in ([a-z ]+?) ((?:[\w.-]+(?:\/[\w.-]+)*)?[#!][1-9]\d*)$/;
 const PER_PAGE = 100;
 const MAX_PAGES = 10;
 
@@ -190,9 +190,13 @@ function api(item: GitLabItem, suffix = ""): string {
   return `projects/${encodeURIComponent(item.path)}/${route}/${item.iid}${suffix}`;
 }
 
-/** The item a payload's `web_url` names, when it is on `host`. */
+/**
+ * The item a payload's `web_url` names, when it is on `host`. Issues from an external tracker,
+ * which `closes_issues` can return, have no `web_url`.
+ */
 function linked(value: unknown, host: string): GitLabItem | undefined {
-  const parsed = parseGitLabUrl(text(object(value).web_url));
+  const url = object(value).web_url;
+  const parsed = typeof url === "string" ? parseGitLabUrl(url) : undefined;
   if (!parsed || parsed.host !== host) return undefined;
   const { host: _, ...item } = parsed;
   return item;
@@ -318,7 +322,9 @@ async function readItem(
     const note = object(value);
     if (note.system !== true || typeof note.body !== "string") continue;
     const match = note.body.trim().match(MENTION);
-    const target = match ? resolveGitLabReference(match[1], self.path) : undefined;
+    // An epic is a group-level work item, which the project API can't read.
+    const target =
+      match && match[1] !== "epic" ? resolveGitLabReference(match[2], self.path) : undefined;
     if (!target) continue;
     add(target, {
       relation: "provider_specific",

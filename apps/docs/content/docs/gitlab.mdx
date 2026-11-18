@@ -7,13 +7,13 @@ description: Map GitLab issue links, closing merge requests, and mentions on git
 
 ## Connect GitLab
 
-`issue-graph gitlab` needs `glab` on your `PATH`. Install it from the [glab repository](https://gitlab.com/gitlab-org/cli), then sign in to each host you read:
+`issue-graph gitlab` needs `glab` 1.126 or later on your `PATH`. Install it from the [glab repository](https://gitlab.com/gitlab-org/cli), then sign in to each host you read:
 
 ```bash
 glab auth login --hostname gitlab.example.com
 ```
 
-You can set `GITLAB_TOKEN` instead. `glab` sends that token only to its default host and the hosts in its configuration, never to another host named in a URL.
+You can set `GITLAB_TOKEN` instead. From version 1.126, `glab` sends that token only to its default host and the hosts in its configuration, never to another host named in a URL.
 
 issue-graph doesn't install `glab`, start its login, or read its credentials. When `glab` isn't on your `PATH`, the command fails with `GLAB_NOT_FOUND`. Without a login, GitLab reports a private project as `NOT_FOUND`, and gitlab.com returns public issues and merge requests but refuses issue links and notes, so the graph is partial.
 
@@ -35,7 +35,7 @@ You can also pass a full reference, `group/project#12` for an issue or `group/pr
 issue-graph gitlab group/subgroup/project#12 --host gitlab.example.com
 ```
 
-A URL and a `--host` value that name different hosts fail before any read. The report prints as Markdown by default, and `--json` prints the versioned JSON report instead. `--open` writes an HTML explorer, opens it in your browser, and saves the run to the dashboard. `--html PATH` writes the explorer to a path you choose and also saves the run.
+The instance must serve HTTPS at the root of its host, not under a path such as `/gitlab`. For a nondefault port, set `api_host` for the host in your `glab` configuration. A URL and a `--host` value that name different hosts fail before any read. The report prints as Markdown by default, and `--json` prints the versioned JSON report instead. `--open` writes an HTML explorer, opens it in your browser, and saves the run to the dashboard. `--html PATH` writes the explorer to a path you choose and also saves the run.
 
 ## Open GitLab runs in the dashboard
 

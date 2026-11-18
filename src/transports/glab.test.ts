@@ -35,6 +35,15 @@ describe("glabGitLabReader", () => {
     ]);
   });
 
+  test("passes glab the hostname without a port", async () => {
+    const log = join(dir, "port.txt");
+    const binary = stub("glab-port", `printf '%s ' "$@" > '${log}'\necho '{}'`);
+    await glabGitLabReader({ binary, host: "gitlab.example.com:8443" }).get(
+      "projects/acme%2Fapi/issues/1",
+    );
+    expect(readFileSync(log, "utf8")).toContain("--hostname gitlab.example.com projects/");
+  });
+
   test("omits --hostname to use glab's default host", async () => {
     const log = join(dir, "default.txt");
     const binary = stub("glab-default", `printf '%s ' "$@" > '${log}'\necho '[]'`);
