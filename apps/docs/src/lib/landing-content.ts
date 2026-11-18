@@ -1,11 +1,12 @@
 export const landingTitle = "Find related work before you start";
-export const landingLastModified = "2026-11-07";
+export const landingLastModified = "2026-11-16";
 export const landingDescription =
-  "Map related issues and pull requests across GitHub and Linear, group open work by root cause, and open the exact view in your browser.";
+  "Map related issues and pull requests across GitHub, Linear, and Jira, group open work by root cause, and open the exact view in your browser.";
 
 export const providerCommands = {
   github: "issue-graph open vercel-labs/portless",
   linear: "issue-graph linear ENG-123 --workspace your-workspace --open",
+  jira: "issue-graph jira ABC-123 --site your-site --open",
   model: "issue-graph query --input model.json --open",
 } as const;
 

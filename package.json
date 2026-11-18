@@ -1,6 +1,6 @@
 {
   "name": "issue-graph",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "publishConfig": {
     "access": "public"
   },
@@ -26,6 +26,10 @@
     "./transport/linear": {
       "types": "./dist/transports/linear.d.ts",
       "import": "./dist/transports/linear.js"
+    },
+    "./transport/twg": {
+      "types": "./dist/transports/twg.d.ts",
+      "import": "./dist/transports/twg.js"
     }
   },
   "main": "./dist/index.js",

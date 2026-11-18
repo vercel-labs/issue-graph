@@ -1347,7 +1347,9 @@ export function mountDashboardView(
     const ext = n.attachments
       ? n.attachments.map(
           (a) =>
-            '<div class="rel"><span class="via">attachment</span><a href="' +
+            '<div class="rel"><span class="via">' +
+            (a.evidence && a.evidence.kind === "remote-link" ? "remote link" : "attachment") +
+            '</span><a href="' +
             esc(a.url) +
             '" target="_blank" rel="noopener">' +
             esc(a.title || a.url) +

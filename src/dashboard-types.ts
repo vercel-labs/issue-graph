@@ -29,7 +29,7 @@ export interface GithubTarget {
 export interface WorkLink {
   url: string;
   title: string;
-  evidence: { kind: "attachment"; id: string };
+  evidence: { kind: "attachment" | "remote-link"; id: string };
   /** Observed state of a GitHub issue or pull request target, when it was read. */
   github?: GithubTarget;
 }

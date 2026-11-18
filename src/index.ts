@@ -3,10 +3,12 @@
  * and rendering. Nothing here imports a Node builtin, so it bundles for any
  * runtime.
  *
- * The two transports are separate entry points, so importing the core never
+ * The transports are separate entry points, so importing the core never
  * drags in `node:child_process`:
- *   ./transports/shell.js  — `gh` shell-out
- *   ./transports/http.js   — fetch + token
+ *   ./transports/shell.js: `gh` shell-out
+ *   ./transports/http.js: fetch + token
+ *   ./transports/linear.js: Linear GraphQL
+ *   ./transports/twg.js: `twg` shell-out for Jira
  *
  * `snapshot.ts` (node:fs) and `cluster.ts` (node:child_process) are CLI
  * internals with no external consumer, so they are deliberately not exported.
@@ -18,6 +20,7 @@ export * from "./dashboard-query.js";
 export * from "./dashboard-types.js";
 export * from "./github.js";
 export * from "./html.js";
+export * from "./jira.js";
 export * from "./linear.js";
 export * from "./linear-html.js";
 export * from "./linear-queries.js";

@@ -150,13 +150,38 @@ if (fields.query.includes("IssueGraphRepositoryOpen")) {
 console.log(JSON.stringify({ data: { repository } }));
 `;
 
+const fakeTwg = String.raw`#!/usr/bin/env node
+const assert = require("node:assert/strict");
+const args = process.argv.slice(2);
+assert.deepEqual(args.slice(0, 3), ["jira", "workitem", "get"]);
+assert.ok(args.includes("--output-summary=none"));
+assert.deepEqual(args.slice(-2), ["--site", "fixture.atlassian.net"]);
+const key = args[3];
+const issue = (k, extra) => ({
+  key: k, url: "https://fixture.atlassian.net/browse/" + k, summary: "Jira fixture " + k,
+  status: { name: "To Do", statusCategory: { key: "new" } }, project: { key: "ENG" },
+  issuetype: { name: "Story", hierarchyLevel: 0 },
+  issuelinks: [], subtasks: [], remoteLinks: [], ...extra,
+});
+if (key === "ENG-1") {
+  console.log(JSON.stringify({ apiVersion: "v2", data: [issue("ENG-1", {
+    issuelinks: [{ id: "1", type: { name: "Blocks" }, inwardIssue: { key: "ENG-2" } }],
+  })] }));
+} else if (key === "ENG-2") {
+  console.log(JSON.stringify({ apiVersion: "v2", data: [issue("ENG-2")] }));
+} else {
+  console.log(JSON.stringify({ apiVersion: "v2", command: "jira.workitem.get", data: { ok: false, error: { code: "TWG_COMMAND_FAILED", message: "not found" } } }));
+  process.exit(1);
+}
+`;
+
 const guard = `
 const assert = require("node:assert/strict");
 const { readdirSync } = require("node:fs");
 assert.equal(process.release.name, "node", "consumer must run under Node.js");
 const bin = process.env.PACKAGE_TEST_BIN;
 assert.ok(bin, "consumer requires an isolated tool directory");
-assert.deepEqual(readdirSync(bin).sort(), ["dirname", "gh", "node", "package.json", "pnpm", "sed", "uname"]);
+assert.deepEqual(readdirSync(bin).sort(), ["dirname", "gh", "node", "package.json", "pnpm", "sed", "twg", "uname"]);
 process.env.PATH = bin;
 require("node:net").Socket.prototype.connect = function () {
   throw new Error("Network forbidden in package smoke consumer");
@@ -219,6 +244,7 @@ const core = await import(name);
 const { httpTransport } = await import(name + "/transport/http");
 const { shellTransport } = await import(name + "/transport/shell");
 const { linearReader } = await import(name + "/transport/linear");
+const { twgJiraReader } = await import(name + "/transport/twg");
 assert.ok(import.meta.resolve(name).endsWith("/dist/index.js"));
 assert.equal(typeof core.crawl, "function");
 assert.equal(typeof core.parseNodeResponse, "function");
@@ -226,6 +252,8 @@ assert.equal(typeof core.collectStatus, "function");
 assert.equal(typeof httpTransport, "function");
 assert.equal(typeof shellTransport, "function");
 assert.equal(typeof linearReader, "function");
+assert.equal(typeof twgJiraReader, "function");
+assert.equal(typeof core.buildJiraGraph, "function");
 assert.equal(typeof core.buildLinearGraph, "function");
 assert.equal(typeof core.buildLinearProject, "function");
 assert.equal(typeof core.linearDashboardModel, "function");
@@ -298,6 +326,8 @@ try {
   writeFileSync(join(bin, "package.json"), JSON.stringify({ type: "commonjs" }));
   writeFileSync(join(bin, "gh"), fakeGh);
   chmodSync(join(bin, "gh"), 0o755);
+  writeFileSync(join(bin, "twg"), fakeTwg);
+  chmodSync(join(bin, "twg"), 0o755);
   const guardPath = join(owned, "guard.cjs");
   writeFileSync(guardPath, guard);
   for (const dir of [consumer, dlxConsumer]) {
@@ -485,11 +515,13 @@ try {
   assert.equal(manifest.exports["./transport/http"].import, "./dist/transports/http.js");
   assert.equal(manifest.exports["./transport/shell"].import, "./dist/transports/shell.js");
   assert.equal(manifest.exports["./transport/linear"].import, "./dist/transports/linear.js");
+  assert.equal(manifest.exports["./transport/twg"].import, "./dist/transports/twg.js");
   assert.equal(manifest.types, "./dist/index.d.ts");
   assert.equal(manifest.exports["."].types, "./dist/index.d.ts");
   assert.equal(manifest.exports["./transport/http"].types, "./dist/transports/http.d.ts");
   assert.equal(manifest.exports["./transport/shell"].types, "./dist/transports/shell.d.ts");
   assert.equal(manifest.exports["./transport/linear"].types, "./dist/transports/linear.d.ts");
+  assert.equal(manifest.exports["./transport/twg"].types, "./dist/transports/twg.d.ts");
   assert.equal(
     readFileSync(join(installed, "dist/bin.js"), "utf8").split("\n")[0],
     "#!/usr/bin/env node",
@@ -531,11 +563,25 @@ try {
   assert.equal(linearProject.scope.issues, "project");
   assert.equal(linearProject.inventory.complete, true);
   assert.equal(linearProject.nodes.length, 2);
+  assert.match(invoke(["jira", "--help"]).stdout, /twg jira workitem get/);
+  const jiraReport = JSON.parse(
+    invoke(["jira", "ENG-1", "--site", "fixture.atlassian.net", "--json"], 0).stdout,
+  );
+  assert.equal(jiraReport.coverageComplete, true);
+  assert.deepEqual(
+    jiraReport.nodes.map((node: { identifier: string }) => node.identifier),
+    ["ENG-1", "ENG-2"],
+  );
+  assert.match(
+    invoke(["jira", "ENG-9", "--site", "fixture.atlassian.net"], 1).stderr,
+    /TWG_COMMAND_FAILED/,
+  );
   const schema = JSON.parse(invoke(["schema"]).stdout);
   assert.equal(schema.name, "issue-graph");
   assert.deepEqual(schema.exitCodes, { success: 0, runtimeFailure: 1, usageError: 2 });
   assert.ok(schema.commands.status);
   assert.ok(schema.commands.graph);
+  assert.equal(schema.commands.jira.remoteMutations, false);
   assert.match(invoke([], 2).stderr, /usage: issue-graph/);
   assert.match(invoke(["--not-a-real-option"], 2).stderr, /unknown flag/);
   assert.match(invoke(["status", "--repo", fixtureRepo], 2).stderr, /requires --repo and --author/);
@@ -806,7 +852,7 @@ try {
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 59 : 60;
+  const expectedChecks = suppliedTarball ? 62 : 63;
   assert.equal(
     checks,
     expectedChecks,

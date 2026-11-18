@@ -1,8 +1,8 @@
 ---
 title: Troubleshooting
 navTitle: Troubleshooting
-description: Diagnose GitHub and Linear sign-in failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
-lastModified: 2026-11-07
+description: Diagnose GitHub and Linear sign-in failures, Jira read failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
+lastModified: 2026-11-16
 ---
 
 ## GitHub requests fail
@@ -27,7 +27,7 @@ Graph, status, reconcile, and plan read GitHub through the GitHub CLI. When `gh`
 
 ## A command exits with code 1 after printing a report
 
-`status` and `linear` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
+`status`, `linear`, and `jira` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
 
 For `status`, stderr ends with `INCOMPLETE_INVENTORY: some counts are unknown; inspect coverage and rerun.` Unknown counts print as `?` in the table and as `null` in JSON. Common causes:
 
@@ -37,6 +37,8 @@ For `status`, stderr ends with `INCOMPLETE_INVENTORY: some counts are unknown; i
 With `--since`, `INCOMPLETE_HISTORY` means some transitions could not be verified. See [Status and history](/docs/status).
 
 For `linear`, `coverageComplete` is false when a node cannot be read, a connection stops at the `--max-pages` limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Nodes that could not be read print `Read failed:` followed by an error code. Depth boundaries are listed in the coverage but do not make the result partial. Raise the limit that stopped the crawl, or start a new run from an unexpanded hub. See [Linear](/docs/linear) for the limits and ranges.
+
+For `jira`, `coverageComplete` is false when an issue cannot be read, `twg` returns a warning for an issue, an expanded epic, other issue above the sub-task level, issue with an unknown hierarchy level, or issue whose `subtasks` field is missing or null has children that aren't read, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable issues print `Read failed:` followed by an error code, and the run fails before printing a report when the first issue can't be read. See [Jira read failures](#jira-read-failures).
 
 `graph`, `open`, and `rank` print partial results without changing the exit code. Check the report instead:
 
@@ -69,6 +71,17 @@ issue-graph linear login
 ```
 
 If `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses it instead of the session, so check or replace that value. `issue-graph linear status` shows which credential the CLI uses. If an expired session cannot be refreshed, the command prints a message starting with `Linear sign-in failed`; run `issue-graph linear login` again in that case too.
+
+## Jira read failures
+
+`issue-graph jira` prints `Jira read failed (CODE)` followed by the reason from `twg`. Common codes:
+
+- `TWG_NOT_FOUND`: `twg` isn't installed or isn't on `PATH`. Install it from the [twg repository](https://github.com/atlassian/twg-cli).
+- `TWG_FAILED` or a code reported by `twg`: the command failed, often because you aren't signed in or can't read the issue. Run `twg login`, or check the issue with `twg jira workitem get ABC-123 --site your-site`. A reason that names an unknown option or an invalid `--output-summary` value means `twg` is older than 1.4; update it.
+- `TIMEOUT`: `twg` didn't finish within 60 seconds.
+- `SITE_MISMATCH`: the issue's web URL names a different site than `--site` or the browse URL.
+- `SITE_UNKNOWN`: neither `--site`, a browse URL, nor the `twg` response names the site, or a browse URL is combined with a `--site` cloud ID and the response doesn't name the site to confirm they match. Pass `--site` with the site's domain.
+- `IDENTITY_MISMATCH`: `twg` returned a different key, usually because the issue moved to another project. Start from the new key.
 
 ## Linear rate limits
 

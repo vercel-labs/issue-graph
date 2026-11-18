@@ -48,7 +48,7 @@ export function GET() {
       agentSetupPrompt,
       "```",
       "",
-      "Capture a GitHub repository or a Linear workspace, filter saved work, and open the exact dashboard view before making changes. GitHub and Linear access is read-only. Captures and query history write local files. Query requires a saved capture.",
+      "Capture a GitHub repository or a Linear workspace, filter saved work, and open the exact dashboard view before making changes. GitHub and Linear access is read-only. Jira access through twg is read-only too. Captures and query history write local files. Query requires a saved capture.",
       "",
       "## Command examples",
       "",

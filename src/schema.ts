@@ -248,6 +248,42 @@ export const ISSUE_GRAPH_SCHEMA = {
         validation: "rejects foreign or duplicate member keys; unassigned nodes stay visible",
       },
     },
+    jira: {
+      remoteMutations: false,
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest site and seed-project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+      ],
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json", "html"],
+      authentication:
+        "the twg session from `twg login`; issue-graph reads and stores no Atlassian credential",
+      transport:
+        "twg jira workitem get KEY --fields ... --remote-links --output json --output-summary=none [--site SITE], one process per issue, no shell",
+      required: ["Jira issue key (ABC-123) or https://<site>/browse/ABC-123 URL"],
+      requires: "twg 1.4 or later",
+      site: "--site prefix, domain, or cloud ID; a browse URL names the site; a --site domain must equal each issue's site and a prefix must be its first label; a cloud ID with a browse URL is checked against the site twg reports for the first issue; default is the twg default site; node keys use the site from the issue's web url or site-hosted REST self link",
+      maxDepth: { default: 1, minimum: 0, maximum: 8 },
+      maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+      hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
+      concurrency: { default: 4, minimum: 1, maximum: 16 },
+      relationships: ["issuelinks", "parent", "subtasks", "remoteLinks"],
+      crossProject: "links into other projects are read at the next depth and not expanded",
+      dashboard:
+        "--html PATH or --open writes the explorer and saves model jira:<site>:project:<KEY> for dashboard and query; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
+      exclusions: [
+        "text mentions",
+        "fetching remote link targets",
+        "comments",
+        "children of an epic or higher-level issue, or of an issue that is not a sub-task and whose type has no hierarchy level or whose subtasks field is missing or null; an expanded issue is marked partial, one at the depth limit is listed as a depth boundary",
+      ],
+      failures:
+        "unreadable, renamed, or other-site linked issues stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; TWG warnings or partial TWG coverage mark the issue partial",
+      exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
+      jsonFlag: "--json emits the report on stdout; takes no path",
+      description:
+        "Read a bounded Jira neighborhood through the Atlassian Teamwork Graph CLI with site-scoped identities, native link direction, and explicit coverage gaps, and save it to the dashboard.",
+    },
     query: {
       providerMutations: false,
       network: false,

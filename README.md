@@ -13,7 +13,7 @@ Find related issues and pull requests before you start work. For humans and agen
   <img alt="issue-graph: open issues and pull requests from vercel-labs/portless grouped into five root-cause clusters, such as proxy port allocation and TLS trust" src="https://issue-graph.dev/readme-hero-light.png">
 </picture>
 
-issue-graph reads GitHub issues and pull requests, or Linear issues, and follows the references between them: closing links, mentions, cross-references, and Linear relations. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub and Linear. Crawling, graph classification, and ranking need no model; semantic `classify` inference can incur charges, so preview it first with `--dry-run`.
+issue-graph reads GitHub issues and pull requests, Linear issues, or Jira issues, and follows the references between them: closing links, mentions, cross-references, Linear relations, and Jira issue links. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub, Linear, and Jira. Crawling, graph classification, and ranking need no model; semantic `classify` inference can incur charges, so preview it first with `--dry-run`.
 
 ## Install
 
@@ -47,6 +47,12 @@ For Linear, connect once in the browser, then capture an issue neighborhood or a
 issue-graph linear login
 issue-graph linear ENG-123 --workspace your-workspace --open
 issue-graph linear --project <project-uuid> --open
+```
+
+For Jira, sign in to the [Atlassian Teamwork Graph CLI](https://github.com/atlassian/twg-cli) with `twg login`, then read an issue neighborhood:
+
+```bash
+issue-graph jira ABC-123 --site your-site --open
 ```
 
 The full walkthrough is in [Get started](https://issue-graph.dev/docs/get-started).
@@ -112,7 +118,7 @@ Run `issue-graph --help` for the full list, or `issue-graph <command> --help` fo
 
 | Group | Commands | Docs |
 | --- | --- | --- |
-| Map work | `open`, `graph`, `linear` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear) |
+| Map work | `open`, `graph`, `linear`, `jira` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear), [Jira](https://issue-graph.dev/docs/jira) |
 | Prioritize | `rank`, `cluster`, `reconcile`, `plan` | [Backlog](https://issue-graph.dev/docs/backlog), [Agents](https://issue-graph.dev/docs/agents) |
 | Dashboard | `dashboard`, `query`, `runs`, `config` | [Dashboard](https://issue-graph.dev/docs/dashboard) |
 | Semantic suggestions | `classify` | [Semantic suggestions](https://issue-graph.dev/docs/classify) |

@@ -23,6 +23,7 @@ import {
   type Model,
 } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
+import { runJira } from "./jira-cli.js";
 import { loginLinear, sessionStore } from "./linear-auth.js";
 import {
   type LinearCredential,
@@ -74,6 +75,7 @@ Run with no arguments inside a GitHub repository to open its backlog dashboard.
 
 commands
   linear <issue>          read Linear issue relationships or capture --project UUID
+  jira <issue>            read Jira issue links through the Atlassian TWG CLI (twg)
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
   rank [repo]              what to fix first, by discussion heat
@@ -464,6 +466,32 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
       stdout: (value) => process.stdout.write(value),
       stderr: (value) => process.stderr.write(value),
     });
+    return;
+  }
+  if (argv[0] === "jira") {
+    process.exitCode = await runJira(
+      argv.slice(1),
+      async (site) => {
+        const { twgJiraReader } = await import("./transports/twg.js");
+        return twgJiraReader({ site });
+      },
+      {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        dashboard: async (report, options) => {
+          const { jiraDashboardModel } = await import("./jira-html.js");
+          const model = jiraDashboardModel(report, options.clusters);
+          const name = model.id.replace(/[^a-z0-9.-]+/gi, "-");
+          const out = options.path || privateExportPath(`issue-graph-${name}.html`);
+          writeNextDashboard(out, [model], modelDefaults([model]));
+          process.stderr.write(`wrote ${out}\n`);
+          if (options.save)
+            process.stderr.write(`dashboard run saved: ${writeDashboardModel(model.id, model)}\n`);
+          if (options.open) openInBrowser(out);
+        },
+      },
+    );
     return;
   }
   if (argv[0] === "linear" && ["login", "logout", "status"].includes(argv[1] ?? "")) {

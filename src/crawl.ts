@@ -95,7 +95,7 @@ export async function crawlGraph<TNode extends CrawlNode>(
         );
       }
       nodes.set(current.key, node);
-      if (current.depth >= opts.maxDepth) continue;
+      if (current.depth >= opts.maxDepth || opts.expand?.(current.key) === false) continue;
       if (!seedKeys.has(current.key) && linkCount(node) > opts.hubThreshold) {
         node.hub = true;
         continue;
