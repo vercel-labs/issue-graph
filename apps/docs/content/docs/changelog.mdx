@@ -3,6 +3,22 @@ title: Changelog
 description: Release notes for issue-graph, covering agent guidance, CLI updates, and documentation.
 ---
 
+## 0.7.0
+
+### Features
+
+- `issue-graph jira <issue>` reads a Jira issue neighborhood through the Atlassian Teamwork Graph CLI (`twg` 1.4 or later): issue links in both directions with their native type, parents, subtasks, and remote links, with site-scoped identifiers. Links into other projects are read one hop. `--html` and `--open` save the run to the dashboard next to GitHub and Linear projects, so `dashboard` and `query` read it offline.
+- The GitHub crawl follows sub-issue links, so an epic reaches sub-issues it never mentions and a sub-issue reaches its parent. Reports and the dashboard show them as `parent of` and `child of`. Sub-issue links add no Heat and never count as closing links.
+
+### Fixes
+
+- The hub threshold counts distinct linked items, so an epic that also lists its sub-issues in a task list counts each one once.
+
+### Documentation
+
+- Add a Jira guide and a Jira card on the landing page, and describe Jira in the README, `schema`, security, and the bundled agent guide.
+
+
 ## 0.6.1
 
 ### Features
@@ -17,7 +33,6 @@ description: Release notes for issue-graph, covering agent guidance, CLI updates
 
 - The bundled agent guide no longer says live Linear collection is unavailable.
 - Docs pages follow the technical-writer style, and the README hero shows clusters in light and dark themes.
-
 
 ## 0.6.0
 
