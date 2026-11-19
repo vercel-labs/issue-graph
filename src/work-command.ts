@@ -22,13 +22,13 @@ export interface WorkLimitsInput {
   concurrency: number;
 }
 
-/** One neighborhood command (`issue-graph jira`, `issue-graph gitlab`, ...). */
+/** One neighborhood command, such as `issue-graph jira`. */
 export interface WorkCommand<TReport extends WorkReport, TReader> {
   /** Provider name in messages: "Jira". */
   name: string;
   usage: string;
   maxConcurrency: number;
-  /** The provider's authority flag, such as `--site` or `--host`. */
+  /** The provider's authority flag, such as `--site`. */
   authority: { flag: string; missing: string; parse(value: string): string };
   /** "Specify exactly one Jira issue". */
   oneSeed: string;

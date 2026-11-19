@@ -5,18 +5,18 @@ issue-graph reads how issues and pull requests connect in a tracker and reports 
 ## Language
 
 **Provider**:
-A tracker issue-graph reads from: GitHub, Linear, Jira, GitLab, YouTrack.
+A tracker issue-graph reads from: GitHub, Linear, Jira.
 _Avoid_: source, backend, integration
 
 **Work provider**:
 A provider other than GitHub, read one neighborhood at a time into work nodes. It follows only the relationships the tracker stores.
 
 **Authority**:
-The tracker instance that names a node: a Jira site, a GitLab host, a YouTrack base URL, or a Linear workspace. Two nodes with the same identifier on different authorities are different nodes.
+The tracker instance that names a node: a Jira site or a Linear workspace. Two nodes with the same identifier on different authorities are different nodes.
 _Avoid_: instance, server, tenant
 
 **Seed**:
-The issue or merge request a run starts from.
+The issue or pull request a run starts from.
 
 **Neighborhood**:
 The nodes reachable from the seed within the requested depth. References into another project are read one hop and not followed.
@@ -54,7 +54,3 @@ A URL attached to a node that points outside the provider. It is reported, never
 - A **Run** starts from one **Seed** on one **Authority** and reads a **Neighborhood**.
 - Every **Node** in a run is either read or an **Unavailable node**; a read node can also be a **Partial node**, a **Hub**, or a **Depth boundary**.
 - A **Complete run** has an empty failed, partial, capped-out, and hub **Coverage** bucket.
-
-## Flagged ambiguities
-
-- "Site" (Jira) and "host" (GitLab) both mean **Authority**; keep the provider word in flags and messages, use **Authority** in shared code.
