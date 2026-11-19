@@ -204,7 +204,7 @@ function dashboardModelFile(repo: string, forWrite: boolean): string | undefined
     file: path.join(dir, `${name}.json`),
     readable: name === base,
   }));
-  const read = (file: string): { id?: unknown } | undefined => {
+  const read = (file: string): { id?: unknown; repo?: unknown } | undefined => {
     try {
       return JSON.parse(fs.readFileSync(file, "utf8"));
     } catch {
@@ -212,11 +212,13 @@ function dashboardModelFile(repo: string, forWrite: boolean): string | undefined
     }
   };
   const saved = candidates.map((candidate) => ({ ...candidate, model: read(candidate.file) }));
-  // Models saved without an id predate the hash suffix and own the readable name.
-  const owned = saved.find(
-    ({ model, readable }) =>
-      model !== undefined && (model?.id === repo || (model?.id === undefined && readable)),
-  );
+  // A model's id names its run, or its repo when it has no id. A model with neither predates the
+  // hash suffix and owns the readable name.
+  const owned = saved.find(({ model, readable }) => {
+    if (model === undefined) return false;
+    const identity = model.id ?? model.repo;
+    return identity === undefined ? readable : identity === repo;
+  });
   if (owned || !forWrite) return owned?.file;
   // A missing or unreadable file is free to write.
   return saved.find(({ model }) => model === undefined)?.file;

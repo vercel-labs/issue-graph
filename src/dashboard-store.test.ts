@@ -46,6 +46,18 @@ test("a run in the hashed file keeps it after the readable file is removed", () 
   expect(readDashboardModels()).toEqual([{ id: b, n: 2 }]);
 });
 
+test("a run without an id keeps answering after it lands in the hashed file", () => {
+  const repo = "acme/api";
+  const other = "acme:api";
+  writeDashboardModel(other, { id: other, n: 1 });
+  const file = writeDashboardModel(repo, { repo, n: 2 });
+  expect(path.basename(file)).not.toBe("acme_api.json");
+  expect(readDashboardModel(repo)).toEqual({ repo, n: 2 });
+  expect(writeDashboardModel(repo, { repo, n: 3 })).toBe(file);
+  expect(removeDashboardRun(repo)).toBe(true);
+  expect(readDashboardModel(other)).toEqual({ id: other, n: 1 });
+});
+
 test("a model saved without an id keeps its readable file name", () => {
   fs.mkdirSync(dashboardDir(), { recursive: true });
   const legacy = path.join(dashboardDir(), "acme_api.json");
