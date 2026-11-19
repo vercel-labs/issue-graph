@@ -63,6 +63,9 @@ export const WORK_LIMIT_RANGES = {
   hubThreshold: [1, 1000],
 } as const;
 
+/** The accepted `[minimum, maximum]` for a provider's concurrency. */
+export const concurrencyRange = (maximum: number): readonly [number, number] => [1, maximum];
+
 /** Rejects limits outside the ranges every work provider accepts. */
 export function validateWorkLimits(
   options: WorkLimits,
@@ -73,7 +76,7 @@ export function validateWorkLimits(
     ["maxDepth", options.maxDepth, ...WORK_LIMIT_RANGES.maxDepth],
     ["maxNodes", options.maxNodes, ...WORK_LIMIT_RANGES.maxNodes],
     ["hubThreshold", options.hubThreshold, ...WORK_LIMIT_RANGES.hubThreshold],
-    ["concurrency", options.concurrency ?? 4, 1, maxConcurrency],
+    ["concurrency", options.concurrency ?? 4, ...concurrencyRange(maxConcurrency)],
     ...extra,
   ];
   for (const [name, value, minimum, maximum] of checks) {

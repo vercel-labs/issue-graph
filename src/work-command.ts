@@ -1,5 +1,5 @@
 import { parseWorkClusters, workClusterPrompt } from "./work-clusters.js";
-import { WORK_LIMIT_RANGES, type WorkReport } from "./work-report.js";
+import { concurrencyRange, WORK_LIMIT_RANGES, type WorkReport } from "./work-report.js";
 
 export interface WorkDashboardOptions {
   path?: string;
@@ -96,7 +96,9 @@ export async function runWorkCommand<TReport extends WorkReport, TReader>(
       else if (Object.hasOwn(integers, arg)) {
         const name = integers[arg as keyof typeof integers];
         const [minimum, maximum] =
-          name === "concurrency" ? [1, command.maxConcurrency] : WORK_LIMIT_RANGES[name];
+          name === "concurrency"
+            ? concurrencyRange(command.maxConcurrency)
+            : WORK_LIMIT_RANGES[name];
         const raw = argv[++index];
         const value = Number(raw);
         if (!raw || !/^\d+$/.test(raw) || value < minimum || value > maximum)
