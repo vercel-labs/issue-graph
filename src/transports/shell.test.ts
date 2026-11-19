@@ -1,5 +1,8 @@
-import { expect, describe as suite, test } from "vitest";
-import { decodeStdout, describe } from "./shell.js";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
+import { afterEach, expect, describe as suite, test, vi } from "vitest";
+import { decodeStdout, describe, shellTransport } from "./shell.js";
 
 /** Shape of the error `execFileSync` throws on a non-zero exit. */
 const exitError = (stdout: string, stderr = "") =>
@@ -36,5 +39,32 @@ suite("describe", () => {
   test("falls back to the error message when stderr is empty", () => {
     expect(describe(exitError("", "  "))).toBe("Command failed: gh");
     expect(describe(new Error("spawn ENOENT"))).toBe("spawn ENOENT");
+  });
+});
+
+suite("shellTransport", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const fakeGh = () => {
+    const bin = mkdtempSync(join(tmpdir(), "issue-graph-gh-"));
+    const log = join(bin, "hosts.log");
+    writeFileSync(
+      join(bin, "gh"),
+      `#!/bin/sh\nprintf '%s\\n' "$GH_HOST" >> '${log}'\nprintf '{"data":{}}'\n`,
+    );
+    chmodSync(join(bin, "gh"), 0o755);
+    vi.stubEnv("PATH", `${bin}${delimiter}${process.env.PATH ?? ""}`);
+    return log;
+  };
+
+  test("a pinned hostname overrides the ambient GH_HOST", async () => {
+    const log = fakeGh();
+    vi.stubEnv("GH_HOST", "ghe.internal.example.com");
+    const transport = shellTransport({ hostname: "github.com" });
+    await transport.graphql("query Q { viewer { login } }");
+    await transport.search("repo:o/r", 1);
+    expect(readFileSync(log, "utf8")).toBe("github.com\ngithub.com\n");
   });
 });

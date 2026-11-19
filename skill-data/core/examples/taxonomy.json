@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "repo": "owner/repo",
+  "version": "1",
+  "components": [
+    {
+      "id": "cli",
+      "description": "Command parsing and terminal output, excluding browser views and saved data.",
+      "examples": ["The list command rejects a documented option."]
+    },
+    {
+      "id": "web",
+      "description": "Browser navigation, forms and visual presentation, excluding command-line behavior.",
+      "examples": ["The search form hides its submit button on narrow screens."]
+    },
+    {
+      "id": "storage",
+      "description": "Saving and loading application data, excluding how that data is displayed.",
+      "examples": ["A saved workspace cannot be reopened after restarting."]
+    }
+  ]
+}

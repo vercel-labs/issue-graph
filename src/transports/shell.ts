@@ -10,6 +10,10 @@
 import { execFile, execFileSync } from "node:child_process";
 import { type GhTransport, GhTransportError, paginate, type SeedRef } from "../transport.js";
 
+function ghEnv(hostname?: string): NodeJS.ProcessEnv | undefined {
+  return hostname ? { ...process.env, GH_HOST: hostname } : undefined;
+}
+
 /**
  * Run `gh` and return stdout. Throws on non-zero exit.
  *
@@ -17,20 +21,21 @@ import { type GhTransport, GhTransportError, paginate, type SeedRef } from "../t
  * makes `gh` print "Could not resolve…", which is expected during a crawl and
  * should not leak into the caller's output. It stays on the thrown error.
  */
-export function gh(args: string[]): string {
+export function gh(args: string[], hostname?: string): string {
   return execFileSync("gh", args, {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
+    env: ghEnv(hostname),
   });
 }
 
-export function ghAsync(args: string[]): Promise<string> {
+export function ghAsync(args: string[], hostname?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "gh",
       args,
-      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: ghEnv(hostname) },
       (error, stdout, stderr) => {
         if (error) {
           reject(Object.assign(error, { stdout, stderr }));
@@ -81,7 +86,15 @@ export function decodeStdout(err: unknown): unknown | null {
   }
 }
 
-export function shellTransport(): GhTransport {
+export interface ShellTransportOptions {
+  /**
+   * Run every `gh` call against this host. Without it, `gh` picks the host from
+   * `GH_HOST` or its own config, which may be a private server.
+   */
+  hostname?: string;
+}
+
+export function shellTransport(options: ShellTransportOptions = {}): GhTransport {
   return {
     async graphql(query, variables = {}) {
       const args = ["api", "graphql", "-f", `query=${query}`];
@@ -89,7 +102,7 @@ export function shellTransport(): GhTransport {
         args.push(typeof v === "number" ? "-F" : "-f", `${k}=${v}`);
       }
       try {
-        return JSON.parse(await ghAsync(args));
+        return JSON.parse(await ghAsync(args, options.hostname));
       } catch (err) {
         // `gh api graphql` exits non-zero for a GraphQL-level error too, and
         // "Could not resolve to an issue with the number of N" is an ordinary
@@ -106,10 +119,10 @@ export function shellTransport(): GhTransport {
       const q = encodeURIComponent(query);
       const items = await paginate(limit, async (page, perPage) => {
         try {
-          const raw = await ghAsync([
-            "api",
-            `search/issues?q=${q}&per_page=${perPage}&page=${page}`,
-          ]);
+          const raw = await ghAsync(
+            ["api", `search/issues?q=${q}&per_page=${perPage}&page=${page}`],
+            options.hostname,
+          );
           return (JSON.parse(raw) as { items?: SearchItem[] }).items ?? [];
         } catch (err) {
           throw new GhTransportError(`gh api search failed: ${describe(err)}`);
