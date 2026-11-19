@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { stateHome } from "./local-store.js";
@@ -190,11 +191,34 @@ export function dashboardDir(): string {
   return path.join(stateHome(), "dashboard");
 }
 
+/**
+ * The file that holds a run's model. Names keep the readable form `owner_repo.json`; when two
+ * ids reduce to the same name (`a/b_c` and `a_b/c`), the later one gets a hash suffix.
+ */
+function dashboardModelFile(repo: string, forWrite: boolean): string | undefined {
+  const dir = dashboardDir();
+  const base = repo.replace(/[^\w.-]/g, "_");
+  const hash = createHash("sha256").update(repo).digest("hex").slice(0, 12);
+  for (const name of [base, `${base}~${hash}`]) {
+    const file = path.join(dir, `${name}.json`);
+    let saved: { id?: unknown };
+    try {
+      saved = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch {
+      // A missing or unreadable file is free to write.
+      if (forWrite) return file;
+      continue;
+    }
+    // Models saved without an id predate the hash suffix and own the readable name.
+    if (saved?.id === repo || (saved?.id === undefined && name === base)) return file;
+  }
+  return undefined;
+}
+
 /** Save one run's explorer model, replacing the previous one for that repository. */
 export function writeDashboardModel(repo: string, model: unknown): string {
-  const dir = dashboardDir();
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const file = path.join(dir, `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  fs.mkdirSync(dashboardDir(), { recursive: true, mode: 0o700 });
+  const file = dashboardModelFile(repo, true) as string;
   fs.writeFileSync(file, JSON.stringify(model), { mode: 0o600 });
   return file;
 }
@@ -250,17 +274,17 @@ export function listDashboardRuns(): Array<{
 
 /** Delete one repository's saved run; false when there was none. */
 export function removeDashboardRun(repo: string): boolean {
-  const file = path.join(dashboardDir(), `${repo.replace(/[^\w.-]/g, "_")}.json`);
-  if (!fs.existsSync(file)) return false;
+  const file = dashboardModelFile(repo, false);
+  if (!file) return false;
   fs.rmSync(file);
   return true;
 }
 
 /** One repository's saved run, or undefined when there is none or it cannot be read. */
 export function readDashboardModel<T>(repo: string): T | undefined {
-  const file = path.join(dashboardDir(), `${repo.replace(/[^\w.-]/g, "_")}.json`);
+  const file = dashboardModelFile(repo, false);
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+    return file ? (JSON.parse(fs.readFileSync(file, "utf8")) as T) : undefined;
   } catch {
     return undefined;
   }
