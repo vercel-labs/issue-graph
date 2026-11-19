@@ -175,13 +175,38 @@ if (key === "ENG-1") {
 }
 `;
 
+const fakeGlab = String.raw`#!/usr/bin/env node
+const assert = require("node:assert/strict");
+const args = process.argv.slice(2);
+if (args[0] === "version") {
+  console.log("glab 1.126.0 (fixture)");
+  process.exit(0);
+}
+assert.deepEqual(args.slice(0, 5), ["api", "--method", "GET", "--hostname", "gitlab.fixture.test"]);
+const path = args[5];
+const root = "projects/eng%2Fplatform%2Fapi/";
+if (path === root + "issues/1") {
+  console.log(JSON.stringify({ id: 1, iid: 1, title: "GitLab fixture issue", state: "opened", web_url: "https://gitlab.fixture.test/eng/platform/api/-/work_items/1" }));
+} else if (path === root + "merge_requests/1") {
+  console.log(JSON.stringify({ id: 2, iid: 1, title: "GitLab fixture MR", state: "merged", web_url: "https://gitlab.fixture.test/eng/platform/api/-/merge_requests/1" }));
+} else if (path.startsWith(root + "issues/1/closed_by")) {
+  console.log(JSON.stringify([{ web_url: "https://gitlab.fixture.test/eng/platform/api/-/merge_requests/1" }]));
+} else if (path.startsWith(root + "issues/9")) {
+  console.log(JSON.stringify({ message: "404 Not found" }));
+  console.error("glab: 404 Not found (HTTP 404)");
+  process.exit(1);
+} else {
+  console.log("[]");
+}
+`;
+
 const guard = `
 const assert = require("node:assert/strict");
 const { readdirSync } = require("node:fs");
 assert.equal(process.release.name, "node", "consumer must run under Node.js");
 const bin = process.env.PACKAGE_TEST_BIN;
 assert.ok(bin, "consumer requires an isolated tool directory");
-assert.deepEqual(readdirSync(bin).sort(), ["dirname", "gh", "node", "package.json", "pnpm", "sed", "twg", "uname"]);
+assert.deepEqual(readdirSync(bin).sort(), ["dirname", "gh", "glab", "node", "package.json", "pnpm", "sed", "twg", "uname"]);
 process.env.PATH = bin;
 require("node:net").Socket.prototype.connect = function () {
   throw new Error("Network forbidden in package smoke consumer");
@@ -245,6 +270,7 @@ const { httpTransport } = await import(name + "/transport/http");
 const { shellTransport } = await import(name + "/transport/shell");
 const { linearReader } = await import(name + "/transport/linear");
 const { twgJiraReader } = await import(name + "/transport/twg");
+const { glabGitLabReader } = await import(name + "/transport/glab");
 assert.ok(import.meta.resolve(name).endsWith("/dist/index.js"));
 assert.equal(typeof core.crawl, "function");
 assert.equal(typeof core.parseNodeResponse, "function");
@@ -253,6 +279,8 @@ assert.equal(typeof httpTransport, "function");
 assert.equal(typeof shellTransport, "function");
 assert.equal(typeof linearReader, "function");
 assert.equal(typeof twgJiraReader, "function");
+assert.equal(typeof glabGitLabReader, "function");
+assert.equal(typeof core.buildGitLabGraph, "function");
 assert.equal(typeof core.buildJiraGraph, "function");
 assert.equal(typeof core.buildLinearGraph, "function");
 assert.equal(typeof core.buildLinearProject, "function");
@@ -328,6 +356,8 @@ try {
   chmodSync(join(bin, "gh"), 0o755);
   writeFileSync(join(bin, "twg"), fakeTwg);
   chmodSync(join(bin, "twg"), 0o755);
+  writeFileSync(join(bin, "glab"), fakeGlab);
+  chmodSync(join(bin, "glab"), 0o755);
   const guardPath = join(owned, "guard.cjs");
   writeFileSync(guardPath, guard);
   for (const dir of [consumer, dlxConsumer]) {
@@ -489,12 +519,14 @@ try {
   assert.equal(manifest.exports["./transport/shell"].import, "./dist/transports/shell.js");
   assert.equal(manifest.exports["./transport/linear"].import, "./dist/transports/linear.js");
   assert.equal(manifest.exports["./transport/twg"].import, "./dist/transports/twg.js");
+  assert.equal(manifest.exports["./transport/glab"].import, "./dist/transports/glab.js");
   assert.equal(manifest.types, "./dist/index.d.ts");
   assert.equal(manifest.exports["."].types, "./dist/index.d.ts");
   assert.equal(manifest.exports["./transport/http"].types, "./dist/transports/http.d.ts");
   assert.equal(manifest.exports["./transport/shell"].types, "./dist/transports/shell.d.ts");
   assert.equal(manifest.exports["./transport/linear"].types, "./dist/transports/linear.d.ts");
   assert.equal(manifest.exports["./transport/twg"].types, "./dist/transports/twg.d.ts");
+  assert.equal(manifest.exports["./transport/glab"].types, "./dist/transports/glab.d.ts");
   assert.equal(
     readFileSync(join(installed, "dist/bin.js"), "utf8").split("\n")[0],
     "#!/usr/bin/env node",
@@ -549,12 +581,26 @@ try {
     invoke(["jira", "ENG-9", "--site", "fixture.atlassian.net"], 1).stderr,
     /TWG_COMMAND_FAILED/,
   );
+  assert.match(invoke(["gitlab", "--help"]).stdout, /glab api --method GET/);
+  const gitlabReport = JSON.parse(
+    invoke(["gitlab", "eng/platform/api#1", "--host", "gitlab.fixture.test", "--json"], 0).stdout,
+  );
+  assert.equal(gitlabReport.coverageComplete, true);
+  assert.deepEqual(
+    gitlabReport.nodes.map((node: { identifier: string }) => node.identifier),
+    ["eng/platform/api#1", "eng/platform/api!1"],
+  );
+  assert.match(
+    invoke(["gitlab", "eng/platform/api#9", "--host", "gitlab.fixture.test"], 1).stderr,
+    /NOT_FOUND/,
+  );
   const schema = JSON.parse(invoke(["schema"]).stdout);
   assert.equal(schema.name, "issue-graph");
   assert.deepEqual(schema.exitCodes, { success: 0, runtimeFailure: 1, usageError: 2 });
   assert.ok(schema.commands.status);
   assert.ok(schema.commands.graph);
   assert.equal(schema.commands.jira.remoteMutations, false);
+  assert.equal(schema.commands.gitlab.remoteMutations, false);
   assert.match(invoke([], 2).stderr, /usage: issue-graph/);
   assert.match(invoke(["--not-a-real-option"], 2).stderr, /unknown flag/);
   assert.match(invoke(["status", "--repo", fixtureRepo], 2).stderr, /requires --repo and --author/);
@@ -812,7 +858,7 @@ try {
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 61 : 62;
+  const expectedChecks = suppliedTarball ? 64 : 65;
   assert.equal(
     checks,
     expectedChecks,

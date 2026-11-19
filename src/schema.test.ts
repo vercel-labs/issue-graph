@@ -65,6 +65,13 @@ describe("ISSUE_GRAPH_SCHEMA", () => {
     expect(jira.concurrency).toEqual({ default: 4, minimum: 1, maximum: 16 });
   });
 
+  test("publishes the read-only GitLab contract", () => {
+    const gitlab = ISSUE_GRAPH_SCHEMA.commands.gitlab;
+    expect(gitlab.remoteMutations).toBe(false);
+    expect(gitlab.transport).toContain("glab api --method GET");
+    expect(gitlab.formats).toEqual(["markdown", "json", "html"]);
+  });
+
   test("publishes bounded crawl limits", () => {
     expect(ISSUE_GRAPH_SCHEMA.crawl.concurrency).toEqual({ default: 4, minimum: 1, maximum: 32 });
     expect(ISSUE_GRAPH_SCHEMA.crawl.maxNodes.maximum).toBe(1000);

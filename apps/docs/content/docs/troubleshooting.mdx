@@ -1,8 +1,8 @@
 ---
 title: Troubleshooting
 navTitle: Troubleshooting
-description: Diagnose GitHub and Linear sign-in failures, Jira read failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
-lastModified: 2026-11-16
+description: Diagnose GitHub and Linear sign-in failures, Jira and GitLab read failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
+lastModified: 2026-11-19
 ---
 
 ## GitHub requests fail
@@ -27,7 +27,7 @@ Graph, status, reconcile, and plan read GitHub through the GitHub CLI. When `gh`
 
 ## A command exits with code 1 after printing a report
 
-`status`, `linear`, and `jira` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
+`status`, `linear`, `jira`, and `gitlab` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
 
 For `status`, stderr ends with `INCOMPLETE_INVENTORY: some counts are unknown; inspect coverage and rerun.` Unknown counts print as `?` in the table and as `null` in JSON. Common causes:
 
@@ -39,6 +39,8 @@ With `--since`, `INCOMPLETE_HISTORY` means some transitions could not be verifie
 For `linear`, `coverageComplete` is false when a node cannot be read, a connection stops at the `--max-pages` limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Nodes that could not be read print `Read failed:` followed by an error code. Depth boundaries are listed in the coverage but do not make the result partial. Raise the limit that stopped the crawl, or start a new run from an unexpanded hub. See [Linear](/docs/linear) for the limits and ranges.
 
 For `jira`, `coverageComplete` is false when an issue cannot be read, `twg` returns a warning for an issue, an expanded epic, other issue above the sub-task level, issue with an unknown hierarchy level, or issue whose `subtasks` field is missing or null has children that aren't read, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable issues print `Read failed:` followed by an error code, and the run fails before printing a report when the first issue can't be read. See [Jira read failures](#jira-read-failures).
+
+For `gitlab`, `coverageComplete` is false when an issue or merge request cannot be read, a links, closing, or notes listing fails or stops at the page limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable items print `Read failed:` followed by an error code, and the run fails before printing a report when the seed can't be read. Group-level work items are listed under `coverage.groupWorkItems` and don't make the run partial. See [GitLab read failures](#gitlab-read-failures).
 
 `graph`, `open`, and `rank` print partial results without changing the exit code. Check the report instead:
 
@@ -82,6 +84,20 @@ If `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses it instead of 
 - `SITE_MISMATCH`: the issue's web URL names a different site than `--site` or the browse URL.
 - `SITE_UNKNOWN`: neither `--site`, a browse URL, nor the `twg` response names the site, or a browse URL is combined with a `--site` cloud ID and the response doesn't name the site to confirm they match. Pass `--site` with the site's domain.
 - `IDENTITY_MISMATCH`: `twg` returned a different key, usually because the issue moved to another project. Start from the new key.
+
+## GitLab read failures
+
+`issue-graph gitlab` prints `GitLab read failed (CODE)` followed by the reason from `glab`. Common codes:
+
+- `GLAB_NOT_FOUND`: `glab` isn't installed or isn't on `PATH`. Install it from the [GitLab CLI repository](https://gitlab.com/gitlab-org/cli).
+- `UNAUTHORIZED` or `FORBIDDEN`: `glab` isn't signed in to the host, or the account can't read the item. Run `glab auth login --hostname your-host`, or set `GITLAB_TOKEN` for a host `glab` is configured for. Anonymous reads of a public project return `UNAUTHORIZED` for links and notes, so the run is partial.
+- `NOT_FOUND`: the item doesn't exist or isn't visible to the account.
+- `RATE_LIMITED`: GitLab returned HTTP 429. Wait and rerun, or lower `--concurrency`.
+- `GLAB_TOO_OLD`: `glab` is older than 1.126, which can send `GITLAB_TOKEN` to a host it isn't configured for. issue-graph checks `glab version` before the first read and stops. Update `glab`.
+- `GLAB_VERSION_UNKNOWN`: `glab version` printed output issue-graph can't parse, so it can't confirm the version. Update `glab` or check that `glab version` prints `glab 1.126.0` or later.
+- `GLAB_FAILED`: another `glab` failure; the reason names it.
+- `TIMEOUT`: `glab` didn't finish within 60 seconds.
+- `HOST_MISMATCH` or `IDENTITY_MISMATCH`: the item's web URL names a different host, project, or number than requested, usually because the item moved. Start from its new URL.
 
 ## Linear rate limits
 

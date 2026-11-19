@@ -9,6 +9,7 @@
  *   ./transports/http.js: fetch + token
  *   ./transports/linear.js: Linear GraphQL
  *   ./transports/twg.js: `twg` shell-out for Jira
+ *   ./transports/glab.js: `glab` shell-out for GitLab
  *
  * `snapshot.ts` (node:fs) and `cluster.ts` (node:child_process) are CLI
  * internals with no external consumer, so they are deliberately not exported.
@@ -19,6 +20,7 @@ export * from "./dashboard-filters.js";
 export * from "./dashboard-query.js";
 export * from "./dashboard-types.js";
 export * from "./github.js";
+export * from "./gitlab.js";
 export * from "./html.js";
 export * from "./jira.js";
 export * from "./linear.js";

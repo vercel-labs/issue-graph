@@ -2,7 +2,7 @@
 title: CLI command reference and exit codes
 navTitle: Command reference
 description: Look up issue-graph commands, flags, output formats, crawl controls, storage options, and exit codes, plus help and JSON schema output.
-lastModified: 2026-09-27
+lastModified: 2026-11-18
 ---
 
 ## Help and schema
@@ -16,10 +16,11 @@ issue-graph config --help
 issue-graph status --help
 issue-graph linear --help
 issue-graph jira --help
+issue-graph gitlab --help
 issue-graph schema
 ```
 
-`query` and `config` share one help page, and `status`, `linear`, and `jira` each have their own. Other commands print the main usage.
+`query` and `config` share one help page, and `status`, `linear`, `jira`, and `gitlab` each have their own. Other commands print the main usage.
 
 `schema` prints the JSON command contract, including each command's formats, mutation flags such as `githubMutations`, `localWrites`, defaults, and limits. Its `schemaVersion` changes independently of the package version.
 
@@ -42,12 +43,13 @@ issue-graph status vercel-labs/portless --author ctate,Railly --json
 issue-graph linear login
 issue-graph linear ENG-123 --json
 issue-graph jira ABC-123 --site your-site --json
+issue-graph gitlab group/project#123 --host gitlab.example.com --json
 issue-graph reconcile owner/repo --format json --no-save
 issue-graph plan owner/repo --format json
 issue-graph schema
 ```
 
-`open`, `rank`, and `cluster` accept a repository scope or items, written as `123`, `#123`, `owner/repo#123`, or a URL. `graph` needs items or `--label`. Live commands infer the repository from the current checkout when you omit it. `status` takes repositories and authors. Offline `query` selects a saved `provider:scope`, and `config` uses `--provider` and `--scope`. `linear` takes a Linear issue URL, identifier, or UUID, or `--project UUID`; see [Linear](/docs/linear) for its flags and authentication. `jira` takes a Jira issue key or browse URL and reads it through `twg`; see [Jira](/docs/jira).
+`open`, `rank`, and `cluster` accept a repository scope or items, written as `123`, `#123`, `owner/repo#123`, or a URL. `graph` needs items or `--label`. Live commands infer the repository from the current checkout when you omit it. `status` takes repositories and authors. Offline `query` selects a saved `provider:scope`, and `config` uses `--provider` and `--scope`. `linear` takes a Linear issue URL, identifier, or UUID, or `--project UUID`; see [Linear](/docs/linear) for its flags and authentication. `jira` takes a Jira issue key or browse URL and reads it through `twg`; see [Jira](/docs/jira). `gitlab` takes a GitLab issue or merge request URL, or a `group/project#N` or `group/project!N` reference, and reads it through `glab`; see [GitLab](/docs/gitlab).
 
 Running `issue-graph` with no arguments in an interactive terminal inside a GitHub checkout opens the backlog dashboard. In a pipe or CI, it prints usage instead. Older flags still work for one minor release and print their replacement.
 
