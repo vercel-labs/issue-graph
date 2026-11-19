@@ -7,6 +7,12 @@ import {
   type LinearReader,
 } from "./linear-queries.js";
 import type { GraphCrawlOptions } from "./types.js";
+import {
+  hasUnreadEdges,
+  validateWorkLimits,
+  type WorkCoverage,
+  workCoverage,
+} from "./work-report.js";
 import type {
   OpenItemCount,
   ReadCoverage,
@@ -73,13 +79,7 @@ export interface LinearReport {
   };
   limits: Omit<LinearGraphOptions, "workspace" | "generatedAt">;
   coverageComplete: boolean;
-  coverage: {
-    failed: string[];
-    partial: string[];
-    cappedOut: string[];
-    hubs: string[];
-    depthBoundaries: string[];
-  };
+  coverage: WorkCoverage;
   nodes: WorkNode[];
   components: string[][];
 }
@@ -430,18 +430,11 @@ export async function buildLinearGraph(
       }
     },
   );
-  const values = [...nodes.values()];
-  const coverage = {
-    failed: values.filter((node) => !node.fetched).map((node) => node.key),
-    partial: values
-      .filter((node) => node.coverage.some((part) => !part.complete))
-      .map((node) => node.key),
-    cappedOut: [...cappedOut].sort(),
-    hubs: values.filter((node) => node.hub).map((node) => node.key),
-    depthBoundaries: values
-      .filter((node) => node.depth === limits.maxDepth && node.edges.some((e) => !nodes.has(e.to)))
-      .map((node) => node.key),
-  };
+  const { coverage, coverageComplete } = workCoverage(
+    nodes,
+    cappedOut,
+    (node) => node.depth === limits.maxDepth && hasUnreadEdges(node, nodes),
+  );
   return {
     schemaVersion: 1,
     source: "linear",
@@ -461,28 +454,15 @@ export async function buildLinearGraph(
       archived: "issues-included-links-excluded",
     },
     limits,
-    coverageComplete:
-      !coverage.failed.length &&
-      !coverage.partial.length &&
-      !coverage.cappedOut.length &&
-      !coverage.hubs.length,
+    coverageComplete,
     coverage,
-    nodes: values,
+    nodes: [...nodes.values()],
     components: components(nodes),
   };
 }
 
 function validateOptions(options: LinearGraphOptions): void {
-  for (const [name, value, minimum, maximum] of [
-    ["maxDepth", options.maxDepth, 0, 8],
-    ["maxNodes", options.maxNodes, 1, 1000],
-    ["hubThreshold", options.hubThreshold, 1, 1000],
-    ["concurrency", options.concurrency ?? 4, 1, 32],
-    ["maxPages", options.maxPages, 1, 100],
-  ] as const) {
-    if (!Number.isInteger(value) || value < minimum || value > maximum)
-      throw new RangeError(`${name} must be an integer from ${minimum} to ${maximum}`);
-  }
+  validateWorkLimits(options, 32, [["maxPages", options.maxPages, 1, 100]]);
   if (options.workspace && !WORKSPACE.test(options.workspace))
     throw new Error("Invalid Linear workspace");
 }
