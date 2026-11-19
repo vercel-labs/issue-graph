@@ -1,5 +1,5 @@
 import { parseWorkClusters, workClusterPrompt } from "./work-clusters.js";
-import type { WorkReport } from "./work-report.js";
+import { WORK_LIMIT_RANGES, type WorkReport } from "./work-report.js";
 
 export interface WorkDashboardOptions {
   path?: string;
@@ -63,10 +63,10 @@ export async function runWorkCommand<TReport extends WorkReport, TReader>(
   }
   const options = { maxDepth: 1, maxNodes: 80, hubThreshold: 12, concurrency: 4 };
   const integers = {
-    "--depth": ["maxDepth", 0, 8],
-    "--max-nodes": ["maxNodes", 1, 1000],
-    "--hub-threshold": ["hubThreshold", 1, 1000],
-    "--concurrency": ["concurrency", 1, command.maxConcurrency],
+    "--depth": "maxDepth",
+    "--max-nodes": "maxNodes",
+    "--hub-threshold": "hubThreshold",
+    "--concurrency": "concurrency",
   } as const;
   let seed: string | undefined;
   let authority: string | undefined;
@@ -94,7 +94,9 @@ export async function runWorkCommand<TReport extends WorkReport, TReader>(
       else if (arg === command.authority.flag)
         authority = command.authority.parse(flagValue(argv[++index], command.authority.missing));
       else if (Object.hasOwn(integers, arg)) {
-        const [name, minimum, maximum] = integers[arg as keyof typeof integers];
+        const name = integers[arg as keyof typeof integers];
+        const [minimum, maximum] =
+          name === "concurrency" ? [1, command.maxConcurrency] : WORK_LIMIT_RANGES[name];
         const raw = argv[++index];
         const value = Number(raw);
         if (!raw || !/^\d+$/.test(raw) || value < minimum || value > maximum)

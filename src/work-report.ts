@@ -56,19 +56,27 @@ export interface WorkLimits {
   concurrency?: number;
 }
 
+/** The accepted `[minimum, maximum]` for each limit shared by work providers. */
+export const WORK_LIMIT_RANGES = {
+  maxDepth: [0, 8],
+  maxNodes: [1, 1000],
+  hubThreshold: [1, 1000],
+} as const;
+
 /** Rejects limits outside the ranges every work provider accepts. */
 export function validateWorkLimits(
   options: WorkLimits,
   maxConcurrency: number,
   extra: ReadonlyArray<readonly [string, number, number, number]> = [],
 ): void {
-  for (const [name, value, minimum, maximum] of [
-    ["maxDepth", options.maxDepth, 0, 8],
-    ["maxNodes", options.maxNodes, 1, 1000],
-    ["hubThreshold", options.hubThreshold, 1, 1000],
+  const checks: Array<readonly [string, number, number, number]> = [
+    ["maxDepth", options.maxDepth, ...WORK_LIMIT_RANGES.maxDepth],
+    ["maxNodes", options.maxNodes, ...WORK_LIMIT_RANGES.maxNodes],
+    ["hubThreshold", options.hubThreshold, ...WORK_LIMIT_RANGES.hubThreshold],
     ["concurrency", options.concurrency ?? 4, 1, maxConcurrency],
     ...extra,
-  ] as const) {
+  ];
+  for (const [name, value, minimum, maximum] of checks) {
     if (!Number.isInteger(value) || value < minimum || value > maximum)
       throw new RangeError(`${name} must be an integer from ${minimum} to ${maximum}`);
   }
