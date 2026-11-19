@@ -10,7 +10,7 @@ import {
 } from "./work-report.js";
 import type { ReadCoverage, WorkEdge, WorkLink, WorkNode } from "./work-types.js";
 
-const ISSUE_ID = /^([A-Za-z][A-Za-z0-9_]*)-([1-9]\d*)$/;
+const ISSUE_ID = /^([A-Za-z0-9][A-Za-z0-9_]*)-([1-9]\d*)$/;
 const CODE = /^[A-Z0-9_]{1,64}$/;
 
 /** Entries per page for every offset-paginated list. */

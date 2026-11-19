@@ -33,6 +33,7 @@ async function build(
 describe("locators and base URLs", () => {
   test("accepts issue IDs and issue URLs that name the base", () => {
     expect(parseYouTrackLocator("ABC-12")).toEqual({ id: "ABC-12" });
+    expect(parseYouTrackLocator("3DS-1")).toEqual({ id: "3DS-1" });
     expect(parseYouTrackLocator("https://acme.youtrack.cloud/issue/ABC-12")).toEqual({
       id: "ABC-12",
       baseUrl: BASE,
@@ -43,6 +44,8 @@ describe("locators and base URLs", () => {
     for (const bad of [
       "UTF",
       "ABC-0",
+      "-1",
+      "_A-1",
       "https://acme.youtrack.cloud/issues/ABC-1",
       "ftp://h/issue/A-1",
       "https://u:p@h/issue/A-1",
@@ -369,6 +372,18 @@ describe("buildYouTrackGraph", () => {
     );
     expect(report.nodes.map((node) => node.identifier)).toEqual(["ABC-1", "PAY-7"]);
     expect(report.coverage.depthBoundaries).toEqual([key("PAY-7")]);
+    expect(report.coverageComplete).toBe(true);
+  });
+
+  test("project IDs that start with a digit are seeds and link targets", async () => {
+    const report = await build(
+      {
+        "3DS-1": { links: [{ type: "Depend", direction: "OUTWARD", targets: ["3DS-2"] }] },
+        "3DS-2": {},
+      },
+      "3DS-1",
+    );
+    expect(report.nodes.map((node) => node.identifier)).toEqual(["3DS-1", "3DS-2"]);
     expect(report.coverageComplete).toBe(true);
   });
 
