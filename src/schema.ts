@@ -109,6 +109,48 @@ export const ISSUE_GRAPH_SCHEMA = {
       description:
         "Read a bounded Jira neighborhood through the Atlassian Teamwork Graph CLI with site-scoped identities, native link direction, and explicit coverage gaps, and save it to the dashboard.",
     },
+    youtrack: {
+      remoteMutations: false,
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest base URL and seed-project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+      ],
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json", "html"],
+      authentication:
+        "YOUTRACK_TOKEN, a permanent token sent as a Bearer token to the configured base URL only; read from the environment, never stored",
+      transport:
+        "GET <base>/api/issues/ID, /issues/ID/links, /issues/ID/links/LINK/issues, and /issues/ID/activitiesPage (PullRequestChangeCategory and VcsChangeCategory) over fetch with fields projections; link lists use $top/$skip offset pages and activity uses the cursor the API returns; requests stay under <base>/api and redirects are not followed",
+      required: ["YouTrack issue ID (ABC-123) or <base-url>/issue/ABC-123 URL"],
+      url: "--url BASE, else YOUTRACK_URL: an absolute https base URL (http only for localhost, 127.0.0.0/8, and ::1) without credentials, query, or fragment and with an optional path prefix such as /youtrack; an issue URL never chooses the host and must match the configured base, or exit 2 before any request; node keys use youtrack:<host and path>:<ID>",
+      maxDepth: { default: 1, minimum: 0, maximum: 8 },
+      maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+      hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
+      concurrency: { default: 4, minimum: 1, maximum: 16 },
+      pages: {
+        size: 100,
+        links:
+          "offset pages with $top and $skip; an entry seen twice, because the list changed between pages, marks the list partial",
+        activity:
+          "cursor pages from afterCursor for pull requests and commits; a repeated cursor or a removal that names no known change marks the list partial",
+        defaultPerList: 5,
+        maximumPerList: 100,
+        option: "maxPages in the library; the CLI uses the default",
+      },
+      relationships: ["links", "pull requests", "commits"],
+      linkTypes:
+        "Depend maps to blocks, Duplicate to duplicate of, Subtask to parent of, Relates to related; other link types keep their native name as provider specific",
+      crossProject: "links into other projects are read at the next depth and not expanded",
+      dashboard:
+        "--html PATH or --open writes the explorer and saves model youtrack:<authority>:project:<SHORTNAME> for dashboard and query; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
+      exclusions: ["text mentions", "fetching pull request and commit targets", "comments"],
+      failures:
+        "unreadable or moved linked issues stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; a link or pull request list that fails or reaches the page limit marks the issue partial",
+      exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
+      jsonFlag: "--json emits the report on stdout; takes no path",
+      description:
+        "Read a bounded YouTrack neighborhood through the REST API with base-URL-scoped identities, native link direction, linked pull requests, and explicit coverage gaps, and save it to the dashboard.",
+    },
     query: {
       providerMutations: false,
       network: false,

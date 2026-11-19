@@ -29,6 +29,10 @@ For the HTTP library transport, store the token on your server and grant it only
 
 `issue-graph jira` runs `twg jira workitem get` for each issue and never creates, edits, transitions, or comments on Jira work items. It uses the session you created with `twg login` and doesn't read or store Atlassian credentials. Each `twg` process runs without a shell, and issue keys and sites are validated before they become arguments. See [Jira](/docs/jira).
 
+## YouTrack access
+
+`issue-graph youtrack` sends only `GET` requests to `<YOUTRACK_URL>/api` and never creates, edits, or comments on YouTrack issues. It reads the permanent token from `YOUTRACK_TOKEN`, sends it as a `Bearer` header to the configured base URL only (`--url`, else `YOUTRACK_URL`), requires `https` except for loopback hosts, rejects an issue URL that names another host before any request, doesn't follow redirects, and never stores it or prints it in errors. Use a token whose account can read only the projects you want to map. See [YouTrack](/docs/youtrack).
+
 ## Local files
 
 | Command | Default storage | Controls |
@@ -39,6 +43,7 @@ For the HTTP library transport, store the token on your server and grant it only
 | Linear | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set |
 | Linear login | Session in the macOS Keychain or under `credentials/` | `linear logout` removes it |
 | Jira | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set; `twg` manages its own session |
+| YouTrack | None without HTML output | `--html PATH` or `--open` writes an HTML export and saves the model unless `--no-save` is set |
 | Dashboard | HTML export of saved models | Temporary file by default; `-o PATH.html` chooses its location |
 | Runs | None when listing | `runs rm owner/repo` deletes that saved dashboard model only |
 | Reconcile | History under `~/.issue-graph/reconcile-owner-repo/` | `--no-save` skips new snapshots |

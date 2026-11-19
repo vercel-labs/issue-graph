@@ -187,6 +187,34 @@ require("node:net").Socket.prototype.connect = function () {
   throw new Error("Network forbidden in package smoke consumer");
 };
 globalThis.fetch = async function (url, init) {
+  if (process.env.PACKAGE_TEST_YOUTRACK === "1") {
+    const target = new URL(String(url));
+    assert.equal(target.origin, "https://fixture.youtrack.cloud");
+    assert.equal(init.method, "GET");
+    assert.equal(new Headers(init.headers).get("authorization"), "Bearer package-smoke-youtrack");
+    assert.equal(init.redirect, "error");
+    const parts = target.pathname.split("/").slice(2).map(decodeURIComponent);
+    assert.equal(target.pathname.split("/")[1], "api");
+    const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
+    const ids = { "ENG-1": 1, "ENG-2": 2, "2-1": 1, "2-2": 2 };
+    if (parts[0] !== "issues" || !(parts[1] in ids)) return json({}, 404);
+    const number = ids[parts[1]];
+    if (parts.length === 2)
+      return json({
+        id: "2-" + number, idReadable: "ENG-" + number, summary: "YouTrack fixture " + number,
+        resolved: null, updated: 1700000000000, project: { shortName: "ENG" },
+        customFields: [{ name: "State", value: { name: "Open", isResolved: false } }],
+      });
+    if (parts[2] === "links" && parts.length === 3)
+      return json([{
+        id: "80-1s", direction: "OUTWARD",
+        linkType: { id: "80-1", name: "Depend", sourceToTarget: "is required for", targetToSource: "depends on", directed: true },
+        issues: number === 1 ? [{ id: "2-2" }] : [],
+      }]);
+    if (parts[2] === "links") return json([{ id: "2-2", idReadable: "ENG-2" }]);
+    if (parts[2] === "activitiesPage") return json({ activities: [], hasAfter: false });
+    return json({}, 404);
+  }
   if (process.env.PACKAGE_TEST_LINEAR === "1") {
     assert.equal(url, "https://api.linear.app/graphql");
     assert.equal(init.method, "POST");
@@ -245,6 +273,7 @@ const { httpTransport } = await import(name + "/transport/http");
 const { shellTransport } = await import(name + "/transport/shell");
 const { linearReader } = await import(name + "/transport/linear");
 const { twgJiraReader } = await import(name + "/transport/twg");
+const { youTrackReader } = await import(name + "/transport/youtrack");
 assert.ok(import.meta.resolve(name).endsWith("/dist/index.js"));
 assert.equal(typeof core.crawl, "function");
 assert.equal(typeof core.parseNodeResponse, "function");
@@ -253,6 +282,8 @@ assert.equal(typeof httpTransport, "function");
 assert.equal(typeof shellTransport, "function");
 assert.equal(typeof linearReader, "function");
 assert.equal(typeof twgJiraReader, "function");
+assert.equal(typeof youTrackReader, "function");
+assert.equal(typeof core.buildYouTrackGraph, "function");
 assert.equal(typeof core.buildJiraGraph, "function");
 assert.equal(typeof core.buildLinearGraph, "function");
 assert.equal(typeof core.buildLinearProject, "function");
@@ -549,12 +580,26 @@ try {
     invoke(["jira", "ENG-9", "--site", "fixture.atlassian.net"], 1).stderr,
     /TWG_COMMAND_FAILED/,
   );
+  assert.match(invoke(["youtrack", "--help"]).stdout, /YOUTRACK_TOKEN/);
+  const youtrackEnv = {
+    PACKAGE_TEST_YOUTRACK: "1",
+    YOUTRACK_TOKEN: "package-smoke-youtrack",
+    YOUTRACK_URL: "https://fixture.youtrack.cloud",
+  };
+  const youtrackReport = JSON.parse(invoke(["youtrack", "ENG-1", "--json"], 0, youtrackEnv).stdout);
+  assert.equal(youtrackReport.coverageComplete, true);
+  assert.deepEqual(
+    youtrackReport.nodes.map((node: { identifier: string }) => node.identifier),
+    ["ENG-1", "ENG-2"],
+  );
+  assert.match(invoke(["youtrack", "ENG-9"], 1, youtrackEnv).stderr, /NOT_FOUND/);
   const schema = JSON.parse(invoke(["schema"]).stdout);
   assert.equal(schema.name, "issue-graph");
   assert.deepEqual(schema.exitCodes, { success: 0, runtimeFailure: 1, usageError: 2 });
   assert.ok(schema.commands.status);
   assert.ok(schema.commands.graph);
   assert.equal(schema.commands.jira.remoteMutations, false);
+  assert.equal(schema.commands.youtrack.remoteMutations, false);
   assert.match(invoke([], 2).stderr, /usage: issue-graph/);
   assert.match(invoke(["--not-a-real-option"], 2).stderr, /unknown flag/);
   assert.match(invoke(["status", "--repo", fixtureRepo], 2).stderr, /requires --repo and --author/);
@@ -812,7 +857,7 @@ try {
   const calls = readFileSync(env.PACKAGE_TEST_GH_LOG as string, "utf8")
     .trim()
     .split("\n");
-  const expectedChecks = suppliedTarball ? 61 : 62;
+  const expectedChecks = suppliedTarball ? 64 : 65;
   assert.equal(
     checks,
     expectedChecks,
