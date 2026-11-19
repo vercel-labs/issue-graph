@@ -193,32 +193,40 @@ export function dashboardDir(): string {
 
 /**
  * The file that holds a run's model. Names keep the readable form `owner_repo.json`; when two
- * ids reduce to the same name (`a/b_c` and `a_b/c`), the later one gets a hash suffix.
+ * ids reduce to the same name (`a/b_c` and `a_b/c`), the later one gets a hash suffix. A run
+ * keeps the file it already has, so freeing the readable name never leaves a second copy.
  */
 function dashboardModelFile(repo: string, forWrite: boolean): string | undefined {
   const dir = dashboardDir();
   const base = repo.replace(/[^\w.-]/g, "_");
   const hash = createHash("sha256").update(repo).digest("hex").slice(0, 12);
-  for (const name of [base, `${base}~${hash}`]) {
-    const file = path.join(dir, `${name}.json`);
-    let saved: { id?: unknown };
+  const candidates = [base, `${base}~${hash}`].map((name) => ({
+    file: path.join(dir, `${name}.json`),
+    readable: name === base,
+  }));
+  const read = (file: string): { id?: unknown } | undefined => {
     try {
-      saved = JSON.parse(fs.readFileSync(file, "utf8"));
+      return JSON.parse(fs.readFileSync(file, "utf8"));
     } catch {
-      // A missing or unreadable file is free to write.
-      if (forWrite) return file;
-      continue;
+      return undefined;
     }
-    // Models saved without an id predate the hash suffix and own the readable name.
-    if (saved?.id === repo || (saved?.id === undefined && name === base)) return file;
-  }
-  return undefined;
+  };
+  const saved = candidates.map((candidate) => ({ ...candidate, model: read(candidate.file) }));
+  // Models saved without an id predate the hash suffix and own the readable name.
+  const owned = saved.find(
+    ({ model, readable }) =>
+      model !== undefined && (model?.id === repo || (model?.id === undefined && readable)),
+  );
+  if (owned || !forWrite) return owned?.file;
+  // A missing or unreadable file is free to write.
+  return saved.find(({ model }) => model === undefined)?.file;
 }
 
 /** Save one run's explorer model, replacing the previous one for that repository. */
 export function writeDashboardModel(repo: string, model: unknown): string {
   fs.mkdirSync(dashboardDir(), { recursive: true, mode: 0o700 });
-  const file = dashboardModelFile(repo, true) as string;
+  const file = dashboardModelFile(repo, true);
+  if (!file) throw new Error(`No free dashboard file for ${repo}`);
   fs.writeFileSync(file, JSON.stringify(model), { mode: 0o600 });
   return file;
 }

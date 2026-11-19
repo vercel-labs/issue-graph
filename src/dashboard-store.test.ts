@@ -36,6 +36,16 @@ test("ids that reduce to the same file name keep separate saved runs", () => {
   expect(readDashboardModel(a)).toEqual({ id: a, n: 1 });
 });
 
+test("a run in the hashed file keeps it after the readable file is removed", () => {
+  const a = "gitlab:h:project:foo/bar_baz";
+  const b = "gitlab:h:project:foo_bar/baz";
+  writeDashboardModel(a, { id: a });
+  const fileB = writeDashboardModel(b, { id: b, n: 1 });
+  expect(removeDashboardRun(a)).toBe(true);
+  expect(writeDashboardModel(b, { id: b, n: 2 })).toBe(fileB);
+  expect(readDashboardModels()).toEqual([{ id: b, n: 2 }]);
+});
+
 test("a model saved without an id keeps its readable file name", () => {
   fs.mkdirSync(dashboardDir(), { recursive: true });
   const legacy = path.join(dashboardDir(), "acme_api.json");
