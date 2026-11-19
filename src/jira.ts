@@ -1,5 +1,13 @@
 import { components, crawlGraph } from "./crawl.js";
 import type { GraphCrawlOptions } from "./types.js";
+import {
+  hasUnreadEdges,
+  markdownText,
+  renderWorkMarkdown,
+  validateWorkLimits,
+  type WorkCoverage,
+  workCoverage,
+} from "./work-report.js";
 import type { ReadCoverage, WorkEdge, WorkNode } from "./work-types.js";
 
 const KEY = /^([A-Z][A-Z0-9_]*)-([1-9]\d*)$/;
@@ -110,13 +118,7 @@ export interface JiraReport {
   };
   limits: Required<Omit<JiraGraphOptions, "site" | "generatedAt">>;
   coverageComplete: boolean;
-  coverage: {
-    failed: string[];
-    partial: string[];
-    cappedOut: string[];
-    hubs: string[];
-    depthBoundaries: string[];
-  };
+  coverage: WorkCoverage;
   nodes: JiraNode[];
   components: string[][];
 }
@@ -398,18 +400,6 @@ function unavailable(site: string, key: string, depth: number, error: unknown): 
   };
 }
 
-function validateOptions(options: JiraGraphOptions): void {
-  for (const [name, value, minimum, maximum] of [
-    ["maxDepth", options.maxDepth, 0, 8],
-    ["maxNodes", options.maxNodes, 1, 1000],
-    ["hubThreshold", options.hubThreshold, 1, 1000],
-    ["concurrency", options.concurrency ?? 4, 1, 16],
-  ] as const) {
-    if (!Number.isInteger(value) || value < minimum || value > maximum)
-      throw new RangeError(`${name} must be an integer from ${minimum} to ${maximum}`);
-  }
-}
-
 /**
  * Reads a bounded Jira neighborhood. Same-project links recurse to `maxDepth`;
  * links into other projects are read one hop and not expanded.
@@ -419,7 +409,7 @@ export async function buildJiraGraph(
   seed: string,
   options: JiraGraphOptions,
 ): Promise<JiraReport> {
-  validateOptions(options);
+  validateWorkLimits(options, 16);
   const locator = parseJiraLocator(seed);
   const requested = options.site ? parseJiraSite(options.site) : undefined;
   if (locator.site && requested && jiraSiteConflicts(locator.site, requested))
@@ -480,23 +470,13 @@ export async function buildJiraGraph(
       }
     },
   );
-  const values = [...nodes.values()];
-  const coverage = {
-    failed: values.filter((node) => !node.fetched).map((node) => node.key),
-    partial: values
-      .filter((node) => node.coverage.some((part) => !part.complete))
-      .map((node) => node.key),
-    cappedOut: [...cappedOut].sort(),
-    hubs: values.filter((node) => node.hub).map((node) => node.key),
-    depthBoundaries: values
-      .filter(
-        (node) =>
-          unlistedChildren.has(node.key) ||
-          ((node.depth === limits.maxDepth || !expandable(node.key)) &&
-            node.edges.some((e) => !nodes.has(e.to))),
-      )
-      .map((node) => node.key),
-  };
+  const { coverage, coverageComplete } = workCoverage(
+    nodes,
+    cappedOut,
+    (node) =>
+      unlistedChildren.has(node.key) ||
+      ((node.depth === limits.maxDepth || !expandable(node.key)) && hasUnreadEdges(node, nodes)),
+  );
   return {
     schemaVersion: 1,
     source: "jira",
@@ -511,13 +491,9 @@ export async function buildJiraGraph(
       textReferences: "not-collected",
     },
     limits,
-    coverageComplete:
-      !coverage.failed.length &&
-      !coverage.partial.length &&
-      !coverage.cappedOut.length &&
-      !coverage.hubs.length,
+    coverageComplete,
     coverage,
-    nodes: values,
+    nodes: [...nodes.values()],
     components: components(nodes),
   };
 }
@@ -527,45 +503,15 @@ function strip(node: Normalized): JiraNode {
   return rest;
 }
 
-function markdown(value: string): string {
-  return value.replace(/\p{Cc}/gu, " ").replace(/[\\`*_[\]<>|#]/g, "\\$&");
-}
-
 export function renderJira(report: JiraReport): string {
-  const lines = [
-    `# Jira graph · ${markdown(report.site)}`,
-    "",
-    `Coverage: ${report.coverageComplete ? "complete within requested scope" : "partial"} · ${report.nodes.length} nodes · depth ${report.limits.maxDepth}`,
-    "",
-    "Issue links, parents, and subtasks. Links into other projects are read one hop. Remote link URLs are reported without fetching their targets. Text mentions are not collected.",
-    "",
-  ];
-  const labels = new Map(report.nodes.map((node) => [node.key, node.identifier]));
-  for (const node of report.nodes) {
-    lines.push(
-      `## ${markdown(node.identifier)} · ${markdown(node.title)}`,
-      "",
-      `Status: ${markdown(node.state.name)}${node.issueType ? ` · ${markdown(node.issueType)}` : ""}${node.hub ? " · hub not expanded" : ""}`,
-      "",
-    );
-    if (node.url) lines.push(markdown(node.url), "");
-    if (!node.fetched) lines.push(`Read failed: ${node.error ?? "READ_FAILED"}`, "");
-    for (const edge of node.edges) {
-      const arrow =
-        edge.direction === "incoming" ? "←" : edge.direction === "undirected" ? "↔" : "→";
-      lines.push(
-        `- ${arrow} ${markdown(edge.nativeRelation)}: ${markdown(labels.get(edge.to) ?? edge.to.slice(edge.to.lastIndexOf(":") + 1))}`,
-      );
-    }
-    for (const link of node.externalLinks)
-      lines.push(`- Remote link: ${markdown(link.title)} · ${markdown(link.url)}`);
-    for (const part of node.coverage.filter((part) => !part.complete))
-      lines.push(`- Incomplete ${part.source}: ${part.reason ?? "not read"}`);
-    lines.push("");
-  }
-  if (report.coverage.cappedOut.length)
-    lines.push(`Node cap: ${report.coverage.cappedOut.length} known nodes not fetched.`, "");
-  if (report.coverage.depthBoundaries.length)
-    lines.push(`Depth boundary: ${report.coverage.depthBoundaries.length} nodes not expanded.`, "");
-  return `${lines.join("\n")}\n`;
+  return renderWorkMarkdown(report, {
+    title: `Jira graph · ${report.site}`,
+    scope:
+      "Issue links, parents, and subtasks. Links into other projects are read one hop. Remote link URLs are reported without fetching their targets. Text mentions are not collected.",
+    status: (node) => (node.issueType ? ` · ${markdownText(node.issueType)}` : ""),
+    links: (node) =>
+      node.externalLinks.map(
+        (link) => `- Remote link: ${markdownText(link.title)} · ${markdownText(link.url)}`,
+      ),
+  });
 }

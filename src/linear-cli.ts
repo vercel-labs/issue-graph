@@ -10,6 +10,7 @@ import { linearDashboardModel } from "./linear-html.js";
 import type { LinearReader } from "./linear-queries.js";
 import type { GhTransport } from "./transport.js";
 import { parseWorkClusters, workClusterPrompt } from "./work-clusters.js";
+import { concurrencyRange, WORK_LIMIT_RANGES } from "./work-report.js";
 
 export const LINEAR_USAGE = `usage: issue-graph linear <issue-url|identifier|uuid> [options]
        issue-graph linear login | logout | status
@@ -67,11 +68,11 @@ export async function runLinear(
     workspace: undefined as string | undefined,
   };
   const integers = {
-    "--depth": ["maxDepth", 0, 8],
-    "--max-nodes": ["maxNodes", 1, 1000],
+    "--depth": ["maxDepth", ...WORK_LIMIT_RANGES.maxDepth],
+    "--max-nodes": ["maxNodes", ...WORK_LIMIT_RANGES.maxNodes],
     "--max-pages": ["maxPages", 1, 100],
-    "--hub-threshold": ["hubThreshold", 1, 1000],
-    "--concurrency": ["concurrency", 1, 32],
+    "--hub-threshold": ["hubThreshold", ...WORK_LIMIT_RANGES.hubThreshold],
+    "--concurrency": ["concurrency", ...concurrencyRange(32)],
   } as const;
   let seed: string | undefined;
   let project: string | undefined;
