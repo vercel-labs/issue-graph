@@ -1,26 +1,26 @@
 diff --git a/dist/build/templates/app-page-runtime.js b/dist/build/templates/app-page-runtime.js
-index f1ab03f292340fe08b563990110ac0835d3415fb..06683da6a9947baf15c1f1c2408b228da5e6967c 100644
+index 393c9ef1e93e87628f25ba89c765804283a88214..b979f2284c402a8743d7d5a24914e5cdc55a28c7 100644
 --- a/dist/build/templates/app-page-runtime.js
 +++ b/dist/build/templates/app-page-runtime.js
-@@ -456,7 +456,7 @@ function createAppPageEntrypoint({ tree, page, pathname, require: __next_app_req
+@@ -480,7 +480,7 @@ function createAppPageEntrypoint({ tree, page, pathname, require: __next_app_req
          };
          try {
              const varyHeader = routeModule.getVaryHeader(resolvedPathname, interceptionRoutePatterns);
 -            res.setHeader('Vary', varyHeader);
 +            res.appendHeader('Vary', varyHeader);
-             let parentSpan;
-             const invokeRouteModule = async (span, context)=>{
+             const invokeRouteModule = async (span, context, renderOperation)=>{
                  const nextReq = new _node.NodeNextRequest(req);
+                 const nextRes = new _node.NodeNextResponse(res);
 diff --git a/dist/esm/build/templates/app-page-runtime.js b/dist/esm/build/templates/app-page-runtime.js
-index 1970588724b6e4880f27a8be60ca32ae6437bc28..6bfd14ec5a9125f34185dc71ba297f0ac4d2aee3 100644
+index b28d926ad23b76fcf34963f3862ad9b76e42235f..b21a07985f5bb895a5ef88e929dbfa42b6b9f3ed 100644
 --- a/dist/esm/build/templates/app-page-runtime.js
 +++ b/dist/esm/build/templates/app-page-runtime.js
-@@ -471,7 +471,7 @@ export function createAppPageEntrypoint({ tree, page, pathname, require: __next_
+@@ -503,7 +503,7 @@ export function createAppPageEntrypoint({ tree, page, pathname, require: __next_
          };
          try {
              const varyHeader = routeModule.getVaryHeader(resolvedPathname, interceptionRoutePatterns);
 -            res.setHeader('Vary', varyHeader);
 +            res.appendHeader('Vary', varyHeader);
-             let parentSpan;
-             const invokeRouteModule = async (span, context)=>{
+             const invokeRouteModule = async (span, context, renderOperation)=>{
                  const nextReq = new NodeNextRequest(req);
+                 const nextRes = new NodeNextResponse(res);
