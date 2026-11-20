@@ -311,6 +311,18 @@ Use `issue-graph jira --help` before a Jira workflow. The command runs `twg jira
 
 Read coverage before making completeness claims: unreadable issues, `twg` warnings, unread children of an expanded epic or of an issue with no `subtasks` field, the node cap, and unexpanded hubs make the graph partial and exit `1`. An unreadable issue is not absent work.
 
+## GitLab reads
+
+Use `issue-graph gitlab --help` before a GitLab workflow. The command reads through `glab api --method GET` with the user's `glab` credentials and never mutates GitLab. If `glab` is missing or not signed in to the host, the command fails with `GLAB_NOT_FOUND` or `UNAUTHORIZED`, or with `NOT_FOUND` for a private project; ask the user to install `glab` and run `glab auth login --hostname HOST` rather than running setup yourself. `GITLAB_TOKEN` also works, and `glab` 1.126 or later sends it only to its default and configured hosts.
+
+- `issue-graph gitlab https://gitlab.example.com/group/subgroup/project/-/issues/12 --json` reads a bounded neighborhood. A URL names the host; a `group/project#12` or `group/project!12` reference uses `--host` or the `glab` default host.
+- Issues and merge requests with the same number are separate nodes, keyed `gitlab:<host>:<path>#<iid>` and `gitlab:<host>:<path>!<iid>` with the path in lowercase.
+- Edges are issue links (`relates_to`, and `blocks` with its direction, which also covers `is_blocked_by`), merge requests that close issues, and "mentioned in" system notes. Mentions are read from the mentioned item, so an item's own outgoing references appear only when the target is read.
+- References within the seed's project recurse to `--depth`; references into other projects are read at the next depth and not expanded. Group-level work items such as epics are listed under `coverage.groupWorkItems` and not read.
+- `--open` or `--html PATH` writes the explorer and saves the model `gitlab:<host>:project:<path>`, so `query` and `dashboard` work offline. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
+
+Read coverage before making completeness claims: unreadable items, failed or page-capped link, closing, or note listings, the node cap, and unexpanded hubs make the graph partial and exit `1`. On gitlab.com without a login, links and notes are refused, so the graph is partial. An unreadable item is not absent work.
+
 ## YouTrack reads
 
 Use `issue-graph youtrack --help` before a YouTrack workflow. The command sends `GET` requests to `<base>/api` with the user's `YOUTRACK_TOKEN` and never mutates YouTrack. If the token or `YOUTRACK_URL` is missing, or the command fails with `AUTHENTICATION` or `FORBIDDEN`, ask the user to create a permanent token and set the variables; never ask for the token in chat.

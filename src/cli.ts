@@ -15,6 +15,7 @@ import {
 import { modelDefaults, readConfig, resolveWeights } from "./config.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
+import { runGitLab } from "./gitlab-cli.js";
 import {
   applyClusters,
   type ClustersConfig,
@@ -69,7 +70,7 @@ import { shellTransport } from "./transports/shell.js";
 import { linkCount, type NodeKey, type Seed } from "./types.js";
 import { runYouTrack } from "./youtrack-cli.js";
 
-/** Writes a work provider's explorer and saves the run, as `jira` and `youtrack` do. */
+/** Writes a work provider's explorer and saves the run, as `jira`, `gitlab`, and `youtrack` do. */
 function saveWorkDashboard(
   model: Model & { id: string },
   options: { path?: string; open: boolean; save: boolean },
@@ -90,6 +91,7 @@ Run with no arguments inside a GitHub repository to open its backlog dashboard.
 commands
   linear <issue>          read Linear issue relationships or capture --project UUID
   jira <issue>            read Jira issue links through the Atlassian TWG CLI (twg)
+  gitlab <issue-or-mr>    read GitLab issue links, closing MRs, and mentions through glab
   youtrack <issue>        read YouTrack issue links and pull requests through the REST API
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
@@ -482,6 +484,25 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         dashboard: async (report, options) => {
           const { jiraDashboardModel } = await import("./jira-html.js");
           saveWorkDashboard(jiraDashboardModel(report, options.clusters), options);
+        },
+      },
+    );
+    return;
+  }
+  if (argv[0] === "gitlab") {
+    process.exitCode = await runGitLab(
+      argv.slice(1),
+      async (host) => {
+        const { glabGitLabReader } = await import("./transports/glab.js");
+        return glabGitLabReader({ host });
+      },
+      {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        dashboard: async (report, options) => {
+          const { gitlabDashboardModel } = await import("./gitlab-html.js");
+          saveWorkDashboard(gitlabDashboardModel(report, options.clusters), options);
         },
       },
     );

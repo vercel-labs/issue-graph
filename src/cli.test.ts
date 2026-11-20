@@ -495,6 +495,45 @@ test("jira exits 1 for an epic whose issue type has no hierarchy level", async (
   }
 });
 
+test("gitlab runs glab from PATH with GET reads and reports system note mentions", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "issue-graph-cli-glab-"));
+  try {
+    const script = `#!/bin/sh
+if [ "$1" = version ]; then echo 'glab 1.126.0 (abc1234)'; exit 0; fi
+for last; do :; done
+case "$last" in
+  projects/acme%2Fplatform%2Fapi/issues/1) echo '{"id":1,"iid":1,"title":"Root","state":"opened","web_url":"https://gitlab.example.com/acme/platform/api/-/issues/1"}' ;;
+  projects/acme%2Fplatform%2Fapi/issues/1/notes*) echo '[{"id":9,"system":true,"body":"mentioned in issue #2"}]' ;;
+  *) echo '[]' ;;
+esac
+`;
+    writeFileSync(join(dir, "glab"), script);
+    chmodSync(join(dir, "glab"), 0o755);
+    const result = await runNode(
+      [
+        "src/bin.ts",
+        "gitlab",
+        "acme/platform/api#1",
+        "--host",
+        "gitlab.example.com",
+        "--depth",
+        "0",
+        "--json",
+      ],
+      { env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}` } },
+    );
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.nodes[0].key).toBe("gitlab:gitlab.example.com:acme/platform/api#1");
+    expect(report.nodes[0].edges).toMatchObject([
+      { to: "gitlab:gitlab.example.com:acme/platform/api#2", nativeRelation: "mentions" },
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 describe("youtrack", () => {
   const token = "perm:cli-test-token";
   const issues = {

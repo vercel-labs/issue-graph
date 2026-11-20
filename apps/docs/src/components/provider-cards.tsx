@@ -7,6 +7,8 @@ const GITHUB_PATH =
   "M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.3.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.5 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2";
 const JIRA_PATH =
   "M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z";
+const GITLAB_PATH =
+  "m23.6 9.593-.033-.086L20.3.98a.851.851 0 0 0-.336-.405.875.875 0 0 0-1 .054.875.875 0 0 0-.29.44L16.47 7.818H7.537L5.332 1.07a.857.857 0 0 0-.29-.441.875.875 0 0 0-1-.054.859.859 0 0 0-.336.405L.433 9.502.4 9.588a6.066 6.066 0 0 0 2.012 7.01l.011.009.03.021 4.976 3.727 2.462 1.863 1.5 1.132a1.009 1.009 0 0 0 1.22 0l1.499-1.132 2.462-1.863 5.006-3.749.012-.01a6.068 6.068 0 0 0 2.01-7.003z";
 const YOUTRACK_PATH =
   "M67.209.009a26.46 26.46 0 0 0-16.538 6.134L27.759 25.24h-2.535v2.111L.88 47.643c-1.031.855-1.18 2.44-.316 3.468l16.253 19.405L2.575 99.854a2.475 2.475 0 0 0 .755 3.052l33.292 24.63c.886.655 2.278.62 3.137-.177c2.048-1.913 15.957-14.486 37.26-24.576h25.748v-9.75c12.216-3.623 20.96-4.864 23.08-5.132c1.412-.177 2.404-1.604 2.097-2.982v-.008l-10.288-45.722c-.308-1.353-1.743-2.205-3.075-1.82l-11.814 3.392V25.24h-8.67A26.42 26.42 0 0 0 83.94 5.596A26.48 26.48 0 0 0 67.209.01Zm.07 3.938A22.54 22.54 0 0 1 81.52 8.709a22.43 22.43 0 0 1 8.631 16.53H33.925L53.199 9.18a22.54 22.54 0 0 1 14.08-5.232ZM25.223 32.492v70.29H68.22c-16.789 8.96-27.462 18.424-30.156 20.9L6.66 100.472l14.827-30.526L4.548 49.723Zm7.714 2.427h6.112l6.58 11.614l.772 1.665l.77-1.688l6.42-11.59h6.003L49.122 53.06v10.944H43.58V53.099Zm27.736 0h23.335v5.11H75.2v23.975h-5.672V40.029h-8.855zm53.483 6.682l9.602 42.694c-2.94.401-10.502 1.57-20.992 4.608V44.868ZM34.919 87.269h31.018v5.819H34.92Z";
 const LINEAR_PATH =
@@ -19,7 +21,7 @@ interface Relation {
 }
 
 interface Provider {
-  id: "github" | "linear" | "jira" | "youtrack" | "model";
+  id: "github" | "linear" | "jira" | "gitlab" | "youtrack" | "model";
   name: string;
   logo: React.ReactNode;
   summary: string;
@@ -118,6 +120,36 @@ const providers: Provider[] = [
     command: providerCommands.jira,
     href: "/docs/jira",
     link: "Connect Jira",
+  },
+  {
+    id: "gitlab",
+    name: "GitLab",
+    logo: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d={GITLAB_PATH} />
+      </svg>
+    ),
+    summary:
+      "Issues and merge requests on gitlab.com or a self-managed host, through your glab sign-in.",
+    reads: [
+      "Blocks and relates links in both directions",
+      "Merge requests that close an issue, and mentions from system notes",
+      "Nested group paths and native states",
+    ],
+    nodes: [
+      { id: "api#12", x: 70, y: 52, kind: "issue", tone: "started" },
+      { id: "api#14", x: 290, y: 44, kind: "issue", tone: "unstarted" },
+      { id: "api!12", x: 150, y: 140, kind: "pr", tone: "merged" },
+      { id: "web#3", x: 380, y: 132, kind: "issue", tone: "started" },
+    ],
+    relations: [
+      { from: [70, 52], to: [290, 44], label: "blocks" },
+      { from: [150, 140], to: [70, 52], label: "closes" },
+      { from: [290, 44], to: [380, 132], label: "relates" },
+    ],
+    command: providerCommands.gitlab,
+    href: "/docs/gitlab",
+    link: "Connect GitLab",
   },
   {
     id: "youtrack",

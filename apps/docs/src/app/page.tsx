@@ -61,7 +61,7 @@ export default function Home() {
           <div className="ig-hero-action">
             <InstallSelector />
             <span className="ig-hero-note">
-              Read-only access to GitHub, Linear, Jira, and YouTrack.
+              Read-only access to GitHub, Linear, Jira, GitLab, and YouTrack.
             </span>
           </div>
         </div>
@@ -73,8 +73,8 @@ export default function Home() {
           <h2 id="providers-title">Bring every tracker into one graph</h2>
           <p>
             Each provider follows the references its tracker records and keeps native states.
-            GitHub, Linear, Jira, and YouTrack are built in, and other trackers can import the same
-            normalized model. Saved runs open in one dashboard with a project switcher.
+            GitHub, Linear, Jira, GitLab, and YouTrack are built in, and other trackers can import
+            the same normalized model. Saved runs open in one dashboard with a project switcher.
           </p>
         </div>
         <ProviderCards />
@@ -134,7 +134,8 @@ export default function Home() {
           <div>
             <span className="ig-contract-label">Collect</span>
             <p>
-              The CLI reads GitHub, Linear, Jira, and YouTrack references and reports missing data.
+              The CLI reads GitHub, Linear, Jira, GitLab, and YouTrack references and reports
+              missing data.
             </p>
           </div>
           <div>
@@ -162,7 +163,7 @@ export default function Home() {
         <h2 id="install-title">Map your backlog before the next fix</h2>
         <p>
           Requires Node.js 20 or later. Sign in with the GitHub CLI, connect Linear, sign in to twg
-          for Jira, or set a YouTrack token.
+          for Jira, sign in to glab for GitLab, or set a YouTrack token.
         </p>
         <CodeBlock title="Terminal" className="ig-closing-command">
           <code>{renderTerminalCommand(plannedInstallCommand)}</code>

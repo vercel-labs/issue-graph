@@ -2,7 +2,7 @@
 title: Use issue-graph as a library
 navTitle: Library
 description: Use issue-graph in your application to crawl issue graphs, collect PR status, and query dashboard models over HTTP or GitHub CLI.
-lastModified: 2026-11-07
+lastModified: 2026-11-18
 ---
 
 ## Install
@@ -20,6 +20,7 @@ The package ships ESM imports with TypeScript declarations and declares Node.js 
 | `issue-graph/transport/http` | `fetch` and a GitHub token |
 | `issue-graph/transport/linear` | `fetch` and a Linear API key or OAuth access token |
 | `issue-graph/transport/twg` | Node-compatible child processes and a signed-in `twg` |
+| `issue-graph/transport/glab` | Node-compatible child processes and a signed-in `glab` |
 | `issue-graph/transport/youtrack` | `fetch` and a YouTrack permanent token |
 
 The core exports exclude CLI snapshot storage and the headless agent runner. Your application handles persistence and agent execution. For the Linear reader, see [Linear](/docs/linear).
@@ -42,6 +43,24 @@ console.log(renderJira(report));
 ```
 
 Pass the same `site` to the reader and the options, or omit both to use the `twg` default site. A reader you write yourself returns `twg jira workitem get --output json` payloads, or the bare work item. See [Jira](/docs/jira) for what the graph includes.
+
+## Read GitLab through glab
+
+`buildGitLabGraph` reads a bounded GitLab neighborhood through any `GitLabReader`. `glabGitLabReader` runs the `glab` on your `PATH`:
+
+```ts
+import { buildGitLabGraph, renderGitLab } from "issue-graph";
+import { glabGitLabReader } from "issue-graph/transport/glab";
+
+const report = await buildGitLabGraph(
+  glabGitLabReader({ host: "gitlab.example.com" }),
+  "group/project#123",
+  { host: "gitlab.example.com", maxDepth: 1, maxNodes: 80, hubThreshold: 12 },
+);
+console.log(renderGitLab(report));
+```
+
+Pass the same `host` to the reader and the options, or omit both to use the authenticated host of the current Git directory, or gitlab.com. A reader you write yourself implements `get(path)`, which receives a REST API v4 path such as `projects/group%2Fproject/issues/123/links` and returns the parsed JSON body. See [GitLab](/docs/gitlab) for what the graph includes.
 
 ## Read YouTrack through the REST API
 
@@ -179,7 +198,7 @@ console.log({
 
 `normalize` fills in defaults and rejects unsupported filters or views. `evaluate` returns the matching keys and the ranked open items. Neither function touches the network or the filesystem. Library calls use the built-in weights unless you pass overrides, and they do not read the CLI configuration.
 
-The package also exports the types `Model`, `ProviderDescriptor`, `DashboardFilters`, `DashboardQuery`, `Weights`, and `HeatSignals`. `scoring` exposes the versioned Heat formula, and `createGraphMetrics(model)` computes the observed relationships that Impact and Swarm use. Live collectors build models for GitHub and Linear. `buildJiraGraph` and `buildYouTrackGraph` return reports, not models. Other providers must supply a normalized model and its capabilities.
+The package also exports the types `Model`, `ProviderDescriptor`, `DashboardFilters`, `DashboardQuery`, `Weights`, and `HeatSignals`. `scoring` exposes the versioned Heat formula, and `createGraphMetrics(model)` computes the observed relationships that Impact and Swarm use. Live collectors build models for GitHub and Linear. `buildJiraGraph`, `buildGitLabGraph`, and `buildYouTrackGraph` return reports, not models. Other providers must supply a normalized model and its capabilities.
 
 The CLI writes static Next.js exports. The library's `renderHtml` and `renderDashboard` return HTML strings from the shared renderer and do not write Next.js assets or query history.
 

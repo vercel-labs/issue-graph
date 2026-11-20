@@ -13,7 +13,7 @@ Find related issues and pull requests before you start work. For humans and agen
   <img alt="issue-graph: open issues and pull requests from vercel-labs/portless grouped into five root-cause clusters, such as proxy port allocation and TLS trust" src="https://issue-graph.dev/readme-hero-light.png">
 </picture>
 
-issue-graph reads GitHub issues and pull requests, Linear issues, Jira issues, or YouTrack issues, and follows the references between them: closing links, mentions, cross-references, Linear relations, Jira issue links, and YouTrack issue links. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub, Linear, Jira, and YouTrack.
+issue-graph reads GitHub issues and pull requests, Linear issues, Jira issues, GitLab issues and merge requests, or YouTrack issues, and follows the references between them: closing links, mentions, cross-references, Linear relations, and Jira, GitLab, and YouTrack issue links. It shows existing fixes, competing PRs, and open follow-ups as one graph, groups open work into clusters, and opens the result in a local dashboard. It only reads from GitHub, Linear, Jira, GitLab, and YouTrack.
 
 ## Install
 
@@ -55,6 +55,12 @@ For Jira, sign in to the [Atlassian Teamwork Graph CLI](https://github.com/atlas
 issue-graph jira ABC-123 --site your-site --open
 ```
 
+For GitLab, sign in with the [GitLab CLI](https://gitlab.com/gitlab-org/cli) through `glab auth login`, then read the neighborhood of an issue or merge request on gitlab.com or a self-managed host:
+
+```bash
+issue-graph gitlab https://gitlab.example.com/group/project/-/issues/123 --open
+```
+
 For YouTrack, set `YOUTRACK_URL` to your base URL and `YOUTRACK_TOKEN` to a permanent token, then read an issue neighborhood:
 
 ```bash
@@ -93,7 +99,7 @@ Run `issue-graph --help` for the full list, or `issue-graph <command> --help` fo
 
 | Group | Commands | Docs |
 | --- | --- | --- |
-| Map work | `open`, `graph`, `linear`, `jira`, `youtrack` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear), [Jira](https://issue-graph.dev/docs/jira), [YouTrack](https://issue-graph.dev/docs/youtrack) |
+| Map work | `open`, `graph`, `linear`, `jira`, `gitlab`, `youtrack` | [Graph](https://issue-graph.dev/docs/graph), [Linear](https://issue-graph.dev/docs/linear), [Jira](https://issue-graph.dev/docs/jira), [GitLab](https://issue-graph.dev/docs/gitlab), [YouTrack](https://issue-graph.dev/docs/youtrack) |
 | Prioritize | `rank`, `cluster`, `reconcile`, `plan` | [Backlog](https://issue-graph.dev/docs/backlog), [Agents](https://issue-graph.dev/docs/agents) |
 | Dashboard | `dashboard`, `query`, `runs`, `config` | [Dashboard](https://issue-graph.dev/docs/dashboard) |
 | Pull requests | `status` | [Status](https://issue-graph.dev/docs/status) |

@@ -1,0 +1,95 @@
+---
+title: GitLab
+description: Map GitLab issue links, closing merge requests, and mentions on gitlab.com or a self-managed instance through the GitLab CLI (glab), then open the run in the dashboard.
+---
+
+`issue-graph gitlab` starts from one GitLab issue or merge request and maps what it blocks, what blocks it, related issues, the merge requests that close it, and the items that mention it. It reads GitLab through the [GitLab CLI](https://gitlab.com/gitlab-org/cli) (`glab`), so your GitLab credentials stay in `glab`, and it saves the run to the same dashboard as GitHub, Linear, and Jira. It works with gitlab.com and self-managed instances.
+
+## Connect GitLab
+
+`issue-graph gitlab` needs `glab` 1.126 or later on your `PATH`; issue-graph checks `glab version` before the first read and stops with `GLAB_TOO_OLD` on an older release. Install it from the [glab repository](https://gitlab.com/gitlab-org/cli), then sign in to each host you read:
+
+```bash
+glab auth login --hostname gitlab.example.com
+```
+
+You can set `GITLAB_TOKEN` instead. From version 1.126, `glab` sends that token only to its default host and the hosts in its configuration, never to another host named in a URL.
+
+issue-graph doesn't install `glab`, start its login, or read its credentials. When `glab` isn't on your `PATH`, the command fails with `GLAB_NOT_FOUND`. Without a login, GitLab reports a private project as `NOT_FOUND`, and gitlab.com returns public issues and merge requests but refuses issue links and notes, so the graph is partial.
+
+## Map an issue or merge request
+
+Pass an issue, work item, or merge request URL, which names the host for you:
+
+```bash
+issue-graph gitlab https://gitlab.example.com/group/subgroup/project/-/issues/12 --open
+```
+
+```bash
+issue-graph gitlab https://gitlab.com/group/project/-/merge_requests/34 --json
+```
+
+You can also pass a full reference, `group/project#12` for an issue or `group/project!34` for a merge request. Add `--host` to choose the host, or leave it out to use the authenticated host of the current Git directory, or gitlab.com:
+
+```bash
+issue-graph gitlab group/subgroup/project#12 --host gitlab.example.com
+```
+
+The instance must serve HTTPS at the root of its host, not under a path such as `/gitlab`. For a nondefault port, set `api_host` for the host in your `glab` configuration. A URL and a `--host` value that name different hosts fail before any read. The report prints as Markdown by default, and `--json` prints the versioned JSON report instead. `--open` writes an HTML explorer, opens it in your browser, and saves the run to the dashboard. `--html PATH` writes the explorer to a path you choose and also saves the run.
+
+## Open GitLab runs in the dashboard
+
+GitLab runs open in the same explorer as the other providers, with the GitLab mark, native states, and the Explore and Swarm views. Merge requests appear as pull requests, and a merge request that closes an issue shows as its fix. issue-graph saves one model per host and seed project, with an ID such as `gitlab:gitlab.example.com:project:group/subgroup/project`. A new run from the same project replaces the saved model.
+
+- `issue-graph dashboard` lists the GitLab project next to your other saved runs in the project switcher.
+- `issue-graph query gitlab:gitlab.example.com:project:group/subgroup/project` filters the saved run without calling `glab`.
+- `--no-save` writes the explorer without saving the run.
+- `--cluster` prints a thematic clustering task for the calling agent, and `--clusters PATH` applies its proposed themes to `--html` or `--open`.
+
+The command writes local files only with `--html` or `--open`. `opened` maps to open, `merged` to merged, and `closed` or `locked` to closed.
+
+## What the graph includes
+
+- Issue links with their native type: `relates_to`, which is undirected, and `blocks`, with its direction. GitLab reports the far end of a `blocks` link as `is_blocked_by`, so both ends become one `blocks` edge.
+- Merge requests that close an issue, read from both the issue and the merge request.
+- Mentions from GitLab's "mentioned in" system notes, such as `mentioned in merge request !34`.
+- Native state, draft status of merge requests, and update time.
+
+Issues (`#12`) and merge requests (`!12`) are separate nodes, even when they share a number in one project. Node keys have the form `gitlab:<host>:<project path>#<iid>` for issues and `gitlab:<host>:<project path>!<iid>` for merge requests, with the project path in lowercase because GitLab paths are case-insensitive. The host comes from the web URL GitLab returns for the first item. Projects in nested groups keep their full path.
+
+References between items in the seed's project recurse up to `--depth`. A reference into another project is read at the next depth and isn't expanded, so the `--max-nodes` cap reaches direct neighbors in other projects before deeper work in the seed's project.
+
+### Why some references are missing
+
+GitLab records a mention as a system note on the item that was mentioned, so issue-graph reads mentions from that side. When an issue's description names another issue, the edge appears once issue-graph reads the other issue, and not when it stops before it. issue-graph doesn't parse descriptions or comments itself, and it ignores mentioned commits.
+
+Group-level work items, such as epics, can be linked to an issue, but the project API can't read them. They appear as link targets in the coverage under `groupWorkItems` and aren't read. Parent and child work item hierarchy isn't read.
+
+## How issue-graph reads GitLab
+
+Every read is a `glab api --method GET` call without a shell, such as:
+
+```bash
+glab api --method GET --hostname gitlab.example.com "projects/group%2Fproject/issues/12/links"
+```
+
+An issue takes four reads: the issue, its links, the merge requests that close it, and its notes. A merge request takes three: the merge request, the issues it closes, and its notes. Lists are read 100 items per page, up to 10 pages. `--concurrency` sets how many items are read at once, from 1 to 16, with a default of 4.
+
+## Coverage and exit codes
+
+The command exits with `0` when coverage is complete within the requested scope, `1` when coverage is partial or the first item can't be read, and `2` for invalid arguments.
+
+These conditions make coverage partial:
+
+- A linked item that can't be read. It stays in the graph as unavailable with an error code, such as `NOT_FOUND`, `UNAUTHORIZED`, or `FORBIDDEN`.
+- A list of links, closing items, or notes that fails, or that has more than 10 pages. A list of exactly 10 full pages is complete.
+- The `--max-nodes` cap or an unexpanded hub.
+
+When the first item can't be read, the command prints the error code on stderr, prints no report, and exits with `1`. Depth boundaries and group work items appear in the coverage but don't make it partial.
+
+| Flag | Default | Range |
+| --- | --- | --- |
+| `--depth` | 1 | 0 to 8 |
+| `--max-nodes` | 80 | 1 to 1000 |
+| `--hub-threshold` | 12 | 1 to 1000 |
+| `--concurrency` | 4 | 1 to 16 |

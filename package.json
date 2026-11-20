@@ -31,6 +31,10 @@
       "types": "./dist/transports/twg.d.ts",
       "import": "./dist/transports/twg.js"
     },
+    "./transport/glab": {
+      "types": "./dist/transports/glab.d.ts",
+      "import": "./dist/transports/glab.js"
+    },
     "./transport/youtrack": {
       "types": "./dist/transports/youtrack.d.ts",
       "import": "./dist/transports/youtrack.js"

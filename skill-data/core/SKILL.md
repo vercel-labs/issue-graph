@@ -32,6 +32,7 @@ If a command or asset is missing, report the CLI/skill mismatch and observed err
 | Backlog verification queue | `issue-graph reconcile owner/repo` |
 | Linear issue or project relationships | `issue-graph linear <issue>`, or `issue-graph linear --project UUID` |
 | Jira issue links, parents, and subtasks | `issue-graph jira <KEY> --site SITE` |
+| GitLab issue links, closing MRs, and mentions | `issue-graph gitlab <issue-or-mr-url>` |
 | YouTrack issue links and linked pull requests | `issue-graph youtrack <ID>`, or an issue URL |
 | Next backlog action | `issue-graph plan owner/repo` |
 | Find work one fix resolves together | `issue-graph plan owner/repo --budget 1000 --format json`, then read `sweep` |
@@ -43,6 +44,8 @@ Live collection supports GitHub. `open`, `rank`, and `cluster` accept a reposito
 Use the dedicated `linear` command for Linear. If `issue-graph linear status` reports no connection, ask the user to run `issue-graph linear login` (browser, read-only) or to set `LINEAR_API_KEY`; never ask for keys in chat. Add `--github` to read the state of attached GitHub issues and pull requests, which shows whether a blocker's linked work is open, draft, or merged. Read `issue-graph linear --help` for its flags and limits.
 
 Use the dedicated `jira` command for Jira. It reads through the Atlassian TWG CLI (`twg`) and never writes to Jira. If it reports `TWG_NOT_FOUND` or a sign-in failure, ask the user to install `twg` and run `twg login`; never run setup or ask for Atlassian tokens yourself. Links into other projects are read one hop, text mentions are not collected, and an epic's child issues are not read from the epic: an expanded epic, or an issue with an unknown hierarchy level or a missing or null `subtasks` field, is partial, and one at the depth limit is a depth boundary. Read `issue-graph jira --help` for its flags and limits.
+
+Use the dedicated `gitlab` command for GitLab issues and merge requests on gitlab.com or a self-managed host. It reads through `glab api --method GET` and never writes to GitLab. If it reports `GLAB_NOT_FOUND`, `UNAUTHORIZED`, or `NOT_FOUND` for an item that exists, ask the user to install `glab` and run `glab auth login --hostname HOST`; never run setup or ask for tokens yourself. Issues (`#N`) and merge requests (`!N`) are separate nodes, mentions come only from system notes on the mentioned item, and group-level work items such as epics are listed but not read. Read `issue-graph gitlab --help` for its flags and limits.
 
 Use the dedicated `youtrack` command for YouTrack. It sends only `GET` requests to the REST API with `YOUTRACK_TOKEN`, a permanent token. If it reports `AUTHENTICATION`, `FORBIDDEN`, or a missing token or URL, ask the user to create a token and set `YOUTRACK_URL` and `YOUTRACK_TOKEN`; never ask for the token in chat. The configured base is `--url`, else `YOUTRACK_URL`, and must be `https` (`http` only for localhost); an issue URL must match it and never chooses the host. Links into other projects are read one hop, linked pull requests and commits are reported without fetching, text mentions are not collected, and a link or pull request list that fails or reaches its page limit makes that issue partial. Read `issue-graph youtrack --help` for its flags and limits.
 
@@ -62,7 +65,7 @@ The link is a local file. If the chat client cannot open it, also give `issue-gr
 
 Weights resolve built-in → global → provider → project → command. Inspect `config show` first. Use `query --weights comments=4,reactions=3` for temporary exploration. Use `config set --weights comments=4` only when the user wants persistent defaults.
 
-Take `--provider` and `--scope` from the query result, without adding the provider prefix to `--scope`. Linear project identity includes workspace and project IDs, such as `linear:WORKSPACE_ID:project:PROJECT_ID`. `query` also reads imported models. Live Linear reads go through `issue-graph linear`, live Jira reads through `issue-graph jira`, and live YouTrack reads through `issue-graph youtrack`. `jira` and `youtrack` save a model for `query` only with `--html` or `--open`.
+Take `--provider` and `--scope` from the query result, without adding the provider prefix to `--scope`. Linear project identity includes workspace and project IDs, such as `linear:WORKSPACE_ID:project:PROJECT_ID`. `query` also reads imported models. Live Linear reads go through `issue-graph linear`, live Jira reads go through `issue-graph jira`, live GitLab reads go through `issue-graph gitlab`, and live YouTrack reads go through `issue-graph youtrack`; `linear`, `jira`, `gitlab`, and `youtrack` save a model for `query` only with `--html` or `--open`.
 
 Dashboard sliders affect the URL/session only. Reset weights restores the document's opening weights. Config stores preferences, never credentials.
 
