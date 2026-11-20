@@ -1,6 +1,26 @@
 # Changelog
 
 <!-- release:start -->
+## 0.8.0
+
+### Features
+
+- `issue-graph gitlab <url | group/project#N | group/project!N>` reads a GitLab issue or merge request neighborhood on gitlab.com or a self-managed host through `glab` 1.126 or later: issue links with their direction, merge requests that close an issue, and mentions from system notes. Issues and merge requests are separate host-scoped nodes, links into other projects are read one hop, and group-level work items such as epics are listed but not read. issue-graph reads no credential; glab keeps it.
+- `issue-graph youtrack <ID | issue-url>` reads a YouTrack issue neighborhood through the REST API with a permanent token in `YOUTRACK_TOKEN`, on YouTrack Cloud or a standalone instance under a path prefix. Depend, Duplicate, Subtask, and Relates links keep their direction, and linked pull requests and commits are reported as remote links. The token is only sent to the configured base URL.
+- `--html` and `--open` save GitLab and YouTrack runs to the dashboard next to GitHub, Linear, and Jira, so `dashboard` and `query` read them offline.
+- The library exports `buildGitLabGraph`, `renderGitLab`, and `issue-graph/transport/glab`, and `buildYouTrackGraph`, `renderYouTrack`, and `issue-graph/transport/youtrack`.
+
+### Fixes
+
+- Saved dashboard runs whose ids reduce to the same file name no longer replace each other. The second run gets a hash suffix, and existing files keep their names.
+
+### Documentation
+
+- Add GitLab and YouTrack guides and landing cards, and describe both in the README, `schema`, security, and the bundled agent guide.
+- The Jira, GitLab, and YouTrack previews on the landing use each tracker's own colors: Jira issue types, GitLab status colors, and YouTrack priorities.
+
+<!-- release:end -->
+
 ## 0.7.0
 
 ### Features
@@ -15,8 +35,6 @@
 ### Documentation
 
 - Add a Jira guide and a Jira card on the landing page, and describe Jira in the README, `schema`, security, and the bundled agent guide.
-
-<!-- release:end -->
 
 ## 0.6.1
 
