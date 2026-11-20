@@ -7,6 +7,8 @@ const GITHUB_PATH =
   "M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.3.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.5 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2";
 const JIRA_PATH =
   "M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z";
+const GITLAB_PATH =
+  "m23.6 9.593-.033-.086L20.3.98a.851.851 0 0 0-.336-.405.875.875 0 0 0-1 .054.875.875 0 0 0-.29.44L16.47 7.818H7.537L5.332 1.07a.857.857 0 0 0-.29-.441.875.875 0 0 0-1-.054.859.859 0 0 0-.336.405L.433 9.502.4 9.588a6.066 6.066 0 0 0 2.012 7.01l.011.009.03.021 4.976 3.727 2.462 1.863 1.5 1.132a1.009 1.009 0 0 0 1.22 0l1.499-1.132 2.462-1.863 5.006-3.749.012-.01a6.068 6.068 0 0 0 2.01-7.003z";
 const LINEAR_PATH =
   "M12.927 16.371a1.47 1.47 0 0 0 .061 2.027l68.595 68.594c.555.555 1.446.59 2.026.062 10.058-9.152 16.372-22.348 16.372-37.018C99.98 22.402 77.579 0 49.945 0c-14.67 0-27.866 6.313-37.018 16.371M4.353 29.39a1.47 1.47 0 0 0 .309 1.648L68.943 95.32c.434.434 1.09.562 1.648.308a50 50 0 0 0 4.335-2.227c.834-.482.962-1.62.28-2.3L8.882 24.773c-.68-.68-1.818-.553-2.3.281a50 50 0 0 0-2.228 4.334m-3.9 18.407a1.48 1.48 0 0 1-.432-1.14q.2-2.986.74-5.866c.215-1.15 1.62-1.55 2.448-.722l56.703 56.704c.828.827.429 2.233-.722 2.448a50 50 0 0 1-5.865.74 1.48 1.48 0 0 1-1.14-.433zm3.48 13.963c-1.033-1.033-2.7-.143-2.322 1.268C6.221 80.22 19.761 93.76 36.954 98.37c1.41.379 2.3-1.289 1.268-2.322z";
 
@@ -17,7 +19,7 @@ interface Relation {
 }
 
 interface Provider {
-  id: "github" | "linear" | "jira" | "model";
+  id: "github" | "linear" | "jira" | "gitlab" | "model";
   name: string;
   logo: React.ReactNode;
   summary: string;
@@ -116,6 +118,36 @@ const providers: Provider[] = [
     command: providerCommands.jira,
     href: "/docs/jira",
     link: "Connect Jira",
+  },
+  {
+    id: "gitlab",
+    name: "GitLab",
+    logo: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d={GITLAB_PATH} />
+      </svg>
+    ),
+    summary:
+      "Issues and merge requests on gitlab.com or a self-managed host, through your glab sign-in.",
+    reads: [
+      "Blocks and relates links in both directions",
+      "Merge requests that close an issue, and mentions from system notes",
+      "Nested group paths and native states",
+    ],
+    nodes: [
+      { id: "api#12", x: 70, y: 52, kind: "issue", tone: "started" },
+      { id: "api#14", x: 290, y: 44, kind: "issue", tone: "unstarted" },
+      { id: "api!12", x: 150, y: 140, kind: "pr", tone: "merged" },
+      { id: "web#3", x: 380, y: 132, kind: "issue", tone: "started" },
+    ],
+    relations: [
+      { from: [70, 52], to: [290, 44], label: "blocks" },
+      { from: [150, 140], to: [70, 52], label: "closes" },
+      { from: [290, 44], to: [380, 132], label: "relates" },
+    ],
+    command: providerCommands.gitlab,
+    href: "/docs/gitlab",
+    link: "Connect GitLab",
   },
   {
     id: "model",

@@ -30,6 +30,10 @@
     "./transport/twg": {
       "types": "./dist/transports/twg.d.ts",
       "import": "./dist/transports/twg.js"
+    },
+    "./transport/glab": {
+      "types": "./dist/transports/glab.d.ts",
+      "import": "./dist/transports/glab.js"
     }
   },
   "main": "./dist/index.js",
