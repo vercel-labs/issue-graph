@@ -17,6 +17,7 @@
 ### Documentation
 
 - Add GitLab and YouTrack guides and landing cards, and describe both in the README, `schema`, security, and the bundled agent guide.
+- The Jira, GitLab, and YouTrack previews on the landing use each tracker's own colors: Jira issue types, GitLab status colors, and YouTrack priorities.
 
 <!-- release:end -->
 
