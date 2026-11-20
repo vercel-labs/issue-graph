@@ -34,6 +34,10 @@
     "./transport/glab": {
       "types": "./dist/transports/glab.d.ts",
       "import": "./dist/transports/glab.js"
+    },
+    "./transport/youtrack": {
+      "types": "./dist/transports/youtrack.d.ts",
+      "import": "./dist/transports/youtrack.js"
     }
   },
   "main": "./dist/index.js",

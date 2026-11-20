@@ -8,6 +8,7 @@
     "linear",
     "jira",
     "gitlab",
+    "youtrack",
     "status",
     "backlog",
     "agents",

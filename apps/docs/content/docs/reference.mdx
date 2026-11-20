@@ -17,10 +17,11 @@ issue-graph status --help
 issue-graph linear --help
 issue-graph jira --help
 issue-graph gitlab --help
+issue-graph youtrack --help
 issue-graph schema
 ```
 
-`query` and `config` share one help page, and `status`, `linear`, `jira`, and `gitlab` each have their own. Other commands print the main usage.
+`query` and `config` share one help page, and `status`, `linear`, `jira`, `gitlab`, and `youtrack` each have their own. Other commands print the main usage.
 
 `schema` prints the JSON command contract, including each command's formats, mutation flags such as `githubMutations`, `localWrites`, defaults, and limits. Its `schemaVersion` changes independently of the package version.
 
@@ -44,6 +45,7 @@ issue-graph linear login
 issue-graph linear ENG-123 --json
 issue-graph jira ABC-123 --site your-site --json
 issue-graph gitlab group/project#123 --host gitlab.example.com --json
+issue-graph youtrack ABC-123 --json
 issue-graph reconcile owner/repo --format json --no-save
 issue-graph plan owner/repo --format json
 issue-graph schema

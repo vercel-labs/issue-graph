@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting
 navTitle: Troubleshooting
-description: Diagnose GitHub and Linear sign-in failures, Jira and GitLab read failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
+description: Diagnose GitHub and Linear sign-in failures, Jira, GitLab, and YouTrack read failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
 lastModified: 2026-11-19
 ---
 
@@ -27,7 +27,7 @@ Graph, status, reconcile, and plan read GitHub through the GitHub CLI. When `gh`
 
 ## A command exits with code 1 after printing a report
 
-`status`, `linear`, `jira`, and `gitlab` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
+`status`, `linear`, `jira`, `gitlab`, and `youtrack` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
 
 For `status`, stderr ends with `INCOMPLETE_INVENTORY: some counts are unknown; inspect coverage and rerun.` Unknown counts print as `?` in the table and as `null` in JSON. Common causes:
 
@@ -41,6 +41,8 @@ For `linear`, `coverageComplete` is false when a node cannot be read, a connecti
 For `jira`, `coverageComplete` is false when an issue cannot be read, `twg` returns a warning for an issue, an expanded epic, other issue above the sub-task level, issue with an unknown hierarchy level, or issue whose `subtasks` field is missing or null has children that aren't read, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable issues print `Read failed:` followed by an error code, and the run fails before printing a report when the first issue can't be read. See [Jira read failures](#jira-read-failures).
 
 For `gitlab`, `coverageComplete` is false when an issue or merge request cannot be read, a links, closing, or notes listing fails or stops at the page limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable items print `Read failed:` followed by an error code, and the run fails before printing a report when the seed can't be read. Group-level work items are listed under `coverage.groupWorkItems` and don't make the run partial. See [GitLab read failures](#gitlab-read-failures).
+
+For `youtrack`, `coverageComplete` is false when an issue cannot be read, a link list, link target list, or pull request activity list fails or reaches its page limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable issues print `Read failed:` followed by an error code, and the run fails before printing a report when the first issue can't be read. See [YouTrack read failures](#youtrack-read-failures).
 
 `graph`, `open`, and `rank` print partial results without changing the exit code. Check the report instead:
 
@@ -98,6 +100,21 @@ If `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses it instead of 
 - `GLAB_FAILED`: another `glab` failure; the reason names it.
 - `TIMEOUT`: `glab` didn't finish within 60 seconds.
 - `HOST_MISMATCH` or `IDENTITY_MISMATCH`: the item's web URL names a different host, project, or number than requested, usually because the item moved. Start from its new URL.
+
+## YouTrack read failures
+
+`issue-graph youtrack` prints `YouTrack read failed (CODE)`. Common codes:
+
+- `AUTHENTICATION`: YouTrack rejected the token. Create a new permanent token and set `YOUTRACK_TOKEN`. The command fails with `Set YOUTRACK_TOKEN` before any read when the variable is empty.
+- `FORBIDDEN`: the token's account can't read the issue, or can't read its activity. A forbidden activity read marks the issue partial and keeps its links.
+- `NOT_FOUND`: the issue ID doesn't exist or isn't visible to the token, or the base URL is wrong. Check that `YOUTRACK_URL` includes any path prefix, such as `/youtrack`.
+- `RATE_LIMITED`: YouTrack answered `429` and asked for a longer wait than the reader allows. Rerun later or lower `--concurrency`.
+- `UPSTREAM`: YouTrack answered with a `5xx` status after the reader's retries.
+- `NETWORK` or `TIMEOUT`: the request failed or didn't finish within 20 seconds. A redirect counts as a network failure, because the reader doesn't follow redirects with your token; use the final base URL.
+- `TOO_LARGE` or `INVALID_PAYLOAD`: the response was over 32 MiB or wasn't the JSON the REST API documents.
+- `IDENTITY_MISMATCH`: YouTrack returned a different issue ID, usually because the issue moved to another project. Start from the new ID.
+
+When neither `--url`, an issue URL, nor `YOUTRACK_URL` names the instance, the command exits with `2` and asks for one.
 
 ## Linear rate limits
 

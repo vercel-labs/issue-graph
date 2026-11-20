@@ -5,6 +5,7 @@ import { delimiter, join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { runNode } from "../tests/node-process.js";
+import { serveYouTrack } from "../tests/youtrack-fixtures.js";
 import { nextSteps, parseArgs, runCli, statusArgs, UsageError } from "./cli.js";
 import { listSnapshots, writeSnapshot } from "./snapshot.js";
 import { shellTransport } from "./transports/shell.js";
@@ -531,4 +532,90 @@ esac
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+describe("youtrack", () => {
+  const token = "perm:cli-test-token";
+  const issues = {
+    "ABC-1": {
+      links: [{ type: "Depend" as const, direction: "OUTWARD" as const, targets: ["ABC-2"] }],
+      pulls: [
+        { timestamp: 1, added: [["https://github.com/o/r/pull/5", "Fix"] as [string, string]] },
+      ],
+    },
+    "ABC-2": {},
+  };
+
+  test("reads the REST API with YOUTRACK_URL and YOUTRACK_TOKEN and never prints the token", async () => {
+    const stub = await serveYouTrack(issues, token);
+    try {
+      const result = await runNode(["src/bin.ts", "youtrack", "ABC-1", "--json"], {
+        env: { ...process.env, YOUTRACK_URL: stub.url, YOUTRACK_TOKEN: token },
+      });
+      expect(result.stderr).toBe("");
+      expect(result.code).toBe(0);
+      expect(result.stdout).not.toContain(token);
+      const report = JSON.parse(result.stdout);
+      expect(report.authority).toMatch(/^127\.0\.0\.1:\d+\/youtrack$/);
+      expect(report.nodes.map((node: { identifier: string }) => node.identifier)).toEqual([
+        "ABC-1",
+        "ABC-2",
+      ]);
+      expect(report.nodes[0].externalLinks[0].url).toBe("https://github.com/o/r/pull/5");
+    } finally {
+      await stub.close();
+    }
+  });
+
+  test("an issue URL on another host exits 2 and the token is never sent there", async () => {
+    const stray = await serveYouTrack(issues, token);
+    try {
+      const result = await runNode(
+        ["src/bin.ts", "youtrack", `${stray.url}/issue/ABC-1`, "--json"],
+        {
+          env: {
+            ...process.env,
+            YOUTRACK_URL: "https://acme.youtrack.cloud",
+            YOUTRACK_TOKEN: token,
+          },
+        },
+      );
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain("does not match YOUTRACK_URL");
+      expect(result.stdout).toBe("");
+      expect(stray.requests).toEqual([]);
+      const noBase = await runNode(["src/bin.ts", "youtrack", `${stray.url}/issue/ABC-1`], {
+        env: { ...process.env, YOUTRACK_URL: "", YOUTRACK_TOKEN: token },
+      });
+      expect(noBase.code).toBe(2);
+      expect(stray.requests).toEqual([]);
+    } finally {
+      await stray.close();
+    }
+  });
+
+  test("a rejected token exits 1 with the code, and a missing token or URL fails before reading", async () => {
+    const stub = await serveYouTrack(issues, token);
+    try {
+      const env = { ...process.env, YOUTRACK_URL: stub.url };
+      const rejected = await runNode(["src/bin.ts", "youtrack", "ABC-1"], {
+        env: { ...env, YOUTRACK_TOKEN: "wrong" },
+      });
+      expect(rejected.code).toBe(1);
+      expect(rejected.stderr).toContain("AUTHENTICATION");
+      expect(rejected.stderr).not.toContain("wrong");
+      const noToken = await runNode(["src/bin.ts", "youtrack", "ABC-1"], {
+        env: { ...env, YOUTRACK_TOKEN: "" },
+      });
+      expect(noToken.code).toBe(1);
+      expect(noToken.stderr).toContain("YOUTRACK_TOKEN");
+      const noUrl = await runNode(["src/bin.ts", "youtrack", "ABC-1"], {
+        env: { ...env, YOUTRACK_URL: "", YOUTRACK_TOKEN: token },
+      });
+      expect(noUrl.code).toBe(2);
+      expect(noUrl.stderr).toContain("YOUTRACK_URL");
+    } finally {
+      await stub.close();
+    }
+  });
 });

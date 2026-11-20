@@ -10,6 +10,7 @@
  *   ./transports/linear.js: Linear GraphQL
  *   ./transports/twg.js: `twg` shell-out for Jira
  *   ./transports/glab.js: `glab` shell-out for GitLab
+ *   ./transports/youtrack.js: YouTrack REST API over fetch + token
  *
  * `snapshot.ts` (node:fs) and `cluster.ts` (node:child_process) are CLI
  * internals with no external consumer, so they are deliberately not exported.
@@ -44,3 +45,4 @@ export * from "./transport.js";
 export * from "./types.js";
 export * from "./work-clusters.js";
 export * from "./work-types.js";
+export * from "./youtrack.js";

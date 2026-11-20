@@ -1,13 +1,14 @@
 export const landingTitle = "Find related work before you start";
 export const landingLastModified = "2026-11-19";
 export const landingDescription =
-  "Map related issues and pull requests across GitHub, Linear, Jira, and GitLab, group open work by root cause, and open the exact view in your browser.";
+  "Map related issues and pull requests across GitHub, Linear, Jira, GitLab, and YouTrack, group open work by root cause, and open the exact view in your browser.";
 
 export const providerCommands = {
   github: "issue-graph open vercel-labs/portless",
   linear: "issue-graph linear ENG-123 --workspace your-workspace --open",
   jira: "issue-graph jira ABC-123 --site your-site --open",
   gitlab: "issue-graph gitlab group/project#12 --open",
+  youtrack: "issue-graph youtrack ABC-123 --open",
   model: "issue-graph query --input model.json --open",
 } as const;
 

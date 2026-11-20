@@ -322,3 +322,15 @@ Use `issue-graph gitlab --help` before a GitLab workflow. The command reads thro
 - `--open` or `--html PATH` writes the explorer and saves the model `gitlab:<host>:project:<path>`, so `query` and `dashboard` work offline. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
 
 Read coverage before making completeness claims: unreadable items, failed or page-capped link, closing, or note listings, the node cap, and unexpanded hubs make the graph partial and exit `1`. On gitlab.com without a login, links and notes are refused, so the graph is partial. An unreadable item is not absent work.
+
+## YouTrack reads
+
+Use `issue-graph youtrack --help` before a YouTrack workflow. The command sends `GET` requests to `<base>/api` with the user's `YOUTRACK_TOKEN` and never mutates YouTrack. If the token or `YOUTRACK_URL` is missing, or the command fails with `AUTHENTICATION` or `FORBIDDEN`, ask the user to create a permanent token and set the variables; never ask for the token in chat.
+
+- `issue-graph youtrack ABC-123 --json` reads a bounded neighborhood from `YOUTRACK_URL`. The base is `--url`, else `YOUTRACK_URL`, and must be `https` (`http` only for localhost). An issue URL such as `https://example.youtrack.cloud/issue/ABC-123` must match it and never chooses the host.
+- `Depend`, `Duplicate`, `Subtask`, and `Relates` links map to blocks, duplicate of, parent of, and related; other link types stay provider specific under their native name.
+- Links within the seed's project recurse to `--depth`; links into other projects are read at the next depth and not expanded.
+- Linked pull requests (with state) and commits are reported as remote links without fetching their targets, and issue IDs in summaries, descriptions, or comments are not collected.
+- `--open` or `--html PATH` writes the explorer and saves the model `youtrack:<host and path>:project:<SHORTNAME>`, so `query` and `dashboard` work offline. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
+
+Read coverage before making completeness claims: unreadable issues, link or pull request lists that failed or reached the page limit, the node cap, and unexpanded hubs make the graph partial and exit `1`. An unreadable issue is not absent work.

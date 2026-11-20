@@ -1,0 +1,93 @@
+---
+title: YouTrack
+description: Map YouTrack issue links and linked pull requests through the REST API with a permanent token, then open the run in the dashboard.
+---
+
+`issue-graph youtrack` starts from one YouTrack issue and maps what it blocks, what blocks it, its duplicates and related work, its parent and subtasks, and its linked pull requests and commits. It reads YouTrack through the [REST API](https://www.jetbrains.com/help/youtrack/devportal/youtrack-rest-api.html) with a permanent token, and it saves the run to the same dashboard as GitHub, Linear, and Jira.
+
+## Connect YouTrack
+
+Create a [permanent token](https://www.jetbrains.com/help/youtrack/devportal/authentication-with-permanent-token.html) for an account that can read the issues you want to map, then export it with your base URL:
+
+```bash
+export YOUTRACK_URL=https://your-name.youtrack.cloud
+export YOUTRACK_TOKEN=perm:...
+```
+
+issue-graph sends the token as a `Bearer` header to your configured base URL only, doesn't follow redirects, and never stores it. Use a token with read access: the command only sends `GET` requests. Without `YOUTRACK_TOKEN`, the command fails before reading anything.
+
+## Map an issue neighborhood
+
+Pass an issue ID, or an issue URL on your configured base URL:
+
+```bash
+issue-graph youtrack ABC-123 --open
+```
+
+```bash
+issue-graph youtrack https://your-name.youtrack.cloud/issue/ABC-123 --json
+```
+
+The report prints as Markdown by default, and `--json` prints the versioned JSON report instead. `--open` writes an HTML explorer, opens it in your browser, and saves the run to the dashboard. `--html PATH` writes the explorer to a path you choose and also saves the run.
+
+## Open YouTrack runs in the dashboard
+
+YouTrack runs open in the same explorer as the other providers, with the YouTrack mark, native state names, and the Explore and Swarm views. issue-graph saves one model per base URL and seed project, with an ID such as `youtrack:your-name.youtrack.cloud:project:ABC`. A new run from the same project replaces the saved model.
+
+- `issue-graph dashboard` lists the YouTrack project next to your other saved runs in the project switcher.
+- `issue-graph query youtrack:your-name.youtrack.cloud:project:ABC` filters the saved run without calling YouTrack.
+- `--no-save` writes the explorer without saving the run.
+- `--cluster` prints a thematic clustering task for the calling agent, and `--clusters PATH` applies its proposed themes to `--html` or `--open`.
+
+The command writes local files only with `--html` or `--open`. An issue with a resolution time is closed in the dashboard, and an unresolved issue is open.
+
+## Choose the base URL
+
+`--url` takes the base URL of your YouTrack service, and `YOUTRACK_URL` is its default. The URL must be absolute `https` with no credentials, query, or fragment, because the token travels in every request. `http` is accepted only for loopback hosts: `localhost`, `127.0.0.0/8`, and `::1`. Cloud instances use `https://your-name.youtrack.cloud`. Instances on `myjetbrains.com` and standalone servers can have a path prefix, such as `https://your-name.myjetbrains.com/youtrack` or `https://host.example/youtrack`. issue-graph keeps the prefix and appends `/api`.
+
+The configured base URL is `--url`, or `YOUTRACK_URL` when you don't pass it. An issue URL never chooses the host. It must have the same scheme, host, and path prefix as the configured base, so `https://host.example/youtrack/issue/ABC-123` works with `--url https://host.example/youtrack`. A different host fails with exit code `2` before any request, so the token is never sent to it. An issue URL with no configured base also exits with `2`. Node keys have the form `youtrack:<host and path>:<ID>`, so issues with the same ID on different instances can't collide.
+
+## What the graph includes
+
+- Issue links in both directions with their native link type name. `Depend` maps to blocks, `Duplicate` to duplicate of, `Subtask` to parent of, and `Relates` to related, which is undirected. Other link types, including custom ones, stay as provider specific relationships under their own name.
+- Linked pull requests from the issue's pull request activity, listed as remote links with their title and state, such as `Fix root (merged)`. A pull request stays while any change still adds it and is left out once every change that added it was removed.
+- Linked commits from the issue's VCS activity, listed as remote links titled `Commit` with the short hash, under the same rule.
+- Native state, resolution, and update time.
+
+Links between issues in the seed's project recurse up to `--depth`. A link into another project is read at the next depth and isn't expanded, so the `--max-nodes` cap reaches direct neighbors in other projects before deeper work in the seed's project.
+
+issue-graph lists pull request and commit URLs without fetching them. It doesn't collect issue IDs mentioned in summaries, descriptions, or comments, so text such as `UTF-8` never turns into a read.
+
+## How issue-graph reads YouTrack
+
+issue-graph sends `GET` requests to `<base>/api` with a `fields` projection for each resource. One issue takes these reads:
+
+| Read | Resource |
+| --- | --- |
+| The issue | `/api/issues/ID` |
+| Link types and directions | `/api/issues/ID/links` |
+| Targets of each link that has any | `/api/issues/ID/links/LINK_ID/issues` |
+| Pull request changes | `/api/issues/ID/activitiesPage` with `categories=PullRequestChangeCategory` |
+| Commits | `/api/issues/ID/activitiesPage` with `categories=VcsChangeCategory` |
+
+Link lists use `$top` and `$skip` pages of 100. Pull request activity uses the cursor the API returns. Each list reads up to 5 pages; a list that reaches that limit marks the issue partial. `--concurrency` sets how many issues are read at once, from 1 to 16, with a default of 4. The reader waits and retries a `429` or `5xx` response a bounded number of times, rejects responses over 32 MiB, and stops a request after 20 seconds.
+
+## Coverage and exit codes
+
+The command exits with `0` when coverage is complete within the requested scope, `1` when coverage is partial or the first issue can't be read, and `2` for invalid arguments.
+
+These conditions make coverage partial:
+
+- A linked issue that can't be read. It stays in the graph as unavailable with an error code, such as `FORBIDDEN`, `NOT_FOUND`, or `IDENTITY_MISMATCH` when the issue moved to another ID.
+- A link list, link target list, pull request activity, or commit activity read that fails, returns an unexpected shape, or reaches the page limit.
+- A link whose direction YouTrack doesn't report as `OUTWARD`, `INWARD`, or `BOTH`.
+- The `--max-nodes` cap or an unexpanded hub.
+
+When the first issue can't be read, the command prints the error code on stderr, prints no report, and exits with `1`. Depth boundaries appear in the coverage but don't make it partial.
+
+| Flag | Default | Range |
+| --- | --- | --- |
+| `--depth` | 1 | 0 to 8 |
+| `--max-nodes` | 80 | 1 to 1000 |
+| `--hub-threshold` | 12 | 1 to 1000 |
+| `--concurrency` | 4 | 1 to 16 |
