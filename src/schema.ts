@@ -53,7 +53,15 @@ export const ISSUE_GRAPH_SCHEMA = {
       },
       concurrency: { default: 4, minimum: 1, maximum: 32 },
       relationships: ["relations", "inverseRelations", "parent", "children", "attachments"],
-      exclusions: ["text mentions", "fetching attachment targets"],
+      exclusions: ["text mentions", "fetching non-GitHub attachment targets"],
+      githubAttachments: {
+        flag: "--github",
+        default: "not fetched",
+        transport: "gh api graphql",
+        depth: "one hop; targets are not expanded",
+        fields: ["repo", "number", "kind", "state", "draft", "title", "observedAt"],
+        failure: "target recorded as unavailable; owning issue marked partial; exit 1",
+      },
       exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
       jsonFlag: "--json emits the report on stdout; takes no path",
       description:
@@ -64,6 +72,125 @@ export const ISSUE_GRAPH_SCHEMA = {
         semantics: "proposed themes, not verified common root causes",
         validation: "rejects foreign or duplicate member keys; unassigned nodes stay visible",
       },
+    },
+    jira: {
+      remoteMutations: false,
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest site and seed-project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+      ],
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json", "html"],
+      authentication:
+        "the twg session from `twg login`; issue-graph reads and stores no Atlassian credential",
+      transport:
+        "twg jira workitem get KEY --fields ... --remote-links --output json --output-summary=none [--site SITE], one process per issue, no shell",
+      required: ["Jira issue key (ABC-123) or https://<site>/browse/ABC-123 URL"],
+      requires: "twg 1.4 or later",
+      site: "--site prefix, domain, or cloud ID; a browse URL names the site; a --site domain must equal each issue's site and a prefix must be its first label; a cloud ID with a browse URL is checked against the site twg reports for the first issue; default is the twg default site; node keys use the site from the issue's web url or site-hosted REST self link",
+      maxDepth: { default: 1, minimum: 0, maximum: 8 },
+      maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+      hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
+      concurrency: { default: 4, minimum: 1, maximum: 16 },
+      relationships: ["issuelinks", "parent", "subtasks", "remoteLinks"],
+      crossProject: "links into other projects are read at the next depth and not expanded",
+      dashboard:
+        "--html PATH or --open writes the explorer and saves model jira:<site>:project:<KEY> for dashboard and query; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
+      exclusions: [
+        "text mentions",
+        "fetching remote link targets",
+        "comments",
+        "children of an epic or higher-level issue, or of an issue that is not a sub-task and whose type has no hierarchy level or whose subtasks field is missing or null; an expanded issue is marked partial, one at the depth limit is listed as a depth boundary",
+      ],
+      failures:
+        "unreadable, renamed, or other-site linked issues stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; TWG warnings or partial TWG coverage mark the issue partial",
+      exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
+      jsonFlag: "--json emits the report on stdout; takes no path",
+      description:
+        "Read a bounded Jira neighborhood through the Atlassian Teamwork Graph CLI with site-scoped identities, native link direction, and explicit coverage gaps, and save it to the dashboard.",
+    },
+    gitlab: {
+      remoteMutations: false,
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest host and seed-project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+      ],
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json", "html"],
+      authentication:
+        "the glab session from `glab auth login`, or GITLAB_TOKEN, which glab sends only to its default or configured hosts; issue-graph reads and stores no GitLab credential",
+      transport:
+        "glab api --method GET [--hostname HOST] projects/:path/(issues|merge_requests)/:iid[/links|/closed_by|/closes_issues|/notes], no shell",
+      required: [
+        "GitLab issue, work item, or merge request URL, or a group/project#N or group/project!N reference",
+      ],
+      requires:
+        "glab 1.126 or later, checked with `glab version` before the first read; older or unreadable versions fail with GLAB_TOO_OLD or GLAB_VERSION_UNKNOWN",
+      host: "--host HOST; a URL names the host and must agree with --host; default is the authenticated host of the current Git directory, or gitlab.com; node keys use the host from the seed's web_url",
+      maxDepth: { default: 1, minimum: 0, maximum: 8 },
+      maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+      hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
+      concurrency: { default: 4, minimum: 1, maximum: 16 },
+      relationships: ["issue links", "closing merge requests", "system note mentions"],
+      identities:
+        "gitlab:<host>:<lowercase project path>#<iid> for issues and !<iid> for merge requests",
+      crossProject: "references into other projects are read at the next depth and not expanded",
+      dashboard:
+        "--html PATH or --open writes the explorer and saves model gitlab:<host>:project:<lowercase path> for dashboard and query; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
+      exclusions: [
+        "references in descriptions or comments that GitLab did not record as a system note on the mentioned item",
+        "group-level work items such as epics, which are listed as link targets but not read",
+        "parent and child work item hierarchy",
+        "commits",
+      ],
+      failures:
+        "unreadable linked items stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; a failed or page-capped links, closing, or notes listing marks the item partial",
+      exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
+      jsonFlag: "--json emits the report on stdout; takes no path",
+      description:
+        "Read a bounded GitLab neighborhood of issues and merge requests through glab with host-scoped identities, native link direction, closing merge requests, system note mentions, and explicit coverage gaps, and save it to the dashboard.",
+    },
+    youtrack: {
+      remoteMutations: false,
+      localWrites: [
+        "HTML with --html PATH or --open",
+        "latest base URL and seed-project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+      ],
+      outputSchemaVersion: 1,
+      formats: ["markdown", "json", "html"],
+      authentication:
+        "YOUTRACK_TOKEN, a permanent token sent as a Bearer token to the configured base URL only; read from the environment, never stored",
+      transport:
+        "GET <base>/api/issues/ID, /issues/ID/links, /issues/ID/links/LINK/issues, and /issues/ID/activitiesPage (PullRequestChangeCategory and VcsChangeCategory) over fetch with fields projections; link lists use $top/$skip offset pages and activity uses the cursor the API returns; requests stay under <base>/api and redirects are not followed",
+      required: ["YouTrack issue ID (ABC-123) or <base-url>/issue/ABC-123 URL"],
+      url: "--url BASE, else YOUTRACK_URL: an absolute https base URL (http only for localhost, 127.0.0.0/8, and ::1) without credentials, query, or fragment and with an optional path prefix such as /youtrack; an issue URL never chooses the host and must match the configured base, or exit 2 before any request; node keys use youtrack:<host and path>:<ID>",
+      maxDepth: { default: 1, minimum: 0, maximum: 8 },
+      maxNodes: { default: 80, minimum: 1, maximum: 1000 },
+      hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
+      concurrency: { default: 4, minimum: 1, maximum: 16 },
+      pages: {
+        size: 100,
+        links:
+          "offset pages with $top and $skip; an entry seen twice, because the list changed between pages, marks the list partial",
+        activity:
+          "cursor pages from afterCursor for pull requests and commits; a repeated cursor or a removal that names no known change marks the list partial",
+        defaultPerList: 5,
+        maximumPerList: 100,
+        option: "maxPages in the library; the CLI uses the default",
+      },
+      relationships: ["links", "pull requests", "commits"],
+      linkTypes:
+        "Depend maps to blocks, Duplicate to duplicate of, Subtask to parent of, Relates to related; other link types keep their native name as provider specific",
+      crossProject: "links into other projects are read at the next depth and not expanded",
+      dashboard:
+        "--html PATH or --open writes the explorer and saves model youtrack:<authority>:project:<SHORTNAME> for dashboard and query; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
+      exclusions: ["text mentions", "fetching pull request and commit targets", "comments"],
+      failures:
+        "unreadable or moved linked issues stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; a link or pull request list that fails or reaches the page limit marks the issue partial",
+      exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
+      jsonFlag: "--json emits the report on stdout; takes no path",
+      description:
+        "Read a bounded YouTrack neighborhood through the REST API with base-URL-scoped identities, native link direction, linked pull requests, and explicit coverage gaps, and save it to the dashboard.",
     },
     query: {
       providerMutations: false,

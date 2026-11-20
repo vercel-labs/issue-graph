@@ -7,14 +7,14 @@ lastModified: 2026-09-27
 
 ## Check PR status
 
-Specify repositories and authors:
+Pass one or more repositories and the authors to count:
 
 ```bash
 issue-graph status vercel-labs/portless --author ctate,Railly
 issue-graph status vercel-labs/agent-browser vercel-labs/portless --author ctate,Railly
 ```
 
-`--author` is required. Name one or more repositories, or run inside a GitHub checkout to use its `git remote`. `--repo owner/repo` also works and can repeat. Repeat `--author` or separate authors with commas. Scope matching and deduplication are case-insensitive.
+`--author` is required. Repeat it or separate authors with commas. Name repositories as arguments or with a repeatable `--repo owner/repo`. Inside a GitHub checkout, you can omit them and status uses the checkout's `git remote`. Repository and author matching and deduplication are case-insensitive.
 
 ## Choose a view
 
@@ -31,37 +31,37 @@ issue-graph status vercel-labs/portless --author ctate --view prs
 
 ## Choose an output format
 
-A terminal gets an aligned table with a narrow-screen fallback. A pipe gets versioned JSON. Set `--format auto|human|markdown|json` to choose explicitly.
+In a terminal, status prints an aligned table that falls back to a narrow layout on small screens. In a pipe, it prints versioned JSON. Set `--format auto|human|markdown|json` to choose explicitly.
 
 ```bash
 issue-graph status vercel-labs/portless --author ctate,Railly --format markdown
 issue-graph status vercel-labs/portless --author ctate,Railly --json
 ```
 
-For status, `--json` writes to stdout and takes no filename. Schema version 1 includes scope, query timestamps, coverage, PR details, author and project rows, totals, and next steps. `NO_COLOR` disables styling. Progress messages go to stderr.
+For status, `--json` writes to stdout and takes no filename. Schema version 1 includes the scope, query timestamps, coverage, PR details, author and project rows, totals, and next steps. `NO_COLOR` disables styling. Progress messages go to stderr.
 
 ## Read the counts
 
-Each metric contains `count`, `prIds`, and `unknownIds`. A `null` count, shown as `?` in human output, means the total is unknown. Known matching IDs provide a lower bound.
+Each metric contains `count`, `prIds`, and `unknownIds`. A `null` count, shown as `?` in human output, means the total is unknown, and the known matching IDs give a lower bound.
 
-Check `coverageComplete` and each repository's `coverage` before using totals. A failed repository makes its aggregate counts and portfolio totals unknown. Complete sibling repositories retain their counts. Query timestamps record the collection window.
+Check `coverageComplete` and each repository's `coverage` before you use totals. When one repository fails, its aggregate counts and the portfolio totals become unknown, while complete sibling repositories keep their counts. Query timestamps record the collection window.
 
-Review-required, changes-requested, approved, no-review-required, and unknown states partition open PRs. Draft, conflict, and unassigned flags are independent and can overlap.
+The review states partition open PRs: review required, changes requested, approved, no review required, and unknown. The draft, conflict, and unassigned flags are independent and can overlap with each other and with any review state.
 
-Ready-for-review means the PR is non-draft. To find non-draft, unassigned PRs, filter `pullRequests` for `isDraft === false` and an explicitly empty `assignees` array. Unknown mergeability or assignees remain unknown.
+Ready for review means the PR isn't a draft. To find non-draft PRs with no assignee, filter `pullRequests` for `isDraft === false` and an explicitly empty `assignees` array. Mergeability or assignees that status couldn't read stay unknown.
 
-Check CI, code review findings, and unresolved review threads separately before merging; status collects review state and metadata.
+Status collects review state and metadata only. Before merging, check CI, code review findings, and unresolved review threads separately.
 
 ## Pagination and exit codes
 
-Status paginates PRs in groups of 50 and also paginates assignees and reviewer requests.
+Status reads PRs in pages of 50 and also paginates assignees and reviewer requests.
 
 | Flag | Default | Range |
 | --- | --- | --- |
 | `--concurrency N` | 4 repositories | 1 to 32 |
 | `--max-pages N` | 100 pages per connection | 1 to 1000 |
 
-Caps, access failures, malformed responses, and detectable pagination drift produce incomplete coverage.
+Coverage becomes incomplete when status hits a cap, an access failure, a malformed response, or pagination drift it can detect.
 
 | Exit code | Meaning |
 | --- | --- |
@@ -71,7 +71,7 @@ Caps, access failures, malformed responses, and detectable pagination drift prod
 
 ## Save and compare captures
 
-Use `--save` to keep a local capture:
+Add `--save` to keep a local capture:
 
 ```bash
 issue-graph status vercel-labs/portless --author ctate,Railly --save
@@ -81,14 +81,14 @@ issue-graph status vercel-labs/portless --author ctate,Railly --since /path/to/p
 
 Captures are immutable JSON files under `~/.issue-graph/status/<scope-hash>/`. Set `ISSUE_GRAPH_HOME` to change the storage root.
 
-`--since last` loads the latest capture for the same repository and author scope before fetching new data. Order and case can differ. `--since PATH` accepts a saved snapshot or an older status JSON export. Missing, corrupt, future, or mismatched baselines return an error.
+`--since last` loads the latest capture for the same repositories and authors before fetching new data, regardless of their order or case. `--since PATH` accepts a saved snapshot or an older status JSON export. A missing, corrupt, future, or mismatched baseline returns an error.
 
-`--no-save` prevents saving and conflicts with `--save`. You can combine it with `--since` to compare without saving the new capture.
+`--no-save` prevents saving and can't be combined with `--save`. Combine it with `--since` to compare without saving the new capture.
 
 ## Read changes
 
-Human output includes a Changes section. JSON adds `history` for comparisons and `snapshot` when saving. Changes cover review state, drafts, conflicts, heads, assignments, requested reviewers, additions, departures, and counts.
+Human output includes a Changes section. JSON adds `history` when comparing and `snapshot` when saving. Changes cover review state, drafts, conflicts, heads, assignments, requested reviewers, additions, departures, and counts.
 
-PRs missing from the new inventory are queried again to identify merged, closed, or unverified departures. Unknown data and incomplete baselines limit which transitions can be reported.
+Status queries PRs that dropped out of the new inventory again to tell merged, closed, and unverified departures apart. Unknown data and incomplete baselines limit which transitions it can report.
 
-See [Permissions and privacy](/docs/security) before storing or sharing captures.
+Read [Permissions and privacy](/docs/security) before you store or share captures.

@@ -252,6 +252,9 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
 }
+.ig-provider:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .ig-provider {
   display: flex;
   flex-direction: column;

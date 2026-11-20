@@ -6,11 +6,15 @@
     "graph",
     "dashboard",
     "linear",
+    "jira",
+    "gitlab",
+    "youtrack",
     "status",
     "backlog",
     "agents",
     "library",
     "security",
+    "troubleshooting",
     "reference",
     "changelog"
   ]

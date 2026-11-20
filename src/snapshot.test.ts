@@ -33,6 +33,35 @@ describe("diffSnapshots", () => {
     expect(out).toContain("o/r#1 —closes→ o/r#2 (by @railly)");
   });
 
+  test("reports a sub-issue link added beside an existing reference to the same node", () => {
+    const prev = snap("t0", [
+      {
+        key: "o/r#1",
+        kind: "Issue",
+        state: "OPEN",
+        title: "parent",
+        edges: [{ to: "o/r#2", via: "text", by: "alice" }],
+      },
+      { key: "o/r#2", kind: "Issue", state: "OPEN", title: "child", edges: [] },
+    ]);
+    const now = snap("t1", [
+      {
+        key: "o/r#1",
+        kind: "Issue",
+        state: "OPEN",
+        title: "parent",
+        edges: [
+          { to: "o/r#2", via: "text", by: "alice" },
+          { to: "o/r#2", via: "parent-of" },
+        ],
+      },
+      { key: "o/r#2", kind: "Issue", state: "OPEN", title: "child", edges: [] },
+    ]);
+    const out = diffSnapshots(prev, now);
+    expect(out).not.toContain("no changes");
+    expect(out).toContain("o/r#1 —parent-of→ o/r#2");
+  });
+
   test("reports removed nodes", () => {
     const prev = snap("t0", [
       { key: "o/r#9", kind: "Issue", state: "OPEN", title: "gone", edges: [] },

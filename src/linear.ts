@@ -1,4 +1,5 @@
 import { components, crawlGraph } from "./crawl.js";
+import { githubTargetLabel } from "./linear-github.js";
 import {
   LINEAR_CONNECTIONS,
   type LinearConnection,
@@ -6,6 +7,12 @@ import {
   type LinearReader,
 } from "./linear-queries.js";
 import type { GraphCrawlOptions } from "./types.js";
+import {
+  hasUnreadEdges,
+  validateWorkLimits,
+  type WorkCoverage,
+  workCoverage,
+} from "./work-report.js";
 import type {
   OpenItemCount,
   ReadCoverage,
@@ -66,19 +73,13 @@ export interface LinearReport {
     issues?: "project" | "neighborhood";
     notes?: readonly string[];
     relationships: readonly string[];
-    externalLinks: "reported-not-fetched";
+    externalLinks: "reported-not-fetched" | "github-resolved";
     textReferences: "not-collected";
     archived: "issues-included-links-excluded" | "excluded";
   };
   limits: Omit<LinearGraphOptions, "workspace" | "generatedAt">;
   coverageComplete: boolean;
-  coverage: {
-    failed: string[];
-    partial: string[];
-    cappedOut: string[];
-    hubs: string[];
-    depthBoundaries: string[];
-  };
+  coverage: WorkCoverage;
   nodes: WorkNode[];
   components: string[][];
 }
@@ -429,18 +430,11 @@ export async function buildLinearGraph(
       }
     },
   );
-  const values = [...nodes.values()];
-  const coverage = {
-    failed: values.filter((node) => !node.fetched).map((node) => node.key),
-    partial: values
-      .filter((node) => node.coverage.some((part) => !part.complete))
-      .map((node) => node.key),
-    cappedOut: [...cappedOut].sort(),
-    hubs: values.filter((node) => node.hub).map((node) => node.key),
-    depthBoundaries: values
-      .filter((node) => node.depth === limits.maxDepth && node.edges.some((e) => !nodes.has(e.to)))
-      .map((node) => node.key),
-  };
+  const { coverage, coverageComplete } = workCoverage(
+    nodes,
+    cappedOut,
+    (node) => node.depth === limits.maxDepth && hasUnreadEdges(node, nodes),
+  );
   return {
     schemaVersion: 1,
     source: "linear",
@@ -460,28 +454,15 @@ export async function buildLinearGraph(
       archived: "issues-included-links-excluded",
     },
     limits,
-    coverageComplete:
-      !coverage.failed.length &&
-      !coverage.partial.length &&
-      !coverage.cappedOut.length &&
-      !coverage.hubs.length,
+    coverageComplete,
     coverage,
-    nodes: values,
+    nodes: [...nodes.values()],
     components: components(nodes),
   };
 }
 
 function validateOptions(options: LinearGraphOptions): void {
-  for (const [name, value, minimum, maximum] of [
-    ["maxDepth", options.maxDepth, 0, 8],
-    ["maxNodes", options.maxNodes, 1, 1000],
-    ["hubThreshold", options.hubThreshold, 1, 1000],
-    ["concurrency", options.concurrency ?? 4, 1, 32],
-    ["maxPages", options.maxPages, 1, 100],
-  ] as const) {
-    if (!Number.isInteger(value) || value < minimum || value > maximum)
-      throw new RangeError(`${name} must be an integer from ${minimum} to ${maximum}`);
-  }
+  validateWorkLimits(options, 32, [["maxPages", options.maxPages, 1, 100]]);
   if (options.workspace && !WORKSPACE.test(options.workspace))
     throw new Error("Invalid Linear workspace");
 }
@@ -665,10 +646,16 @@ export function renderLinear(report: LinearReport): string {
     "",
     `Coverage: ${report.coverageComplete ? "complete within requested scope" : "partial"} · ${report.nodes.length} nodes · ${report.scope.issues === "project" ? "project capture" : `depth ${report.limits.maxDepth}`}`,
     "",
-    `Explicit relationships and hierarchy. ${report.scope.archived === "excluded" ? "Archived issues are excluded." : "Archived issues are included; archived relations and attachments are excluded."} Attachment URLs are reported without fetching their targets. Text mentions are not collected.`,
+    `Explicit relationships and hierarchy. ${report.scope.archived === "excluded" ? "Archived issues are excluded." : "Archived issues are included; archived relations and attachments are excluded."} ${report.scope.externalLinks === "github-resolved" ? "GitHub issue and pull request attachments are read one hop; other attachment URLs are reported without fetching." : "Attachment URLs are reported without fetching their targets."} Text mentions are not collected.`,
     "",
   ];
   const labels = new Map(report.nodes.map((node) => [node.key, node.identifier]));
+  const linked = new Map(
+    report.nodes.map((node) => [
+      node.key,
+      node.externalLinks.flatMap((link) => (link.github ? [githubTargetLabel(link.github)] : [])),
+    ]),
+  );
   for (const node of report.nodes) {
     lines.push(
       `## ${markdown(node.identifier)} · ${markdown(node.title)}`,
@@ -681,12 +668,16 @@ export function renderLinear(report: LinearReport): string {
     for (const edge of node.edges) {
       const arrow =
         edge.direction === "incoming" ? "←" : edge.direction === "undirected" ? "↔" : "→";
+      const work =
+        edge.relation === "blocks" && edge.direction === "incoming" ? linked.get(edge.to) : [];
       lines.push(
-        `- ${arrow} ${markdown(edge.nativeRelation)}: ${markdown(labels.get(edge.to) ?? edge.to)}`,
+        `- ${arrow} ${markdown(edge.nativeRelation)}: ${markdown(labels.get(edge.to) ?? edge.to)}${work?.length ? ` · ${markdown(work.join("; "))}` : ""}`,
       );
     }
     for (const link of node.externalLinks)
-      lines.push(`- Attachment: ${markdown(link.title)} · ${markdown(link.url)}`);
+      lines.push(
+        `- Attachment: ${markdown(link.title)} · ${markdown(link.url)}${link.github ? ` · ${markdown(githubTargetLabel(link.github))}` : ""}`,
+      );
     for (const part of node.coverage.filter((part) => !part.complete))
       lines.push(`- Incomplete ${part.source}: ${part.reason}`);
     lines.push("");

@@ -3,6 +3,61 @@ title: Changelog
 description: Release notes for issue-graph, covering agent guidance, CLI updates, and documentation.
 ---
 
+## 0.7.0
+
+### Features
+
+- `issue-graph jira <issue>` reads a Jira issue neighborhood through the Atlassian Teamwork Graph CLI (`twg` 1.4 or later): issue links in both directions with their native type, parents, subtasks, and remote links, with site-scoped identifiers. Links into other projects are read one hop. `--html` and `--open` save the run to the dashboard next to GitHub and Linear projects, so `dashboard` and `query` read it offline.
+- The GitHub crawl follows sub-issue links, so an epic reaches sub-issues it never mentions and a sub-issue reaches its parent. Reports and the dashboard show them as `parent of` and `child of`. Sub-issue links add no Heat and never count as closing links.
+
+### Fixes
+
+- The hub threshold counts distinct linked items, so an epic that also lists its sub-issues in a task list counts each one once.
+
+### Documentation
+
+- Add a Jira guide and a Jira card on the landing page, and describe Jira in the README, `schema`, security, and the bundled agent guide.
+
+
+## 0.6.1
+
+### Features
+
+- `issue-graph linear --github` reads the GitHub issues and pull requests attached to each Linear issue, one hop through `gh`. A blocked issue shows whether its blocker's linked work is open, draft, closed, or merged, and the dashboard shows the state on each attachment. Unreadable targets stay visible and mark the issue partial.
+
+### Fixes
+
+- With the Linear MCP session, a relation read from both of its issues shows once in the dashboard instead of twice.
+
+### Documentation
+
+- The bundled agent guide no longer says live Linear collection is unavailable.
+- Docs pages follow the technical-writer style, and the README hero shows clusters in light and dark themes.
+
+## 0.6.0
+
+### Features
+
+- `issue-graph linear <issue>` reads a Linear issue neighborhood: relations in both directions, parents, sub-issues, and attachment links, with native states and workspace-scoped identifiers.
+- `issue-graph linear --project UUID` captures a whole Linear project, including disconnected issues, and counts its open issues.
+- `issue-graph linear login` connects through the browser to Linear's read-only MCP server, with no API key or admin access. `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` also works and takes precedence. `linear status`, `linear logout`, and `auth status` show the connection.
+- Linear projects open in the dashboard next to saved GitHub runs, and `--cluster` with `--clusters` applies proposed themes.
+- When Linear rate limits a capture, the command waits if the window resets within the retry budget and otherwise stops with the reset time.
+- `--no-save` replaces `--no-snapshot`, which still works as a deprecated alias.
+- The dashboard uses Geist color tokens in light and dark themes, and the first 14 cluster colors come from the Geist hue scales. Larger graphs keep every cluster color distinct.
+
+### Fixes
+
+- Provider logos in imported dashboard models must be static SVG shapes with allowlisted attributes, so an imported capture cannot run script in the dashboard.
+- Default dashboard exports are written to a new private temporary directory. Exports refuse asset paths through directories that another account owns or can write, including existing assets with open permissions.
+- `cluster --agent claude` runs Claude with no tools or MCP servers, and `cluster --agent codex` runs Codex in its read-only sandbox. Both start in an empty directory, and the prompt marks issue titles as untrusted data.
+
+### Documentation
+
+- Add a Linear guide, and describe Linear in the README, the bundled agent guide, and `schema`.
+- The landing page shows agent-proposed clusters from a real capture, the GitHub and Linear providers, and Heat ranking with adjustable weights.
+- Shorten the README and move website and dashboard development notes to CONTRIBUTING.
+
 ## 0.5.0
 
 ### Features
@@ -19,7 +74,6 @@ description: Release notes for issue-graph, covering agent guidance, CLI updates
 ### Documentation
 
 - The bundled agent guide adds a sweep workflow that verifies each group on the current release before drafting close comments.
-
 
 ## 0.4.1
 

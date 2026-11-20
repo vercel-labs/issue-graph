@@ -213,7 +213,7 @@ If `limits.seedLimitReached` is true, `limits.cappedOut` is non-empty, or `limit
 
 ## Plan mode
 
-Use `issue-graph plan owner/repo --format json` when a human or agent needs the next safe backlog action. It returns a ready execution queue, an investigation queue, blocked work, a single `next` item when coverage permits, and a structured `decision` for its observed neighborhood. Competing pull requests include comparable draft, review, mergeability, diff, file-count, and update signals. A `reviewFirst` value orders inspection only; it never proves correctness or chooses the winning implementation. Failed neighbor references are quarantined to their affected items. The ordering is deterministic and uses reconcile action, PR readiness, discussion heat, and visible inbound references.
+Use `issue-graph plan owner/repo --format json` when a human or agent needs the next safe backlog action. It returns a ready execution queue, an investigation queue, blocked work, a single `next` item when coverage permits, and a structured `decision` for its observed neighborhood. Competing pull requests include comparable draft, review, mergeability, diff, file-count, and update signals. A `reviewFirst` value orders inspection only; it never proves correctness or chooses the winning implementation. Failed neighbor references are quarantined to their affected items. A sub-issue link is structure, not a reference: an unfetched or capped sub-issue never blocks its parent, nor a missing parent its sub-issue. The ordering is deterministic and uses reconcile action, PR readiness, discussion heat, and visible inbound references.
 
 The plan does not infer semantic dependencies from issue prose. Treat `blockedBy` as visible graph evidence only, and re-run after each merge or closure.
 
@@ -256,7 +256,7 @@ Re-run the plan after each merge or closure; groups change as work lands.
 
 ## How it reads the graph
 
-- **Two edge sources.** Text mentions (body + comments) and structural links (timeline cross-references, connected events, closing refs) via GraphQL. Structural links catch attached PRs that never appear in the body text, the reason a text grep alone misses orphans.
+- **Two edge sources.** Text mentions (body + comments) and structural links (timeline cross-references, connected events, closing refs, sub-issue links) via GraphQL. Structural links catch attached PRs that never appear in the body text, the reason a text grep alone misses orphans. A sub-issue link is a `parent-of` edge on the parent and a `child-of` edge on the sub-issue; it adds no heat but counts as a connection in dashboard Impact, `links`, and `blast`, is never a closing link, and sits beside any mention or cross-reference between the same two issues instead of replacing it.
 - **PR triage metadata.** Each PR node carries `review`, draft/mergeable state, `+adds/-dels across Nf`, `updated <date>` (staleness), and the file paths it touches, all in the one node query, no extra requests.
 - **Heat signals.** Every node also carries comment count, distinct participants, reactions, and createdAt in the same query, the inputs to `issue-graph rank`.
 - **File-overlap detection.** Open PRs whose changed-file sets intersect are paired as possible duplicates/conflicts; a shared closing issue promotes the pair to a likely duplicate.
@@ -264,7 +264,7 @@ Re-run the plan after each merge or closure; groups change as work lands.
 - **Attribution.** Each node carries its author and who mentioned it; each edge carries the actor and date.
 - **State is fetched live per node** (OPEN/CLOSED/MERGED), never trusted from a cross-reference event, which can be stale.
 - **Snapshot + diff.** Graph runs compare the same seed list; keep seed order consistent. Reconcile runs compare the repository even when its open seed set changes, including a transition to zero open items; incomplete reconciliation coverage suppresses unsafe new or resolved claims. Graph/reconcile save under `~/.issue-graph/` unless `--no-save` is set, and may still read prior history with that flag. Status saves only with `--save`; plan never saves snapshots. `ISSUE_GRAPH_HOME` overrides the shared state root, including config, captures, query history, saved dashboards and graph/status/reconcile history.
-- **Bounded coverage.** Graph queries read up to 100 comments, 100 timeline items, 100 PR files, and 50 closing references per node without fully paginating those connections. Search-based seeds also face the node budget and 1000-result ceiling. Increasing `--budget` cannot remove every limit. A zero exit from graph/reconcile/plan alone does not certify complete coverage.
+- **Bounded coverage.** Graph queries read up to 100 comments, 100 timeline items, 100 PR files, 50 closing references, and 50 sub-issues per node without fully paginating those connections. A parent past the sub-issue limit carries `subIssuesPastLimit`; sub-issues the token cannot read are counted in `subIssuesUnreadable`. Search-based seeds also face the node budget and 1000-result ceiling. Increasing `--budget` cannot remove every limit. A zero exit from graph/reconcile/plan alone does not certify complete coverage.
 
 ## Guardrails
 
@@ -290,7 +290,47 @@ first; if Linear is not connected, ask the user to run `issue-graph linear login
   to skip the saved model; explicit HTML output is still written.
 - `--cluster` prints a task for the current agent. `--clusters PATH --html project.html`
   applies proposed themes without changing native relationships or statuses.
+- `--github` reads attached GitHub issues and pull requests one hop through `gh`. A
+  blocked issue then shows whether each blocker's linked work is open, draft, closed,
+  or merged. An unreadable target marks its issue partial.
 
 Read coverage before making completeness claims: node/page limits and read failures
-can make the graph partial. Text mentions and attachment targets are not crawled.
+can make the graph partial. Text mentions and non-GitHub attachment targets are not
+crawled, and GitHub targets are never expanded past one hop.
 The HTML is a static capture; regenerate it to refresh.
+
+## Jira reads
+
+Use `issue-graph jira --help` before a Jira workflow. The command runs `twg jira workitem get` for each issue with the user's `twg` session and never mutates Jira. If `twg` is missing or not signed in, the command fails with `TWG_NOT_FOUND` or the code `twg` reports; ask the user to install `twg` 1.4 or later and run `twg login` rather than running setup yourself.
+
+- `issue-graph jira ABC-123 --site example --json` reads a bounded neighborhood. A browse URL such as `https://example.atlassian.net/browse/ABC-123` names the site; a `--site` domain must equal each issue's site and a prefix its first label; a cloud ID with a browse URL is checked against the site `twg` reports.
+- Links within the seed's project recurse to `--depth`; links into other projects are read at the next depth and not expanded.
+- Remote links are reported without fetching their targets, and issue keys in summaries, descriptions, or comments are not collected.
+- Children of an epic or another issue above the sub-task level are not read from the parent. An expanded issue like this is marked partial; one at the depth limit is listed as a depth boundary. An issue whose type has no hierarchy level, or whose `subtasks` field is missing or null, counts as one unless it is a sub-task. Start from a child to see its parent.
+- `--open` or `--html PATH` writes the explorer and saves the model `jira:<site>:project:<KEY>`, so `query` and `dashboard` work offline like Linear runs. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
+
+Read coverage before making completeness claims: unreadable issues, `twg` warnings, unread children of an expanded epic or of an issue with no `subtasks` field, the node cap, and unexpanded hubs make the graph partial and exit `1`. An unreadable issue is not absent work.
+
+## GitLab reads
+
+Use `issue-graph gitlab --help` before a GitLab workflow. The command reads through `glab api --method GET` with the user's `glab` credentials and never mutates GitLab. If `glab` is missing or not signed in to the host, the command fails with `GLAB_NOT_FOUND` or `UNAUTHORIZED`, or with `NOT_FOUND` for a private project; ask the user to install `glab` and run `glab auth login --hostname HOST` rather than running setup yourself. `GITLAB_TOKEN` also works, and `glab` 1.126 or later sends it only to its default and configured hosts.
+
+- `issue-graph gitlab https://gitlab.example.com/group/subgroup/project/-/issues/12 --json` reads a bounded neighborhood. A URL names the host; a `group/project#12` or `group/project!12` reference uses `--host` or the `glab` default host.
+- Issues and merge requests with the same number are separate nodes, keyed `gitlab:<host>:<path>#<iid>` and `gitlab:<host>:<path>!<iid>` with the path in lowercase.
+- Edges are issue links (`relates_to`, and `blocks` with its direction, which also covers `is_blocked_by`), merge requests that close issues, and "mentioned in" system notes. Mentions are read from the mentioned item, so an item's own outgoing references appear only when the target is read.
+- References within the seed's project recurse to `--depth`; references into other projects are read at the next depth and not expanded. Group-level work items such as epics are listed under `coverage.groupWorkItems` and not read.
+- `--open` or `--html PATH` writes the explorer and saves the model `gitlab:<host>:project:<path>`, so `query` and `dashboard` work offline. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
+
+Read coverage before making completeness claims: unreadable items, failed or page-capped link, closing, or note listings, the node cap, and unexpanded hubs make the graph partial and exit `1`. On gitlab.com without a login, links and notes are refused, so the graph is partial. An unreadable item is not absent work.
+
+## YouTrack reads
+
+Use `issue-graph youtrack --help` before a YouTrack workflow. The command sends `GET` requests to `<base>/api` with the user's `YOUTRACK_TOKEN` and never mutates YouTrack. If the token or `YOUTRACK_URL` is missing, or the command fails with `AUTHENTICATION` or `FORBIDDEN`, ask the user to create a permanent token and set the variables; never ask for the token in chat.
+
+- `issue-graph youtrack ABC-123 --json` reads a bounded neighborhood from `YOUTRACK_URL`. The base is `--url`, else `YOUTRACK_URL`, and must be `https` (`http` only for localhost). An issue URL such as `https://example.youtrack.cloud/issue/ABC-123` must match it and never chooses the host.
+- `Depend`, `Duplicate`, `Subtask`, and `Relates` links map to blocks, duplicate of, parent of, and related; other link types stay provider specific under their native name.
+- Links within the seed's project recurse to `--depth`; links into other projects are read at the next depth and not expanded.
+- Linked pull requests (with state) and commits are reported as remote links without fetching their targets, and issue IDs in summaries, descriptions, or comments are not collected.
+- `--open` or `--html PATH` writes the explorer and saves the model `youtrack:<host and path>:project:<SHORTNAME>`, so `query` and `dashboard` work offline. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
+
+Read coverage before making completeness claims: unreadable issues, link or pull request lists that failed or reached the page limit, the node cap, and unexpanded hubs make the graph partial and exit `1`. An unreadable issue is not absent work.

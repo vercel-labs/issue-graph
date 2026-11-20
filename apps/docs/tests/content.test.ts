@@ -136,21 +136,20 @@ describe("documentation content contract", () => {
     expect(pages[2]).toContain(`${example.coverage.omittedEdges} edges`);
   });
 
-  test("ships illustrated README media with a static alternative", async () => {
+  test("ships a README hero image for light and dark themes", async () => {
     const readme = await read("../../README.md");
-    expect(readme).toContain("https://issue-graph.dev/issue-graph-workflows.gif");
-    expect(readme).toContain("[Static version](https://issue-graph.dev/issue-graph-workflows.png)");
-    expect(readme).toContain("Illustrated workflows:");
-    expect(readme).not.toContain("Public CLI output captured on September 22, 2026.");
-    const gif = await readFile(new URL("public/issue-graph-workflows.gif", appRoot));
-    expect(gif.toString("ascii", 0, 6)).toBe("GIF89a");
-    expect(gif.readUInt16LE(6)).toBe(1080);
-    expect(gif.readUInt16LE(8)).toBe(520);
-    expect(gif.length).toBeLessThan(100_000);
-    const still = await readFile(new URL("public/issue-graph-workflows.png", appRoot));
-    expect(still.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
-    expect(still.readUInt32BE(16)).toBe(1080);
-    expect(still.readUInt32BE(20)).toBe(1560);
+    expect(readme).toContain(
+      '<source media="(prefers-color-scheme: dark)" srcset="https://issue-graph.dev/readme-hero-dark.png">',
+    );
+    expect(readme).toContain('src="https://issue-graph.dev/readme-hero-light.png"');
+    expect(readme).toMatch(/<img alt="issue-graph: [^"]+"/);
+    for (const theme of ["dark", "light"]) {
+      const image = await readFile(new URL(`public/readme-hero-${theme}.png`, appRoot));
+      expect(image.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      expect(image.readUInt32BE(16)).toBe(2400);
+      expect(image.readUInt32BE(20)).toBe(1200);
+      expect(image.length).toBeLessThan(400_000);
+    }
   });
 
   test("root guidance documents published installation and automatic releases", async () => {

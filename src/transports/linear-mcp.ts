@@ -143,8 +143,12 @@ export function linearMcpReader(options: LinearMcpReaderOptions): LinearReader &
     const incoming: unknown[] = [];
     const add = async (target: unknown, type: string, direction: "out" | "in") => {
       const other = await ref(target);
+      const from = String(direction === "out" ? self.id : other.id);
+      const to = String(direction === "out" ? other.id : self.id);
+      // The same id from either endpoint, so a relation read from both issues stays one edge.
+      const ends = type === "related" && from > to ? [to, from] : [from, to];
       const node = {
-        id: `${self.id}:${direction}:${type}:${other.id}`,
+        id: `${ends[0]}:${type}:${ends[1]}`,
         type,
         archivedAt: null,
         issue: direction === "out" ? self : other,

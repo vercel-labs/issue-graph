@@ -1,5 +1,5 @@
 import { scoring, type Weights } from "./scoring.js";
-import type { GraphNode, NodeKey } from "./types.js";
+import { type GraphNode, isHierarchyVia, type NodeKey } from "./types.js";
 
 /** One ranked row: the raw signals plus the composite score. */
 export interface PriorityRow {
@@ -42,10 +42,11 @@ export function prioritize(
   now: Date,
   weights: Weights = scoring.defaults,
 ): PriorityRow[] {
-  // distinct referencing nodes per target
+  // distinct referencing nodes per target, leaving out sub-issue structure
   const inbound = new Map<NodeKey, number>();
   for (const n of nodes.values())
-    for (const e of n.edges) inbound.set(e.to, (inbound.get(e.to) ?? 0) + 1);
+    for (const e of n.edges)
+      if (!isHierarchyVia(e.via)) inbound.set(e.to, (inbound.get(e.to) ?? 0) + 1);
 
   const rows: PriorityRow[] = [];
   for (const n of nodes.values()) {

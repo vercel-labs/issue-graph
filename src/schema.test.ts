@@ -54,6 +54,24 @@ describe("ISSUE_GRAPH_SCHEMA", () => {
     expect(skills.errorCodes).toEqual(["USAGE_ERROR", "SKILL_READ_FAILED"]);
   });
 
+  test("publishes the read-only Jira contract", () => {
+    const jira = ISSUE_GRAPH_SCHEMA.commands.jira;
+    expect(jira.remoteMutations).toBe(false);
+    expect(jira.localWrites.join(" ")).toContain("--no-save");
+    expect(jira.formats).toEqual(["markdown", "json", "html"]);
+    expect(jira.transport).toContain("--output-summary=none");
+    expect(jira.exclusions).toContain("text mentions");
+    expect(jira.exclusions.join(" ")).toContain("subtasks field is missing or null");
+    expect(jira.concurrency).toEqual({ default: 4, minimum: 1, maximum: 16 });
+  });
+
+  test("publishes the read-only GitLab contract", () => {
+    const gitlab = ISSUE_GRAPH_SCHEMA.commands.gitlab;
+    expect(gitlab.remoteMutations).toBe(false);
+    expect(gitlab.transport).toContain("glab api --method GET");
+    expect(gitlab.formats).toEqual(["markdown", "json", "html"]);
+  });
+
   test("publishes bounded crawl limits", () => {
     expect(ISSUE_GRAPH_SCHEMA.crawl.concurrency).toEqual({ default: 4, minimum: 1, maximum: 32 });
     expect(ISSUE_GRAPH_SCHEMA.crawl.maxNodes.maximum).toBe(1000);

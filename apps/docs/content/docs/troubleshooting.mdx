@@ -1,0 +1,151 @@
+---
+title: Troubleshooting
+navTitle: Troubleshooting
+description: Diagnose GitHub and Linear sign-in failures, Jira, GitLab, and YouTrack read failures, partial coverage and exit code 1, Linear rate limits, and queries that find no saved model.
+lastModified: 2026-11-19
+---
+
+## GitHub requests fail
+
+Graph, status, reconcile, and plan read GitHub through the GitHub CLI. When `gh` cannot authenticate, a seed search fails with `gh api search failed:` and graph reads fail with `gh api graphql failed:`, each followed by the message `gh` printed. Nodes that fail during a crawl stay in the graph as unfetched nodes with an `UNKNOWN` state, and status reports the repository as incomplete.
+
+1. Check the sign-in state:
+
+   ```bash
+   issue-graph auth status
+   ```
+
+   When GitHub is not available, the first line reads `github  not signed in via gh  (run: gh auth login)` and the command exits with code `1`. The command never prints tokens.
+
+2. If GitHub is not signed in, sign in with the GitHub CLI and run `issue-graph auth status` again:
+
+   ```bash
+   gh auth login
+   ```
+
+3. If GitHub is signed in but some repositories still fail, check that your account can read each repository, including private repositories reached through references, and that your organization's SSO authorization covers the credential. See [Permissions and privacy](/docs/security).
+
+## A command exits with code 1 after printing a report
+
+`status`, `linear`, `jira`, `gitlab`, and `youtrack` exit with code `1` when coverage is incomplete, and with code `2` for invalid arguments. A report printed before exit code `1` is partial, so read its coverage before using the counts.
+
+For `status`, stderr ends with `INCOMPLETE_INVENTORY: some counts are unknown; inspect coverage and rerun.` Unknown counts print as `?` in the table and as `null` in JSON. Common causes:
+
+- The page cap: the report says `PR pagination limit (N pages) reached.` Raise `--max-pages`, up to 1000.
+- A failed read: an access error or API failure for one repository. Fix access as described in [GitHub requests fail](#github-requests-fail), then rerun.
+
+With `--since`, `INCOMPLETE_HISTORY` means some transitions could not be verified. See [Status and history](/docs/status).
+
+For `linear`, `coverageComplete` is false when a node cannot be read, a connection stops at the `--max-pages` limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Nodes that could not be read print `Read failed:` followed by an error code. Depth boundaries are listed in the coverage but do not make the result partial. Raise the limit that stopped the crawl, or start a new run from an unexpanded hub. See [Linear](/docs/linear) for the limits and ranges.
+
+For `jira`, `coverageComplete` is false when an issue cannot be read, `twg` returns a warning for an issue, an expanded epic, other issue above the sub-task level, issue with an unknown hierarchy level, or issue whose `subtasks` field is missing or null has children that aren't read, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable issues print `Read failed:` followed by an error code, and the run fails before printing a report when the first issue can't be read. See [Jira read failures](#jira-read-failures).
+
+For `gitlab`, `coverageComplete` is false when an issue or merge request cannot be read, a links, closing, or notes listing fails or stops at the page limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable items print `Read failed:` followed by an error code, and the run fails before printing a report when the seed can't be read. Group-level work items are listed under `coverage.groupWorkItems` and don't make the run partial. See [GitLab read failures](#gitlab-read-failures).
+
+For `youtrack`, `coverageComplete` is false when an issue cannot be read, a link list, link target list, or pull request activity list fails or reaches its page limit, the `--max-nodes` cap stops the crawl, or a non-seed hub is not expanded. Unreadable issues print `Read failed:` followed by an error code, and the run fails before printing a report when the first issue can't be read. See [YouTrack read failures](#youtrack-read-failures).
+
+`graph`, `open`, and `rank` print partial results without changing the exit code. Check the report instead:
+
+- `## Not crawled (node cap N reached)` lists nodes beyond the `--budget` cap. Raise `--budget`, up to 1000.
+- `## Hubs not expanded` lists nodes linked to more items than `--hub-threshold`, sub-issues included and each item counted once, each with a `--depth 1` command that starts a new crawl from that hub.
+- Unfetched nodes, with `fetched: false` in JSON, are reads that failed.
+- `sub-issues: N more not read (first 50 per node)` under an issue means it has more than 50 sub-issues and the rest are missing from the graph. Start a new crawl from a missing sub-issue to see it.
+- `sub-issues: N returned no data` under an issue means GitHub listed sub-issues your token cannot read. Check access to their repositories as described in [GitHub requests fail](#github-requests-fail).
+- Same-repository references stop at `--depth`, and cross-repository references stop after one hop.
+
+## Linear is not connected
+
+`issue-graph linear` and `issue-graph linear status` print a setup guide that starts with `Linear is not connected.` when no session or environment key exists. `linear status` then exits with code `1`.
+
+Connect through the browser, then check the result:
+
+```bash
+issue-graph linear login
+issue-graph linear status
+```
+
+You can instead set exactly one of `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN`. Environment keys take precedence over the login session.
+
+## Linear rejects the session
+
+When Linear rejects the stored credential, the command stops and prints `Linear read failed (AUTHENTICATION)`. Sign in again to replace the session:
+
+```bash
+issue-graph linear login
+```
+
+If `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN` is set, the CLI uses it instead of the session, so check or replace that value. `issue-graph linear status` shows which credential the CLI uses. If an expired session cannot be refreshed, the command prints a message starting with `Linear sign-in failed`; run `issue-graph linear login` again in that case too.
+
+## Jira read failures
+
+`issue-graph jira` prints `Jira read failed (CODE)` followed by the reason from `twg`. Common codes:
+
+- `TWG_NOT_FOUND`: `twg` isn't installed or isn't on `PATH`. Install it from the [twg repository](https://github.com/atlassian/twg-cli).
+- `TWG_FAILED` or a code reported by `twg`: the command failed, often because you aren't signed in or can't read the issue. Run `twg login`, or check the issue with `twg jira workitem get ABC-123 --site your-site`. A reason that names an unknown option or an invalid `--output-summary` value means `twg` is older than 1.4; update it.
+- `TIMEOUT`: `twg` didn't finish within 60 seconds.
+- `SITE_MISMATCH`: the issue's web URL names a different site than `--site` or the browse URL.
+- `SITE_UNKNOWN`: neither `--site`, a browse URL, nor the `twg` response names the site, or a browse URL is combined with a `--site` cloud ID and the response doesn't name the site to confirm they match. Pass `--site` with the site's domain.
+- `IDENTITY_MISMATCH`: `twg` returned a different key, usually because the issue moved to another project. Start from the new key.
+
+## GitLab read failures
+
+`issue-graph gitlab` prints `GitLab read failed (CODE)` followed by the reason from `glab`. Common codes:
+
+- `GLAB_NOT_FOUND`: `glab` isn't installed or isn't on `PATH`. Install it from the [GitLab CLI repository](https://gitlab.com/gitlab-org/cli).
+- `UNAUTHORIZED` or `FORBIDDEN`: `glab` isn't signed in to the host, or the account can't read the item. Run `glab auth login --hostname your-host`, or set `GITLAB_TOKEN` for a host `glab` is configured for. Anonymous reads of a public project return `UNAUTHORIZED` for links and notes, so the run is partial.
+- `NOT_FOUND`: the item doesn't exist or isn't visible to the account.
+- `RATE_LIMITED`: GitLab returned HTTP 429. Wait and rerun, or lower `--concurrency`.
+- `GLAB_TOO_OLD`: `glab` is older than 1.126, which can send `GITLAB_TOKEN` to a host it isn't configured for. issue-graph checks `glab version` before the first read and stops. Update `glab`.
+- `GLAB_VERSION_UNKNOWN`: `glab version` printed output issue-graph can't parse, so it can't confirm the version. Update `glab` or check that `glab version` prints `glab 1.126.0` or later.
+- `GLAB_FAILED`: another `glab` failure; the reason names it.
+- `TIMEOUT`: `glab` didn't finish within 60 seconds.
+- `HOST_MISMATCH` or `IDENTITY_MISMATCH`: the item's web URL names a different host, project, or number than requested, usually because the item moved. Start from its new URL.
+
+## YouTrack read failures
+
+`issue-graph youtrack` prints `YouTrack read failed (CODE)`. Common codes:
+
+- `AUTHENTICATION`: YouTrack rejected the token. Create a new permanent token and set `YOUTRACK_TOKEN`. The command fails with `Set YOUTRACK_TOKEN` before any read when the variable is empty.
+- `FORBIDDEN`: the token's account can't read the issue, or can't read its activity. A forbidden activity read marks the issue partial and keeps its links.
+- `NOT_FOUND`: the issue ID doesn't exist or isn't visible to the token, or the base URL is wrong. Check that `YOUTRACK_URL` includes any path prefix, such as `/youtrack`.
+- `RATE_LIMITED`: YouTrack answered `429` and asked for a longer wait than the reader allows. Rerun later or lower `--concurrency`.
+- `UPSTREAM`: YouTrack answered with a `5xx` status after the reader's retries.
+- `NETWORK` or `TIMEOUT`: the request failed or didn't finish within 20 seconds. A redirect counts as a network failure, because the reader doesn't follow redirects with your token; use the final base URL.
+- `TOO_LARGE` or `INVALID_PAYLOAD`: the response was over 32 MiB or wasn't the JSON the REST API documents.
+- `IDENTITY_MISMATCH`: YouTrack returned a different issue ID, usually because the issue moved to another project. Start from the new ID.
+
+When neither `--url`, an issue URL, nor `YOUTRACK_URL` names the instance, the command exits with `2` and asks for one.
+
+## Linear rate limits
+
+With `LINEAR_API_KEY` or `LINEAR_ACCESS_TOKEN`, the CLI waits and retries when Linear's reset time falls within its retry budget. When the reset is later, the command stops instead of waiting and prints `Linear read failed (RATE_LIMITED); the limit resets at` followed by an ISO timestamp, or `Linear read failed (RATE_LIMITED)` when Linear reports no reset time. With a login session, the command stops on the first rate-limited read and prints `Linear read failed (RATE_LIMITED)`.
+
+A rate limit on a node after the seed shows up as `Read failed: RATE_LIMITED` on that node instead, and the command exits with code `1`.
+
+Wait until the reset time and rerun the command. A lower `--max-nodes` or `--depth` reduces the number of reads per run.
+
+## Query finds no saved model
+
+`query` reads only saved models and makes no provider requests. When no saved model matches, it exits with code `2` and prints a JSON error on stderr with the message `no matching capture; use a saved run or --input model.json`. If several saved models match, the message is `select a provider:scope; more than one saved model matches`.
+
+1. List the saved runs:
+
+   ```bash
+   issue-graph runs
+   ```
+
+2. If the project you want is missing, capture it without `--no-save`:
+
+   ```bash
+   issue-graph open owner/repo
+   ```
+
+   For Linear, run `issue-graph linear` with `--html PATH` or `--open`. Only HTML output saves a Linear model.
+
+3. Pass an explicit scope, such as `github:owner/repo`, when more than one model exists. You can also query a normalized model file with `--input model.json`.
+
+`issue-graph dashboard` fails for the same reason with `no saved runs yet: run issue-graph open owner/repo first (without --no-save)`.
+
+## Report a problem
+
+When you open an issue, include the command, its exit code, the error text, and the coverage section of the report. Remove tokens, private repository names, and other private data first. Report security vulnerabilities privately as described in [Permissions and privacy](/docs/security#vulnerability-reports).

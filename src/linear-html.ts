@@ -1,6 +1,6 @@
-import type { ClientNode, Model } from "./html.js";
+import type { Model } from "./html.js";
 import type { LinearReport } from "./linear.js";
-import { workClusterGroups } from "./work-clusters.js";
+import { workDashboardModel, workEdgeLabels } from "./work-dashboard.js";
 import type { WorkEdge, WorkNode } from "./work-types.js";
 
 const LINEAR_SVG =
@@ -12,110 +12,21 @@ function state(node: WorkNode): string {
 }
 
 function labels(edge: WorkEdge): [string, string] {
-  if (edge.relation === "blocks") return ["blocks", "blocked by"];
   if (edge.relation === "duplicate_of") return ["duplicate of", "has duplicate"];
-  if (edge.relation === "parent_of") return ["parent of", "child of"];
-  return [edge.nativeRelation, `${edge.nativeRelation} (incoming)`];
+  return workEdgeLabels(edge);
 }
 
 export function linearDashboardModel(
   report: LinearReport,
   clusters?: unknown,
 ): Model & { id: string } {
-  const seeds = new Set(report.seeds);
-  const nodes: Record<string, ClientNode> = {};
-  for (const node of report.nodes) {
-    if (
-      report.project !== undefined &&
-      node.fetched &&
-      (report.project
-        ? node.project?.id !== report.project.id
-        : node.project !== null || node.team?.id !== report.team?.id)
-    )
-      continue;
-    nodes[node.key] = {
-      key: node.key,
-      num: 0,
-      identifier: node.identifier,
-      repo: report.workspace.slug,
-      kind: "Issue",
-      state: state(node),
-      stateLabel: node.state.name,
-      stateType: node.state.type,
-      archived: node.archived,
-      read: { fetched: node.fetched, error: node.error, coverage: node.coverage },
-      title: node.title,
-      url: node.url,
-      depth: node.depth,
-      seed: seeds.has(node.key),
-      flags: [
-        ...(node.hub ? ["Hub not expanded"] : []),
-        ...(!node.fetched ? ["Issue unavailable"] : []),
-        ...(node.coverage.some((part) => !part.complete) ? ["Incomplete connections"] : []),
-      ],
-      mentionedBy: [],
-      external: node.externalLinks.map((link) => link.url),
-      attachments: node.externalLinks,
-      out: [],
-      in: [],
-      overlaps: [],
-    };
-  }
-  const seen = new Set<string>();
-  for (const node of report.nodes) {
-    for (const edge of node.edges) {
-      let from = edge.direction === "incoming" ? edge.to : node.key;
-      let to = edge.direction === "incoming" ? node.key : edge.to;
-      const undirected = edge.direction === "undirected";
-      if (undirected && from > to) [from, to] = [to, from];
-      const key = JSON.stringify([from, to, edge.nativeRelation, edge.evidence]);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const [outLabel, inLabel] = labels(edge);
-      nodes[from]?.out.push({ to, via: outLabel, undirected, evidence: edge.evidence });
-      if (undirected)
-        nodes[to]?.out.push({
-          to: from,
-          via: outLabel,
-          undirected: true,
-          evidence: edge.evidence,
-        });
-      else nodes[to]?.in.push({ from, via: inLabel, evidence: edge.evidence });
-    }
-  }
-  const warnings: string[] = [];
-  for (const [keys, label] of [
-    [report.coverage.failed, "issues unavailable"],
-    [report.coverage.partial, "issues with incomplete connections"],
-    [report.coverage.cappedOut, "known issues omitted by the node limit"],
-    [report.coverage.hubs, "hubs not expanded"],
-  ] as const)
-    if (keys.length) warnings.push(`${keys.length} ${label}`);
-  if (report.inventory && !report.inventory.complete)
-    warnings.push(`Project issue list incomplete: ${report.inventory.reason ?? "read incomplete"}`);
-  const messages = [
-    `Source: ${report.readSource ?? "Linear API"}.`,
-    report.scope.issues === "project"
-      ? "Project issues and their explicit connections."
-      : `Issue neighborhood, up to ${report.limits.maxDepth} relationship steps.`,
-    ...(report.scope.notes ?? []),
-  ];
-  if (report.coverage.depthBoundaries.length)
-    messages.push(`${report.coverage.depthBoundaries.length} issues at the depth boundary`);
-  messages.push(
-    "Text mentions are not collected.",
-    "Attachment targets are listed without being fetched.",
-    report.scope.archived === "excluded"
-      ? "Archived issues are outside this capture."
-      : "Archived issues are included; archived relations and attachments are excluded.",
-  );
-  const omitted = report.nodes.length - Object.keys(nodes).length;
-  if (omitted) messages.push(`${omitted} issues outside this project are omitted from this view.`);
-  if (clusters !== undefined)
-    messages.push(
-      "Themes are proposed groupings, not verified common root causes. Native relationships are unchanged.",
-    );
-  const all = Object.values(nodes);
+  const include = (node: WorkNode) =>
+    report.project === undefined ||
+    !node.fetched ||
+    (report.project
+      ? node.project?.id === report.project.id
+      : node.project === null && node.team?.id === report.team?.id);
+  const omitted = report.nodes.filter((node) => !include(node)).length;
   const scopeId = report.project
     ? `project:${report.project.id}`
     : report.project === null && report.team
@@ -126,50 +37,50 @@ export function linearDashboardModel(
     (report.project === null
       ? `${report.team?.name ?? "Issues"} / No project`
       : "Unscoped capture");
-  return {
-    id: `linear:${report.workspace.id}:${scopeId}`,
-    label: `${report.workspace.name} / ${scopeName}`,
-    url: report.project?.url ?? `https://linear.app/${report.workspace.slug}`,
-    openCount: report.openCount,
-    grouping: clusters === undefined ? "components" : "themes",
-    provider: {
-      id: "linear",
-      name: "Linear",
-      logo: LINEAR_SVG,
-      repoUrl: "https://linear.app/{repo}",
-      signals: [],
-      views: ["explore", "swarm"],
-      metrics: ["links", "depth"],
+  return workDashboardModel(
+    report,
+    {
+      id: `linear:${report.workspace.id}:${scopeId}`,
+      label: `${report.workspace.name} / ${scopeName}`,
+      url: report.project?.url ?? `https://linear.app/${report.workspace.slug}`,
+      openCount: report.openCount,
+      provider: {
+        id: "linear",
+        name: "Linear",
+        logo: LINEAR_SVG,
+        repoUrl: "https://linear.app/{repo}",
+      },
+      repo: report.workspace.slug,
+      noun: "issues",
+      include,
+      node: (node) => ({
+        repo: report.workspace.slug,
+        kind: "Issue",
+        state: state(node),
+        archived: node.archived,
+      }),
+      edgeLabels: labels,
+      warnings:
+        report.inventory && !report.inventory.complete
+          ? [`Project issue list incomplete: ${report.inventory.reason ?? "read incomplete"}`]
+          : [],
+      messages: [
+        `Source: ${report.readSource ?? "Linear API"}.`,
+        report.scope.issues === "project"
+          ? "Project issues and their explicit connections."
+          : `Issue neighborhood, up to ${report.limits.maxDepth} relationship steps.`,
+        ...(report.scope.notes ?? []),
+        ...(report.coverage.depthBoundaries.length
+          ? [`${report.coverage.depthBoundaries.length} issues at the depth boundary`]
+          : []),
+        "Text mentions are not collected.",
+        "Attachment targets are listed without being fetched.",
+        report.scope.archived === "excluded"
+          ? "Archived issues are outside this capture."
+          : "Archived issues are included; archived relations and attachments are excluded.",
+        ...(omitted ? [`${omitted} issues outside this project are omitted from this view.`] : []),
+      ],
     },
-    repo: report.workspace.slug,
-    seeds: report.seeds.filter((key) => nodes[key]),
-    groups:
-      clusters !== undefined
-        ? workClusterGroups(Object.keys(nodes), clusters)
-        : report.components
-            .map((members, index) => ({
-              label: `Component ${index + 1}`,
-              subtitle:
-                members.length === 1
-                  ? "No explicit relationships"
-                  : (report.nodes.find((node) => seeds.has(node.key) && members.includes(node.key))
-                      ?.title ?? "Connected by explicit relationships"),
-              members: members.filter((key) => nodes[key]),
-            }))
-            .filter((group) => group.members.length),
-    cleanup: [],
-    stats: {
-      nodes: all.length,
-      openIssues: all.filter((node) => node.state === "OPEN" && !node.archived).length,
-      archived: all.filter((node) => node.archived).length,
-    },
-    nodes,
-    coverage: {
-      complete: report.coverageComplete && !warnings.length,
-      generatedAt: report.generatedAt,
-      maxDepth: report.limits.maxDepth,
-      messages,
-      warnings,
-    },
-  };
+    clusters,
+  );
 }

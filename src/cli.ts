@@ -15,6 +15,7 @@ import {
 import { modelDefaults, readConfig, resolveWeights } from "./config.js";
 import { components, crawl } from "./crawl.js";
 import { labelSeeds, makeFetchNode, openBacklogSeeds, repositoryOpenCount } from "./github.js";
+import { runGitLab } from "./gitlab-cli.js";
 import {
   applyClusters,
   type ClustersConfig,
@@ -23,6 +24,7 @@ import {
   type Model,
 } from "./html.js";
 import { renderHumanOutput } from "./human-output.js";
+import { runJira } from "./jira-cli.js";
 import { loginLinear, sessionStore } from "./linear-auth.js";
 import {
   type LinearCredential,
@@ -65,7 +67,22 @@ import { runStatus } from "./status-cli.js";
 import { buildSweep, missingBasePaths, sweepBasePaths } from "./sweep.js";
 import type { GhTransport } from "./transport.js";
 import { shellTransport } from "./transports/shell.js";
-import type { NodeKey, Seed } from "./types.js";
+import { linkCount, type NodeKey, type Seed } from "./types.js";
+import { runYouTrack } from "./youtrack-cli.js";
+
+/** Writes a work provider's explorer and saves the run, as `jira`, `gitlab`, and `youtrack` do. */
+function saveWorkDashboard(
+  model: Model & { id: string },
+  options: { path?: string; open: boolean; save: boolean },
+): void {
+  const name = model.id.replace(/[^a-z0-9.-]+/gi, "-");
+  const out = options.path || privateExportPath(`issue-graph-${name}.html`);
+  writeNextDashboard(out, [model], modelDefaults([model]));
+  process.stderr.write(`wrote ${out}\n`);
+  if (options.save)
+    process.stderr.write(`dashboard run saved: ${writeDashboardModel(model.id, model)}\n`);
+  if (options.open) openInBrowser(out);
+}
 
 const USAGE = `usage: issue-graph [command] [scope...] [options]
 
@@ -73,6 +90,9 @@ Run with no arguments inside a GitHub repository to open its backlog dashboard.
 
 commands
   linear <issue>          read Linear issue relationships or capture --project UUID
+  jira <issue>            read Jira issue links through the Atlassian TWG CLI (twg)
+  gitlab <issue-or-mr>    read GitLab issue links, closing MRs, and mentions through glab
+  youtrack <issue>        read YouTrack issue links and pull requests through the REST API
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap
   rank [repo]              what to fix first, by discussion heat
@@ -108,7 +128,7 @@ options
 advanced
   --budget N               stop after N items (80; 1000 for unfiltered open/rank/cluster repos)
   --depth N                same-repository reference depth (default 2)
-  --hub-threshold N        fetch but do not expand an item with more references (default 12)
+  --hub-threshold N        fetch but do not expand an item linked to more items (default 12)
   --concurrency N          GitHub requests in flight (default 4, max 32)
 
 Older flags still work for one minor release and print their replacement.
@@ -450,6 +470,66 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
     });
     return;
   }
+  if (argv[0] === "jira") {
+    process.exitCode = await runJira(
+      argv.slice(1),
+      async (site) => {
+        const { twgJiraReader } = await import("./transports/twg.js");
+        return twgJiraReader({ site });
+      },
+      {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        dashboard: async (report, options) => {
+          const { jiraDashboardModel } = await import("./jira-html.js");
+          saveWorkDashboard(jiraDashboardModel(report, options.clusters), options);
+        },
+      },
+    );
+    return;
+  }
+  if (argv[0] === "gitlab") {
+    process.exitCode = await runGitLab(
+      argv.slice(1),
+      async (host) => {
+        const { glabGitLabReader } = await import("./transports/glab.js");
+        return glabGitLabReader({ host });
+      },
+      {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        dashboard: async (report, options) => {
+          const { gitlabDashboardModel } = await import("./gitlab-html.js");
+          saveWorkDashboard(gitlabDashboardModel(report, options.clusters), options);
+        },
+      },
+    );
+    return;
+  }
+  if (argv[0] === "youtrack") {
+    process.exitCode = await runYouTrack(
+      argv.slice(1),
+      async (baseUrl) => {
+        const token = process.env.YOUTRACK_TOKEN;
+        if (!token) throw new Error("Set YOUTRACK_TOKEN to a YouTrack permanent token");
+        const { youTrackReader } = await import("./transports/youtrack.js");
+        return youTrackReader({ baseUrl: baseUrl as string, token });
+      },
+      {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+        readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        dashboard: async (report, options) => {
+          const { youTrackDashboardModel } = await import("./youtrack-html.js");
+          saveWorkDashboard(youTrackDashboardModel(report, options.clusters), options);
+        },
+      },
+      process.env.YOUTRACK_URL,
+    );
+    return;
+  }
   if (argv[0] === "linear" && ["login", "logout", "status"].includes(argv[1] ?? "")) {
     process.exitCode = await runLinearAccount(argv[1] as "login" | "logout" | "status");
     return;
@@ -476,6 +556,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
         stdout: (value) => process.stdout.write(value),
         stderr: (value) => process.stderr.write(value),
         readClusters: async (path) => JSON.parse(readFileSync(path, "utf8")),
+        github: () => shellTransport(),
         dashboard: async (report, options) => {
           const model = linearDashboardModel(report, options.clusters);
           const out =
@@ -626,7 +707,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<void> {
   if (hubs.length) {
     md += "\n## Hubs not expanded — re-seed to explore\n\n";
     for (const h of hubs) {
-      md += `- ${h.key} (${h.edges.length} refs) → \`issue-graph graph ${h.owner}/${h.repo}#${h.number} --depth 1\`\n`;
+      md += `- ${h.key} (${linkCount(h)} refs) → \`issue-graph graph ${h.owner}/${h.repo}#${h.number} --depth 1\`\n`;
     }
   }
 
