@@ -232,7 +232,7 @@ describe("documentation content contract", () => {
     for (const [name, version] of Object.entries({
       "@vercel/geistdocs": "2.7.5",
       "@vercel/agent-readability": "0.7.0",
-      next: "16.3.8",
+      next: "16.4.5",
       react: "19.3.0",
       "react-dom": "19.3.0",
       geist: "1.7.2",

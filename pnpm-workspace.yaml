@@ -3,9 +3,9 @@ packages:
 
 minimumReleaseAge: 2880
 
-patchedDependencies:
-  next@16.3.8: patches/next@16.3.8.patch
-
 onlyBuiltDependencies:
   - esbuild
   - sharp
+
+patchedDependencies:
+  next@16.4.5: patches/next@16.4.5.patch
