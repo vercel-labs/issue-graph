@@ -26,7 +26,15 @@ interface Provider {
   logo: React.ReactNode;
   summary: string;
   reads: string[];
-  nodes: Array<{ id: string; x: number; y: number; kind: "issue" | "pr"; tone: string }>;
+  nodes: Array<{
+    id: string;
+    x: number;
+    y: number;
+    kind: "issue" | "pr" | "type" | "priority";
+    tone: string;
+    letter?: string;
+    resolved?: boolean;
+  }>;
   relations: Relation[];
   command: string;
   href: string;
@@ -107,10 +115,10 @@ const providers: Provider[] = [
       "Native status categories and remote links",
     ],
     nodes: [
-      { id: "ABC-12", x: 70, y: 52, kind: "issue", tone: "started" },
-      { id: "ABC-19", x: 290, y: 44, kind: "issue", tone: "unstarted" },
-      { id: "ABC-15", x: 150, y: 140, kind: "issue", tone: "done" },
-      { id: "PAY-7", x: 380, y: 132, kind: "issue", tone: "started" },
+      { id: "ABC-12", x: 70, y: 52, kind: "type", tone: "jira-epic" },
+      { id: "ABC-19", x: 290, y: 44, kind: "type", tone: "jira-bug" },
+      { id: "ABC-15", x: 150, y: 140, kind: "type", tone: "jira-story" },
+      { id: "PAY-7", x: 380, y: 132, kind: "type", tone: "jira-task" },
     ],
     relations: [
       { from: [70, 52], to: [290, 44], label: "blocks" },
@@ -137,10 +145,10 @@ const providers: Provider[] = [
       "Nested group paths and native states",
     ],
     nodes: [
-      { id: "api#12", x: 70, y: 52, kind: "issue", tone: "started" },
-      { id: "api#14", x: 290, y: 44, kind: "issue", tone: "unstarted" },
-      { id: "api!12", x: 150, y: 140, kind: "pr", tone: "merged" },
-      { id: "web#3", x: 380, y: 132, kind: "issue", tone: "started" },
+      { id: "api#12", x: 70, y: 52, kind: "issue", tone: "gitlab-open" },
+      { id: "api#14", x: 290, y: 44, kind: "issue", tone: "gitlab-open" },
+      { id: "api!12", x: 150, y: 140, kind: "pr", tone: "gitlab-merged" },
+      { id: "web#3", x: 380, y: 132, kind: "issue", tone: "gitlab-closed" },
     ],
     relations: [
       { from: [70, 52], to: [290, 44], label: "blocks" },
@@ -166,10 +174,18 @@ const providers: Provider[] = [
       "Native states and resolution",
     ],
     nodes: [
-      { id: "PRJ-12", x: 70, y: 52, kind: "issue", tone: "started" },
-      { id: "PRJ-19", x: 290, y: 44, kind: "issue", tone: "unstarted" },
-      { id: "PRJ-15", x: 150, y: 140, kind: "issue", tone: "done" },
-      { id: "WEB-7", x: 380, y: 132, kind: "issue", tone: "started" },
+      { id: "PRJ-12", x: 70, y: 52, kind: "priority", tone: "youtrack-major", letter: "M" },
+      { id: "PRJ-19", x: 290, y: 44, kind: "priority", tone: "youtrack-show-stopper", letter: "S" },
+      {
+        id: "PRJ-15",
+        x: 150,
+        y: 140,
+        kind: "priority",
+        tone: "youtrack-normal",
+        letter: "N",
+        resolved: true,
+      },
+      { id: "WEB-7", x: 380, y: 132, kind: "priority", tone: "youtrack-critical", letter: "C" },
     ],
     relations: [
       { from: [70, 52], to: [290, 44], label: "blocks" },
@@ -275,10 +291,24 @@ function RelationDiagram({ provider }: { provider: Provider }) {
             <path
               d={`M${node.x},${node.y - 8}L${node.x + 8},${node.y} ${node.x},${node.y + 8} ${node.x - 8},${node.y}Z`}
             />
+          ) : node.kind === "type" ? (
+            <rect x={node.x - 7} y={node.y - 7} width={14} height={14} rx={3} />
+          ) : node.kind === "priority" ? (
+            <>
+              <rect x={node.x - 8} y={node.y - 8} width={16} height={16} rx={2} />
+              <text className="ig-provider-letter" x={node.x} y={node.y + 4} textAnchor="middle">
+                {node.letter}
+              </text>
+            </>
           ) : (
             <circle cx={node.x} cy={node.y} r={6.5} />
           )}
-          <text x={node.x} y={node.y + 26} textAnchor="middle">
+          <text
+            x={node.x}
+            y={node.y + 26}
+            textAnchor="middle"
+            textDecoration={node.resolved ? "line-through" : undefined}
+          >
             {node.id}
           </text>
         </g>

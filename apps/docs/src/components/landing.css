@@ -322,7 +322,7 @@
   font-size: 12px;
   fill: var(--ig-ink);
 }
-.ig-provider-node :is(circle, path) {
+.ig-provider-node :is(circle, path, rect) {
   stroke: var(--ig-soft);
   stroke-width: 2;
 }
@@ -343,6 +343,47 @@
 }
 .ig-provider-node[data-tone="done"] :is(circle, path) {
   fill: var(--ig-done);
+}
+/* Provider-native colors: Jira issue-type icons, GitLab status badges. */
+.ig-provider-node[data-tone="jira-epic"] rect {
+  fill: #904ee2;
+}
+.ig-provider-node[data-tone="jira-bug"] rect {
+  fill: #e5493a;
+}
+.ig-provider-node[data-tone="jira-story"] rect {
+  fill: #63ba3c;
+}
+.ig-provider-node[data-tone="jira-task"] rect {
+  fill: #4bade8;
+}
+.ig-provider-node[data-tone="gitlab-open"] :is(circle, path) {
+  fill: #108548;
+}
+.ig-provider-node[data-tone="gitlab-merged"] :is(circle, path),
+.ig-provider-node[data-tone="gitlab-closed"] :is(circle, path) {
+  fill: #1f75cb;
+}
+/* YouTrack priority tiles. */
+.ig-provider-node text.ig-provider-letter {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  fill: #1f1f1f;
+}
+.ig-provider-node[data-tone="youtrack-show-stopper"] rect {
+  fill: #be2420;
+}
+.ig-provider-node[data-tone="youtrack-show-stopper"] text.ig-provider-letter {
+  fill: #fff;
+}
+.ig-provider-node[data-tone="youtrack-critical"] rect {
+  fill: #de56a4;
+}
+.ig-provider-node[data-tone="youtrack-major"] rect {
+  fill: #cf9433;
+}
+.ig-provider-node[data-tone="youtrack-normal"] rect {
+  fill: #b4d8b8;
 }
 .ig-provider-node[data-tone="neutral"] :is(circle, path) {
   fill: var(--ig-soft);
