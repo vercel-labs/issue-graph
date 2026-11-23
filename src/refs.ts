@@ -3,9 +3,9 @@ import type { NodeKey, Seed } from "./types.js";
 /** Full GitHub issue/PR URL. */
 const GH_REF = /\bhttps:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:issues|pull)\/(\d+)/g;
 /** Cross-repo shorthand `owner/repo#123`. */
-const SHORT_REF = /(?:^|[\s(])([\w.-]+)\/([\w.-]+)#(\d+)/g;
+const SHORT_REF = /(?:^|[\s(])([\w.-]+)\/([\w.-]+)#([1-9]\d*)\b/g;
 /** Same-repo shorthand `#123`. */
-const LOCAL_REF = /(?:^|[\s(])#(\d+)\b/g;
+const LOCAL_REF = /(?:^|[\s(])#([1-9]\d*)\b/g;
 /** Any http(s) URL. */
 const ANY_URL = /\bhttps?:\/\/[^\s)\]<>"'`]+/g;
 
@@ -51,7 +51,7 @@ export function isNoiseUrl(raw: string): boolean {
  * no structural closing link — the merge won't auto-close it.
  */
 const CLOSING_REF =
-  /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s*:?\s+(?:https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:issues|pull)\/(\d+)|([\w.-]+)\/([\w.-]+)#(\d+)|#(\d+))/gi;
+  /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s*:?\s+(?:https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:issues|pull)\/(\d+)|([\w.-]+)\/([\w.-]+)#([1-9]\d*)\b|#([1-9]\d*)\b)/gi;
 
 /** Issues a PR body claims to close via a closing keyword. */
 export function extractClosingRefs(text: string, owner: string, repo: string): NodeKey[] {
