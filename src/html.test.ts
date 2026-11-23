@@ -56,7 +56,8 @@ describe("renderHtml", () => {
     const html = renderHtml(nodes, ["o/r#1"], "o/r");
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain("<title>issue-graph · o/r</title>");
-    expect(html).toContain('class="brand-name">issue-graph</span>');
+    expect(html).not.toContain('class="labs-mark"');
+    expect(html).toContain('id="canvas-view"');
     expect(html).toContain('id="data"');
     expect(html).toContain("o/r#2");
     expect(html).toContain('id="impact-view"');
