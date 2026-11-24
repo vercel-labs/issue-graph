@@ -224,6 +224,11 @@ interface Listing {
   coverage?: ReadCoverage;
 }
 
+const failed = (error: unknown) =>
+  error instanceof GitLabReadError && error.code === "RATE_LIMITED"
+    ? "rate-limited"
+    : "read-failed";
+
 /**
  * Reads up to MAX_PAGES pages; a failed or capped listing becomes incomplete coverage. After
  * MAX_PAGES full pages one more page probes for items, so a listing that ends exactly at the cap is
@@ -240,8 +245,8 @@ async function list(
     let body: unknown[];
     try {
       body = array(await reader.get(paged ? `${path}?per_page=${PER_PAGE}&page=${page}` : path));
-    } catch {
-      return { items, coverage: { source, pages: page, complete: false, reason: "read-failed" } };
+    } catch (error) {
+      return { items, coverage: { source, pages: page, complete: false, reason: failed(error) } };
     }
     items.push(...body);
     if (!paged || body.length < PER_PAGE) return { items };
@@ -249,10 +254,10 @@ async function list(
   let probe: unknown[];
   try {
     probe = array(await reader.get(`${path}?per_page=${PER_PAGE}&page=${MAX_PAGES + 1}`));
-  } catch {
+  } catch (error) {
     return {
       items,
-      coverage: { source, pages: MAX_PAGES + 1, complete: false, reason: "read-failed" },
+      coverage: { source, pages: MAX_PAGES + 1, complete: false, reason: failed(error) },
     };
   }
   if (!probe.length) return { items };
@@ -420,15 +425,35 @@ function unavailable(host: string, item: GitLabItem, depth: number, error: unkno
 }
 
 /**
+ * Stops reading after the first rate limit: every later read fails as RATE_LIMITED without a
+ * request, since GitLab counts blocked requests against the limit too.
+ */
+function stopOnRateLimit(reader: GitLabReader): GitLabReader {
+  let limited = false;
+  return {
+    async get(path) {
+      if (limited) throw new GitLabReadError("RATE_LIMITED");
+      try {
+        return await reader.get(path);
+      } catch (error) {
+        if (error instanceof GitLabReadError && error.code === "RATE_LIMITED") limited = true;
+        throw error;
+      }
+    },
+  };
+}
+
+/**
  * Reads a bounded GitLab neighborhood of issues and merge requests. Same-project references
  * recurse to `maxDepth`; references into other projects are read one hop and not expanded.
  */
 export async function buildGitLabGraph(
-  reader: GitLabReader,
+  source: GitLabReader,
   seed: string,
   options: GitLabGraphOptions,
 ): Promise<GitLabReport> {
   validateWorkLimits(options, 16);
+  const reader = stopOnRateLimit(source);
   const locator = parseGitLabLocator(seed);
   const requested = options.host ? parseGitLabHost(options.host) : undefined;
   if (locator.host && requested && locator.host !== requested)
@@ -483,7 +508,7 @@ export async function buildGitLabGraph(
     source: "gitlab",
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     host,
-    ...(reader.label ? { readSource: reader.label } : {}),
+    ...(source.label ? { readSource: source.label } : {}),
     seeds: [first.node.key],
     scope: {
       relationships: ["issue links", "closing merge requests", "system note mentions"],
