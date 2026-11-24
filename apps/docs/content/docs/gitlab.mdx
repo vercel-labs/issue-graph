@@ -84,6 +84,7 @@ These conditions make coverage partial:
 - A linked item that can't be read. It stays in the graph as unavailable with an error code, such as `NOT_FOUND`, `UNAUTHORIZED`, or `FORBIDDEN`.
 - A list of links, closing items, or notes that fails, or that has more than 10 pages. A list of exactly 10 full pages is complete.
 - The `--max-nodes` cap or an unexpanded hub.
+- A GitLab rate limit. After the first HTTP 429, no new reads start: items not yet read stay unavailable with `RATE_LIMITED`, and lists cut short record the reason `rate-limited`.
 
 When the first item can't be read, the command prints the error code on stderr, prints no report, and exits with `1`. Depth boundaries and group work items appear in the coverage but don't make it partial.
 

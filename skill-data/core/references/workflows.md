@@ -321,7 +321,7 @@ Use `issue-graph gitlab --help` before a GitLab workflow. The command reads thro
 - References within the seed's project recurse to `--depth`; references into other projects are read at the next depth and not expanded. Group-level work items such as epics are listed under `coverage.groupWorkItems` and not read.
 - `--open` or `--html PATH` writes the explorer and saves the model `gitlab:<host>:project:<path>`, so `query` and `dashboard` work offline. `--no-save` skips saving; without `--html` or `--open` the command writes no local files.
 
-Read coverage before making completeness claims: unreadable items, failed or page-capped link, closing, or note listings, the node cap, and unexpanded hubs make the graph partial and exit `1`. On gitlab.com without a login, links and notes are refused, so the graph is partial. An unreadable item is not absent work.
+Read coverage before making completeness claims: unreadable items, failed or page-capped link, closing, or note listings, the node cap, unexpanded hubs, and a GitLab rate limit make the graph partial and exit `1`. After the first HTTP 429 the command starts no new reads, so items it hadn't read show `RATE_LIMITED`; rerun once the limit resets. On gitlab.com without a login, links and notes are refused, so the graph is partial. An unreadable item is not absent work.
 
 ## YouTrack reads
 

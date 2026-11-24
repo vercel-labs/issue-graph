@@ -144,7 +144,7 @@ export const ISSUE_GRAPH_SCHEMA = {
         "commits",
       ],
       failures:
-        "unreadable linked items stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; a failed or page-capped links, closing, or notes listing marks the item partial",
+        "unreadable linked items stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; a failed or page-capped links, closing, or notes listing marks the item partial; after the first HTTP 429 no new reads start, unread items fail with RATE_LIMITED and listings cut short record the reason rate-limited",
       exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
       jsonFlag: "--json emits the report on stdout; takes no path",
       description:
