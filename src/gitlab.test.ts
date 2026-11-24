@@ -298,6 +298,33 @@ describe("buildGitLabGraph", () => {
     expect(requests.some((request) => request.includes("notes?per_page=100&page=11"))).toBe(true);
   });
 
+  test("sends no reads after the first rate limit and marks the unread items failed", async () => {
+    const requests: string[] = [];
+    const links = [2, 3, 4].map((iid) => ({ ...item(API, "issue", iid), link_type: "relates_to" }));
+    const report = await buildGitLabGraph(
+      reader(
+        {
+          [base(API, "issue", 1)]: item(API, "issue", 1),
+          [`${base(API, "issue", 1)}/links`]: links,
+          [base(API, "issue", 2)]: new GitLabReadError("RATE_LIMITED"),
+          [base(API, "issue", 3)]: item(API, "issue", 3),
+          [base(API, "issue", 4)]: item(API, "issue", 4),
+        },
+        requests,
+      ),
+      `${API}#1`,
+      { ...options, concurrency: 1 },
+    );
+    expect(requests.filter((request) => request.startsWith(base(API, "issue", 3)))).toEqual([]);
+    expect(requests.filter((request) => request.startsWith(base(API, "issue", 4)))).toEqual([]);
+    expect(report.nodes.filter((node) => !node.fetched).map((node) => node.error)).toEqual([
+      "RATE_LIMITED",
+      "RATE_LIMITED",
+      "RATE_LIMITED",
+    ]);
+    expect(report.coverageComplete).toBe(false);
+  });
+
   test("keeps an unreadable linked item as an unavailable node", async () => {
     const report = await buildGitLabGraph(
       reader({

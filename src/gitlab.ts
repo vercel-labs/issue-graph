@@ -420,15 +420,36 @@ function unavailable(host: string, item: GitLabItem, depth: number, error: unkno
 }
 
 /**
+ * Stops reading after the first rate limit: every later read fails as RATE_LIMITED without a
+ * request, since GitLab counts blocked requests against the limit too.
+ */
+function stopOnRateLimit(reader: GitLabReader): GitLabReader {
+  let limited = false;
+  return {
+    ...reader,
+    async get(path) {
+      if (limited) throw new GitLabReadError("RATE_LIMITED");
+      try {
+        return await reader.get(path);
+      } catch (error) {
+        if (error instanceof GitLabReadError && error.code === "RATE_LIMITED") limited = true;
+        throw error;
+      }
+    },
+  };
+}
+
+/**
  * Reads a bounded GitLab neighborhood of issues and merge requests. Same-project references
  * recurse to `maxDepth`; references into other projects are read one hop and not expanded.
  */
 export async function buildGitLabGraph(
-  reader: GitLabReader,
+  source: GitLabReader,
   seed: string,
   options: GitLabGraphOptions,
 ): Promise<GitLabReport> {
   validateWorkLimits(options, 16);
+  const reader = stopOnRateLimit(source);
   const locator = parseGitLabLocator(seed);
   const requested = options.host ? parseGitLabHost(options.host) : undefined;
   if (locator.host && requested && locator.host !== requested)
