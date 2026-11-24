@@ -85,6 +85,13 @@ describe("glabGitLabReader", () => {
     await expect(
       glabGitLabReader({ binary: limited }).get("projects/acme%2Fapi/issues/1"),
     ).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    const proxied = stub(
+      "glab-proxied",
+      `echo 'glab: upstream returned HTTP 429' >&2\necho 'glab: 404 Project Not Found (HTTP 404)' >&2\nexit 1`,
+    );
+    await expect(
+      glabGitLabReader({ binary: proxied }).get("projects/acme%2Fapi/issues/1"),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
       glabGitLabReader({ binary: join(dir, "missing") }).get("projects/acme%2Fapi/issues/1"),
     ).rejects.toMatchObject({ code: "GLAB_NOT_FOUND" });

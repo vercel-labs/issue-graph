@@ -325,6 +325,33 @@ describe("buildGitLabGraph", () => {
     expect(report.coverageComplete).toBe(false);
   });
 
+  test("a rate-limited listing marks the item partial and stops the crawl", async () => {
+    const requests: string[] = [];
+    const report = await buildGitLabGraph(
+      reader(
+        {
+          [base(API, "issue", 1)]: item(API, "issue", 1),
+          [`${base(API, "issue", 1)}/links`]: [
+            { ...item(API, "issue", 2), link_type: "relates_to" },
+          ],
+          [`${base(API, "issue", 1)}/notes`]: new GitLabReadError("RATE_LIMITED"),
+          [base(API, "issue", 2)]: item(API, "issue", 2),
+        },
+        requests,
+      ),
+      `${API}#1`,
+      options,
+    );
+    expect(report.nodes[0].coverage).toContainEqual({
+      source: "system notes",
+      pages: 1,
+      complete: false,
+      reason: "rate-limited",
+    });
+    expect(requests.filter((request) => request.startsWith(base(API, "issue", 2)))).toEqual([]);
+    expect(report.coverageComplete).toBe(false);
+  });
+
   test("keeps an unreadable linked item as an unavailable node", async () => {
     const report = await buildGitLabGraph(
       reader({

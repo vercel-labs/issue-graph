@@ -12,7 +12,13 @@ export interface ReadCoverage {
   source: string;
   pages: number;
   complete: boolean;
-  reason?: "page-limit" | "node-limit" | "invalid-page" | "read-failed" | "changed-during-read";
+  reason?:
+    | "page-limit"
+    | "node-limit"
+    | "invalid-page"
+    | "read-failed"
+    | "rate-limited"
+    | "changed-during-read";
 }
 
 export interface GithubTarget {

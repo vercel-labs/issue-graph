@@ -224,6 +224,11 @@ interface Listing {
   coverage?: ReadCoverage;
 }
 
+const failed = (error: unknown) =>
+  error instanceof GitLabReadError && error.code === "RATE_LIMITED"
+    ? "rate-limited"
+    : "read-failed";
+
 /**
  * Reads up to MAX_PAGES pages; a failed or capped listing becomes incomplete coverage. After
  * MAX_PAGES full pages one more page probes for items, so a listing that ends exactly at the cap is
@@ -240,8 +245,8 @@ async function list(
     let body: unknown[];
     try {
       body = array(await reader.get(paged ? `${path}?per_page=${PER_PAGE}&page=${page}` : path));
-    } catch {
-      return { items, coverage: { source, pages: page, complete: false, reason: "read-failed" } };
+    } catch (error) {
+      return { items, coverage: { source, pages: page, complete: false, reason: failed(error) } };
     }
     items.push(...body);
     if (!paged || body.length < PER_PAGE) return { items };
@@ -249,10 +254,10 @@ async function list(
   let probe: unknown[];
   try {
     probe = array(await reader.get(`${path}?per_page=${PER_PAGE}&page=${MAX_PAGES + 1}`));
-  } catch {
+  } catch (error) {
     return {
       items,
-      coverage: { source, pages: MAX_PAGES + 1, complete: false, reason: "read-failed" },
+      coverage: { source, pages: MAX_PAGES + 1, complete: false, reason: failed(error) },
     };
   }
   if (!probe.length) return { items };
@@ -426,7 +431,6 @@ function unavailable(host: string, item: GitLabItem, depth: number, error: unkno
 function stopOnRateLimit(reader: GitLabReader): GitLabReader {
   let limited = false;
   return {
-    ...reader,
     async get(path) {
       if (limited) throw new GitLabReadError("RATE_LIMITED");
       try {
@@ -504,7 +508,7 @@ export async function buildGitLabGraph(
     source: "gitlab",
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     host,
-    ...(reader.label ? { readSource: reader.label } : {}),
+    ...(source.label ? { readSource: source.label } : {}),
     seeds: [first.node.key],
     scope: {
       relationships: ["issue links", "closing merge requests", "system note mentions"],

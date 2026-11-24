@@ -32,8 +32,9 @@ function failure(error: ExecException, stderr: string) {
     return new GitLabReadError("GLAB_NOT_FOUND", "glab is not installed or not on PATH");
   if (error.killed || error.signal)
     return new GitLabReadError("TIMEOUT", "glab did not finish in time");
-  // glab prints "message (HTTP 404)" for an error body and a bare "HTTP 429" for a rate limit.
-  const status = stderr.match(/\bHTTP (\d{3})\b/)?.[1];
+  // glab prints "message (HTTP 404)" for an error body and a bare "glab: HTTP 429" line for a rate limit.
+  const status =
+    stderr.match(/\(HTTP (\d{3})\)/)?.[1] ?? stderr.match(/^glab: HTTP (\d{3})\b/m)?.[1];
   return new GitLabReadError(
     (status && HTTP_CODES[status]) || "GLAB_FAILED",
     clean(stderr) || clean(error.message),
