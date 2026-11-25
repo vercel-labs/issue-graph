@@ -88,6 +88,12 @@ describe("extractRefs", () => {
   test("empty text yields nothing", () => {
     expect(extractRefs("", "o", "r")).toEqual({ refs: [], external: [] });
   });
+
+  test("ignores hex colors and zero-padded numbers", () => {
+    const text = "fill #c with #000000, see #0 and o/r#0042, fixes #12";
+    expect(extractRefs(text, "o", "r").refs).toEqual(["o/r#12"]);
+    expect(extractClosingRefs("fixes #000000 and closes #7", "o", "r")).toEqual(["o/r#7"]);
+  });
 });
 
 describe("extractClosingRefs", () => {

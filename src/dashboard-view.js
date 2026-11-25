@@ -28,9 +28,6 @@ export function mountDashboardView(
     document.title = originalTitle;
   };
 
-  const LABS_SVG =
-    '<svg class="labs-mark" aria-hidden="true" fill="none" focusable="false" viewBox="0 0 183 42" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M23.5092 0L47.0185 41.44H0L23.5092 0Z" fill="currentColor" fill-rule="evenodd"></path><path d="M169.729 41.2752C166.731 41.2752 164.206 40.8386 162.156 39.9656C160.145 39.0925 158.588 37.8778 157.487 36.3214C156.387 34.7651 155.76 32.9999 155.608 31.026L163.068 30.6844C163.333 32.2787 163.998 33.5124 165.06 34.3855C166.123 35.2585 167.699 35.6951 169.786 35.6951C171.495 35.6951 172.823 35.4294 173.772 34.8979C174.759 34.3285 175.253 33.4554 175.253 32.2787C175.253 31.5954 175.082 31.026 174.74 30.5705C174.399 30.115 173.753 29.7164 172.804 29.3748C171.855 29.0331 170.451 28.6915 168.591 28.3498C165.478 27.8184 163.03 27.1731 161.245 26.4139C159.461 25.6167 158.19 24.6298 157.43 23.453C156.709 22.2763 156.349 20.8148 156.349 19.0687C156.349 16.2217 157.43 13.9251 159.594 12.1789C161.796 10.3948 165.003 9.50278 169.217 9.50278C171.95 9.50278 174.247 9.95829 176.107 10.8693C177.967 11.7424 179.409 12.9571 180.434 14.5135C181.497 16.0319 182.161 17.778 182.427 19.7519L175.082 20.0936C174.892 19.0687 174.55 18.1766 174.057 17.4174C173.563 16.6582 172.899 16.0888 172.064 15.7092C171.229 15.2917 170.242 15.0829 169.103 15.0829C167.395 15.0829 166.104 15.4245 165.231 16.1078C164.358 16.7911 163.922 17.7021 163.922 18.8409C163.922 19.6381 164.111 20.3024 164.491 20.8338C164.909 21.3652 165.573 21.8018 166.484 22.1434C167.395 22.4471 168.61 22.7318 170.128 22.9975C173.317 23.491 175.822 24.1363 177.644 24.9335C179.504 25.6927 180.814 26.6796 181.573 27.8943C182.37 29.0711 182.769 30.4946 182.769 32.1648C182.769 34.1008 182.218 35.752 181.117 37.1186C180.055 38.4851 178.536 39.529 176.562 40.2503C174.626 40.9335 172.349 41.2752 169.729 41.2752Z" fill="currentColor"></path><path d="M141.184 41.2752C139.058 41.2752 137.198 40.8197 135.603 39.9086C134.047 38.9976 132.832 37.7259 131.959 36.0937L131.788 40.5919H124.842V0.164658L132.13 0.164658V14.5135C132.965 13.109 134.161 11.9322 135.717 10.9832C137.274 9.99626 139.096 9.50278 141.184 9.50278C143.803 9.50278 146.061 10.1671 147.959 11.4957C149.895 12.7863 151.376 14.6274 152.401 17.0188C153.464 19.3723 153.995 22.1624 153.995 25.389C153.995 28.6156 153.464 31.4246 152.401 33.8161C151.376 36.1696 149.895 38.0106 147.959 39.3392C146.061 40.6299 143.803 41.2752 141.184 41.2752ZM139.532 35.3534C141.62 35.3534 143.29 34.4804 144.543 32.7342C145.796 30.9501 146.422 28.5017 146.422 25.389C146.422 22.2383 145.796 19.7899 144.543 18.0438C143.328 16.2976 141.677 15.4245 139.589 15.4245C138.033 15.4245 136.685 15.8231 135.546 16.6203C134.446 17.3795 133.592 18.4993 132.984 19.9797C132.415 21.4601 132.13 23.2632 132.13 25.389C132.13 27.4388 132.415 29.2229 132.984 30.7413C133.592 32.2218 134.446 33.3606 135.546 34.1577C136.647 34.9549 137.976 35.3534 139.532 35.3534Z" fill="currentColor"></path><path d="M103.361 41.2752C100.172 41.2752 97.6099 40.5539 95.6739 39.1115C93.738 37.631 92.77 35.5812 92.77 32.962C92.77 30.3427 93.5862 28.2929 95.2184 26.8125C96.8507 25.332 99.3371 24.2692 102.678 23.6238L112.756 21.631C112.756 19.4672 112.262 17.8539 111.275 16.7911C110.288 15.6902 108.827 15.1398 106.891 15.1398C105.145 15.1398 103.759 15.5574 102.734 16.3925C101.748 17.1896 101.064 18.3474 100.685 19.8658L93.2825 19.5242C93.8898 16.2976 95.3703 13.8302 97.7238 12.122C100.077 10.3759 103.133 9.50278 106.891 9.50278C111.219 9.50278 114.483 10.6036 116.685 12.8053C118.924 14.969 120.044 18.0817 120.044 22.1434V33.1897C120.044 33.9869 120.177 34.5373 120.443 34.841C120.746 35.1447 121.183 35.2965 121.752 35.2965H122.72V40.5919C122.493 40.6678 122.113 40.7248 121.582 40.7627C121.088 40.8007 120.576 40.8197 120.044 40.8197C118.792 40.8197 117.672 40.6299 116.685 40.2503C115.698 39.8327 114.939 39.1304 114.407 38.1435C113.876 37.1186 113.61 35.733 113.61 33.9869L114.236 34.4424C113.933 35.771 113.268 36.9667 112.243 38.0296C111.256 39.0545 110.004 39.8517 108.485 40.4211C106.967 40.9905 105.259 41.2752 103.361 41.2752ZM104.841 35.9798C106.474 35.9798 107.878 35.6571 109.055 35.0118C110.232 34.3665 111.143 33.4744 111.788 32.3356C112.433 31.1968 112.756 29.8493 112.756 28.2929V26.5847L104.898 28.179C103.266 28.5207 102.089 29.0331 101.368 29.7164C100.685 30.3617 100.343 31.2158 100.343 32.2787C100.343 33.4554 100.723 34.3665 101.482 35.0118C102.279 35.6571 103.399 35.9798 104.841 35.9798Z" fill="currentColor"></path><path d="M64.0186 40.5919V0.164627L71.4207 0.164627V38.3143L67.378 34.1577H90.6094V40.5919H64.0186Z" fill="currentColor"></path></svg>';
-
   const PROJECTS = DOCUMENT.projects;
   const projectId = (p) => {
     const id = p.id || p.repo;
@@ -596,6 +593,7 @@ export function mountDashboardView(
     if (N[sel]) inspector(sel);
     else if (view === "swarm") swarmRender();
     else if (view === "rank") rankRender();
+    else if (view === "canvas") canvasRender(false);
     else if (view === "impact") impactView(impactSel);
     else if (view === "sweep") sweepView();
     else exploreView(sel?.startsWith("explore:") ? +sel.slice(8) : undefined);
@@ -894,7 +892,9 @@ export function mountDashboardView(
         esc(PV.name) +
         '" title="Open on ' +
         esc(PV.name) +
-        '">↗</a></div>'
+        '">↗</a>' +
+        snapshotDetails() +
+        "</div>"
       );
     return (
       '<div class="project-row"><span class="project">' +
@@ -908,7 +908,9 @@ export function mountDashboardView(
       esc(PV.name) +
       '" title="Open on ' +
       esc(PV.name) +
-      '">↗</a></div>'
+      '">↗</a>' +
+      snapshotDetails() +
+      "</div>"
     );
   }
   function snapshotDetails() {
@@ -1088,11 +1090,7 @@ export function mountDashboardView(
     const total = mix.reduce((a, m) => a + m[2], 0) || 1;
     return (
       '<div class="side"><div class="side-top">' +
-      '<div class="brand"><div class="brand-row"><a class="labs" href="https://vercel.com/labs" target="_blank" rel="noopener" aria-label="Vercel Labs">' +
-      LABS_SVG +
-      '</a><span class="brand-sep" aria-hidden="true">/</span><span class="brand-name">issue-graph</span>' +
-      snapshotDetails() +
-      "</div>" +
+      '<div class="brand">' +
       projectRow() +
       "</div>" +
       '<div class="mix"><div class="mix-bar" role="img" aria-label="' +
@@ -1115,12 +1113,13 @@ export function mountDashboardView(
           "</div>"
         : "") +
       '<div class="view-toggle" style="grid-template-columns:repeat(' +
-      ["explore", "impact", "swarm", "rank"].filter(hasView).length +
+      (["explore", "impact", "swarm", "rank"].filter(hasView).length + 1) +
       ',1fr)" role="group" aria-label="View">' +
       '<button class="view-btn" id="explore-view">Explore</button>' +
       (hasView("impact") ? '<button class="view-btn" id="impact-view">Impact</button>' : "") +
       '<button class="view-btn" id="swarm-view">Swarm</button>' +
       (hasView("rank") ? '<button class="view-btn" id="rank-view">Rank</button>' : "") +
+      '<button class="view-btn" id="canvas-view">Canvas</button>' +
       "</div>" +
       '<input class="filter" id="filter" placeholder="Filter by identifier, title, author" aria-label="Filter nodes"/>' +
       sweepBtn +
@@ -2066,7 +2065,7 @@ export function mountDashboardView(
       " open PRs touch it). The list ranks rarer shared files first.</div>"
     );
   }
-  function impactPanel(k) {
+  function impactPanel(k, opts = {}) {
     const n = N[k],
       b = blastRadius(k);
     return (
@@ -2078,7 +2077,7 @@ export function mountDashboardView(
       '<div class="sub">' +
       esc(n.title || "") +
       "</div>" +
-      ripple(k) +
+      (opts.ripple === false ? "" : ripple(k)) +
       '<div class="im-legend">' +
       BUCKETS.map(
         (x) => '<span><i class="b-' + x[0] + '"></i>' + x[1] + "<b>" + b[x[0]].size + "</b></span>",
@@ -2089,7 +2088,11 @@ export function mountDashboardView(
       hotspot(k) +
       affectedList(k) +
       '<div class="im-actions"><button class="cl-swarm" id="im-inspect">Inspect evidence</button><button class="cl-swarm" id="im-swarm">See in Swarm</button></div>' +
-      '<div class="im-hint">Inner ring: direct effects. Outer ring: work that touches it. A projection from visible links, not proof.</div></div>'
+      '<div class="im-hint">' +
+      (opts.ripple === false
+        ? "Counts project the work this touches from visible links, not proof."
+        : "Inner ring: direct effects. Outer ring: work that touches it. A projection from visible links, not proof.") +
+      "</div></div>"
     );
   }
   function impactView(k) {
@@ -2348,12 +2351,13 @@ export function mountDashboardView(
     }
     return { P, links };
   }
+  const CLUSTER_SEL = {};
   function clusterView(gi) {
     const g = DATA.groups[gi],
       st = clusterStats(g),
       keys = st.ms,
-      W = 860,
-      H = Math.min(460, 220 + keys.length * 14);
+      W = 460,
+      H = Math.min(420, 260 + keys.length * 6);
     const { P, links } = layoutCluster(keys, W, H),
       pend = clPending();
     if (!keys.length) {
@@ -2435,31 +2439,62 @@ export function mountDashboardView(
       return m;
     }, {});
     const rows = keys
-      .slice()
-      .sort((a, b) => (N[b].heat ? heatScore(N[b]) : -1) - (N[a].heat ? heatScore(N[a]) : -1))
       .map((k) => {
-        const n = N[k];
+        const b = blastRadius(k),
+          parts = GRAPH.impactParts(k, b);
+        return { k, b, parts, score: Object.values(parts).reduce((a, v) => a + v, 0) };
+      })
+      .sort(
+        (a, b) =>
+          Number(active(N[b.k])) - Number(active(N[a.k])) ||
+          b.score - a.score ||
+          (N[b.k].heat ? heatScore(N[b.k]) : -1) - (N[a.k].heat ? heatScore(N[a.k]) : -1) ||
+          a.k.localeCompare(b.k),
+      );
+    let pick = CLUSTER_SEL[gi];
+    if (!pick || !rows.some((r) => r.k === pick)) pick = rows[0].k;
+    CLUSTER_SEL[gi] = pick;
+    const max = Math.max(1, ...rows.map((r) => r.score));
+    const list = rows
+      .map((r, i) => {
+        const n = N[r.k];
+        const lane = BUCKETS.map((x, j) =>
+          r.parts[x[0]] > 0
+            ? '<span class="b-' +
+              x[0] +
+              '" style="width:' +
+              (r.parts[x[0]] / max) * 100 +
+              "%;animation-delay:" +
+              (Math.min(i, 14) * 25 + j * 40) +
+              'ms"></span>'
+            : "",
+        ).join("");
+        const note = labels[r.k] || n.verdict || "";
         return (
-          '<tr data-key="' +
-          esc(k) +
-          '"><td><span class="who"><i class="dot ' +
+          '<button class="im-row' +
+          (r.k === pick ? " on" : "") +
+          (active(n) ? "" : " ex-done") +
+          '" data-k="' +
+          esc(r.k) +
+          '" title="' +
+          esc(stateLabel(n) + (note ? " · " + note : "")) +
+          '"><span class="im-rank">' +
+          (i + 1) +
+          "</span>" +
+          '<span class="im-who"><i class="dot ' +
           kcls(n) +
           '"></i><span class="k">' +
-          esc(short(k)) +
+          esc(short(r.k)) +
           '</span><span class="t">' +
-          esc(n.title) +
-          "</span></span>" +
-          (labels[k] ? '<div class="act">' + esc(labels[k]) + "</div>" : "") +
-          (n.verdict && !labels[k] ? '<div class="act">' + esc(n.verdict) + "</div>" : "") +
-          "</td>" +
-          "<td>" +
-          esc(stateLabel(n)) +
-          (n.archived ? " · archived" : "") +
-          "</td>" +
-          (hasMetric("heat") ? '<td class="num">' + (n.heat ? heatScore(n) : "") + "</td>" : "") +
-          '<td class="num">' +
-          neighbors(k).size +
-          "</td></tr>"
+          esc(n.title || "") +
+          "</span>" +
+          (pend.has(r.k) ? '<span class="ex-clean">cleanup</span>' : "") +
+          "</span>" +
+          '<span class="im-lane" aria-hidden="true">' +
+          lane +
+          '</span><span class="im-total">' +
+          Math.round(r.score * 10) / 10 +
+          "</span></button>"
         );
       })
       .join("");
@@ -2472,7 +2507,7 @@ export function mountDashboardView(
         '</h1><div class="muted">' +
         esc(g.subtitle || "") +
         "</div></div>" +
-        '<div class="segs"><button class="cl-swarm" id="ex-swarm">View in Swarm</button></div></div>' +
+        '<div class="segs"><button class="cl-swarm" id="ex-canvas">View in Canvas</button><button class="cl-swarm" id="ex-swarm">View in Swarm</button></div></div>' +
         '<div class="muted" style="font-size:13px;margin-bottom:12px">' +
         (proposedGroups() ? "Proposed theme" : "Connected component") +
         " · " +
@@ -2484,10 +2519,13 @@ export function mountDashboardView(
         " connections" +
         (hasMetric("heat") ? " · " + st.heat + " heat" : "") +
         (st.cleanup ? " · " + st.cleanup + " to clean up" : "") +
-        "</div>" +
+        ". Ranked by the work each resolution touches; pick one to trace it in the graph, use ↑ and ↓ to move.</div>" +
         '<div class="swarm-legend" aria-label="Item status">' +
         legendMarkup(statusGroups(keys.map((k) => N[k]))) +
         "</div>" +
+        '<div class="im ex-im"><div class="im-list" role="listbox" aria-label="Cluster items by impact">' +
+        list +
+        '</div><div id="im-side" class="ex-side">' +
         '<div class="ex-graph" id="ex-graph"><svg viewBox="0 0 ' +
         W +
         " " +
@@ -2498,50 +2536,86 @@ export function mountDashboardView(
         edges +
         nodes +
         "</svg></div>" +
-        '<div class="muted" style="font-size:12px;margin:-8px 0 16px">' +
+        '<div class="im-hint ex-hint">' +
         (links.length
           ? "Lines show captured relationships; arrows show explicit direction."
           : "No explicit connections between these items in this capture.") +
         (keys.some((k) => N[k].heat) ? " Dot size reflects heat." : "") +
         (st.cleanup ? " Amber rings mark pending cleanup." : "") +
-        " Hover to trace, click to inspect.</div>" +
-        '<div class="card-wrap"><table class="tbl"><thead><tr><th>Item</th><th>State</th>' +
-        (hasMetric("heat") ? '<th class="num">Heat</th>' : "") +
-        '<th class="num">Links</th></tr></thead><tbody>' +
-        rows +
-        "</tbody></table></div></div>",
+        "</div>" +
+        '<div id="ex-panel">' +
+        impactPanel(pick, { ripple: false }) +
+        "</div></div></div></div>",
     );
     const graph = document.getElementById("ex-graph");
     const focus = (k) => {
-      graph.classList.toggle("focus", !!k);
-      if (!k) return;
-      const on = new Set([k]);
+      const key = k || CLUSTER_SEL[gi];
+      graph.classList.toggle("focus", !!key);
+      if (!key) return;
+      const on = new Set([key]);
       for (const e of graph.querySelectorAll(".e")) {
-        const hit = e.dataset.s === k || e.dataset.t === k;
+        const hit = e.dataset.s === key || e.dataset.t === key;
         e.classList.toggle("on", hit);
         if (hit) {
           on.add(e.dataset.s);
           on.add(e.dataset.t);
         }
       }
-      for (const n of graph.querySelectorAll(".n")) n.classList.toggle("on", on.has(n.dataset.key));
+      for (const n of graph.querySelectorAll(".n")) {
+        n.classList.toggle("on", on.has(n.dataset.key));
+        n.classList.toggle("sel", n.dataset.key === CLUSTER_SEL[gi]);
+      }
+    };
+    const wirePanel = () => {
+      const open = (k) => (keys.includes(k) ? choose(k) : select(k));
+      for (const el of app.querySelectorAll("#ex-panel .im-rip .sat, #ex-panel .im-aff-row")) {
+        el.classList.toggle("filter-context", !keys.includes(el.dataset.key));
+        el.onclick = () => open(el.dataset.key);
+      }
+      const i = document.getElementById("im-inspect");
+      if (i) i.onclick = () => select(CLUSTER_SEL[gi]);
+      const w = document.getElementById("im-swarm");
+      if (w) w.onclick = () => swarmView("cluster", "blast");
+    };
+    const choose = (k) => {
+      CLUSTER_SEL[gi] = k;
+      for (const r of app.querySelectorAll(".ex-im .im-row"))
+        r.classList.toggle("on", r.dataset.k === k);
+      document.getElementById("ex-panel").innerHTML = impactPanel(k, { ripple: false });
+      wirePanel();
+      focus(null);
     };
     for (const n of graph.querySelectorAll(".n")) {
       n.onmouseenter = () => focus(n.dataset.key);
       n.onmouseleave = () => focus(null);
       n.onfocus = () => focus(n.dataset.key);
       n.onblur = () => focus(null);
-      n.onclick = () => select(n.dataset.key);
+      n.onclick = () => choose(n.dataset.key);
+      n.ondblclick = () => select(n.dataset.key);
       n.onkeydown = (e) => {
-        if (e.key === "Enter") select(n.dataset.key);
+        if (e.key === "Enter") choose(n.dataset.key);
       };
     }
-    for (const tr of app.querySelectorAll(".tbl tbody tr")) {
-      tr.onclick = () => select(tr.dataset.key);
-      tr.onmouseenter = () => focus(tr.dataset.key);
-      tr.onmouseleave = () => focus(null);
+    for (const r of app.querySelectorAll(".ex-im .im-row")) {
+      r.onclick = () => choose(r.dataset.k);
+      r.ondblclick = () => select(r.dataset.k);
+      r.onmouseenter = () => focus(r.dataset.k);
+      r.onmouseleave = () => focus(null);
+      r.onkeydown = (e) => {
+        if (e.key === "Enter") return select(r.dataset.k);
+        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+        e.preventDefault();
+        const next = e.key === "ArrowDown" ? r.nextElementSibling : r.previousElementSibling;
+        if (next) {
+          next.focus();
+          choose(next.dataset.k);
+        }
+      };
     }
+    wirePanel();
+    focus(null);
     document.getElementById("ex-back").onclick = () => exploreView();
+    document.getElementById("ex-canvas").onclick = () => canvasView("clusters", "g" + gi);
     document.getElementById("ex-swarm").onclick = () => swarmView("cluster", "links");
     setHash("explore:" + gi);
     sel = "explore:" + gi;
@@ -3267,6 +3341,852 @@ export function mountDashboardView(
     rankRender();
   }
 
+  const CV = {
+    mode: "clusters",
+    scope: "top8",
+    edges: "both",
+    selected: null,
+    tx: 24,
+    ty: 24,
+    scale: 0.5,
+    layout: null,
+  };
+  const cvHash = () => "canvas:" + CV.mode + ":" + CV.scope + ":" + CV.edges;
+  function cvAccent(n) {
+    const c = stateColor(n);
+    if (c === "iss") return "var(--open-fg)";
+    if (c === "pr") return "var(--accent)";
+    if (c === "merged") return "var(--merged-fg)";
+    if (c === "closed" || c === "canceled") return "var(--danger-fg)";
+    return "var(--muted)";
+  }
+  function cvIsCompeting(n) {
+    return (n.flags || []).some((f) => /competes/i.test(f));
+  }
+  function cvGroupsRanked() {
+    return DATA.groups
+      .map((g, gi) => {
+        const members = g.members.filter((k) => N[k] && matches(k));
+        const set = new Set(members);
+        let intra = 0,
+          closes = 0;
+        for (const k of members) {
+          for (const e of N[k].out || []) {
+            if (set.has(e.to)) {
+              intra++;
+              if (e.via === "closes" || e.via === "blocks") closes++;
+            }
+          }
+        }
+        return {
+          gi,
+          id: "g" + gi,
+          label: g.label,
+          subtitle: g.subtitle || "",
+          members,
+          intra,
+          closes,
+          richness: closes * 5 + intra * 1.5 + members.length * 0.5,
+        };
+      })
+      .filter((g) => g.members.length > 0 && g.label !== "Ungrouped")
+      .sort((a, b) => b.richness - a.richness);
+  }
+  function cvBuildFrames(ranked) {
+    if (CV.mode === "clusters") {
+      if (CV.scope === "top8") return ranked.slice(0, 8);
+      if (CV.scope === "top14") return ranked.slice(0, 14);
+      const hit = ranked.find((g) => g.id === CV.scope);
+      if (hit) return [hit];
+      const gi = Number(CV.scope.slice(1));
+      if (Number.isInteger(gi) && DATA.groups[gi]) {
+        const g = DATA.groups[gi];
+        const members = g.members.filter((k) => N[k] && matches(k));
+        if (members.length)
+          return [{ gi, id: "g" + gi, label: g.label, subtitle: g.subtitle || "", members }];
+      }
+      return ranked.slice(0, 8);
+    }
+    const allNodes = Object.values(N).filter((n) => matches(n.key));
+    const hasPRs = allNodes.some((n) => n.kind === "PullRequest");
+    if (!hasPRs) {
+      const linked = allNodes
+        .filter((n) => (n.out || []).some((e) => N[e.to]) || (n.in || []).some((e) => N[e.from]))
+        .slice(0, 28)
+        .map((n) => n.key);
+      const linkedSet = new Set(linked);
+      const openRest = allNodes
+        .filter((n) => active(n) && !linkedSet.has(n.key))
+        .slice(0, 28)
+        .map((n) => n.key);
+      return [
+        {
+          gi: -1,
+          id: "plan-linked",
+          label: "Stage 1 · Connected chains",
+          subtitle: "Items with captured links to resolve in dependency order",
+          members: linked,
+        },
+        {
+          gi: -1,
+          id: "plan-open",
+          label: "Stage 2 · Independent active items",
+          subtitle: "Active items without captured blockers",
+          members: openRest,
+        },
+      ].filter((f) => f.members.length > 0);
+    }
+    const competing = new Set();
+    for (const n of allNodes) {
+      if (cvIsCompeting(n)) {
+        competing.add(n.key);
+        for (const e of n.out || []) {
+          if (e.via === "closes" && N[e.to] && matches(e.to)) competing.add(e.to);
+        }
+      }
+    }
+    const readyPRs = allNodes
+      .filter(
+        (n) =>
+          n.kind === "PullRequest" &&
+          active(n) &&
+          n.pr &&
+          !n.pr.draft &&
+          (n.pr.review === "APPROVED" || n.pr.mergeable === "MERGEABLE"),
+      )
+      .sort(
+        (a, b) =>
+          (b.pr.review === "APPROVED" ? 1 : 0) - (a.pr.review === "APPROVED" ? 1 : 0) ||
+          heatScore(b) - heatScore(a),
+      )
+      .slice(0, 16);
+    const readyKeys = new Set(readyPRs.map((n) => n.key));
+    for (const pr of readyPRs) {
+      for (const e of pr.out || []) {
+        if (e.via === "closes" && N[e.to] && matches(e.to) && !competing.has(e.to))
+          readyKeys.add(e.to);
+      }
+    }
+    const closedByOpenPR = new Set();
+    const activePairs = new Set();
+    for (const n of allNodes) {
+      if (n.kind === "PullRequest" && active(n)) {
+        for (const e of n.out || []) {
+          if (e.via === "closes" && N[e.to] && matches(e.to)) {
+            closedByOpenPR.add(e.to);
+            if (!competing.has(n.key) && !readyKeys.has(n.key) && activePairs.size < 28) {
+              activePairs.add(n.key);
+              activePairs.add(e.to);
+            }
+          }
+        }
+      }
+    }
+    const unaddressed = allNodes
+      .filter(
+        (n) =>
+          n.kind === "Issue" && active(n) && !closedByOpenPR.has(n.key) && !competing.has(n.key),
+      )
+      .sort((a, b) => heatScore(b) - heatScore(a))
+      .slice(0, 18)
+      .map((n) => n.key);
+    return [
+      {
+        gi: -1,
+        id: "stage-1",
+        label: "Stage 1 · Competing PRs",
+        subtitle: "Multiple open PRs targeting the same issue",
+        members: [...competing],
+      },
+      {
+        gi: -1,
+        id: "stage-2",
+        label: "Stage 2 · Ready / Mergeable PRs",
+        subtitle: "Non-draft PRs with APPROVED or MERGEABLE status + target issues",
+        members: [...readyKeys],
+      },
+      {
+        gi: -1,
+        id: "stage-3",
+        label: "Stage 3 · Active PR -> Issue pairs",
+        subtitle: "Open PRs with explicit closes links awaiting review",
+        members: [...activePairs],
+      },
+      {
+        gi: -1,
+        id: "stage-4",
+        label: "Stage 4 · High-heat open issues (no closing PR)",
+        subtitle: "Highest-heat open issues with zero captured closing PRs",
+        members: unaddressed,
+      },
+    ].filter((f) => f.members.length > 0);
+  }
+  function cvRoundedPoly(pts, r) {
+    if (pts.length < 2) return "";
+    let d = "M " + pts[0][0] + " " + pts[0][1];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1],
+        p1 = pts[i],
+        p2 = pts[i + 1];
+      const dx1 = p1[0] - p0[0],
+        dy1 = p1[1] - p0[1],
+        dx2 = p2[0] - p1[0],
+        dy2 = p2[1] - p1[1];
+      const l1 = Math.hypot(dx1, dy1) || 1,
+        l2 = Math.hypot(dx2, dy2) || 1;
+      const cr = Math.min(r, l1 / 2, l2 / 2);
+      const ax = p1[0] - (dx1 / l1) * cr,
+        ay = p1[1] - (dy1 / l1) * cr;
+      const bx = p1[0] + (dx2 / l2) * cr,
+        by = p1[1] + (dy2 / l2) * cr;
+      d +=
+        " L " +
+        ax.toFixed(1) +
+        " " +
+        ay.toFixed(1) +
+        " Q " +
+        p1[0].toFixed(1) +
+        " " +
+        p1[1].toFixed(1) +
+        " " +
+        bx.toFixed(1) +
+        " " +
+        by.toFixed(1);
+    }
+    const last = pts[pts.length - 1];
+    return d + " L " + last[0].toFixed(1) + " " + last[1].toFixed(1);
+  }
+  function cvElbow(a, b, idx) {
+    const aCx = a.x + a.w / 2,
+      bCx = b.x + b.w / 2,
+      jitter = ((idx % 5) - 2) * 4;
+    if (Math.abs(a.x - b.x) < 10) {
+      const x1 = a.x + a.w,
+        y1 = a.y + a.h / 2,
+        x2 = b.x + b.w,
+        y2 = b.y + b.h / 2;
+      const mx = Math.max(x1, x2) + 22 + Math.abs(jitter);
+      return cvRoundedPoly(
+        [
+          [x1, y1],
+          [mx, y1],
+          [mx, y2],
+          [x2, y2],
+        ],
+        8,
+      );
+    }
+    let x1, y1, x2, y2;
+    if (aCx <= bCx) {
+      x1 = a.x + a.w;
+      y1 = a.y + a.h / 2;
+      x2 = b.x;
+      y2 = b.y + b.h / 2;
+    } else {
+      x1 = a.x;
+      y1 = a.y + a.h / 2;
+      x2 = b.x + b.w;
+      y2 = b.y + b.h / 2;
+    }
+    const midX = (x1 + x2) / 2 + jitter;
+    return cvRoundedPoly(
+      [
+        [x1, y1],
+        [midX, y1],
+        [midX, y2],
+        [x2, y2],
+      ],
+      9,
+    );
+  }
+  function cvComputeLayout(rawFrames) {
+    const CARD_W = 244,
+      CARD_H = 80,
+      COL_GAP = 60,
+      ROW_GAP = 14,
+      PAD_X = 22,
+      PAD_TOP = 38,
+      PAD_BOTTOM = 22,
+      FRAME_GAP_X = 80,
+      FRAME_GAP_Y = 86;
+    const used = new Set();
+    const boxes = rawFrames
+      .map((frame) => {
+        const keys = frame.members.filter((k) => N[k] && !used.has(k));
+        for (const k of keys) used.add(k);
+        if (!keys.length) return null;
+        const set = new Set(keys);
+        const adj = new Map(keys.map((k) => [k, []]));
+        const indeg = new Map(keys.map((k) => [k, 0]));
+        for (const k of keys) {
+          const n = N[k];
+          for (const e of n.out || []) {
+            if (!set.has(e.to) || e.to === k) continue;
+            if (e.via === "closes") {
+              adj.get(e.to).push(k);
+              indeg.set(k, (indeg.get(k) || 0) + 1);
+            } else if (e.via === "blocks") {
+              adj.get(k).push(e.to);
+              indeg.set(e.to, (indeg.get(e.to) || 0) + 1);
+            } else if ((N[e.to].num || 0) < (n.num || 0)) {
+              adj.get(e.to).push(k);
+              indeg.set(k, (indeg.get(k) || 0) + 1);
+            }
+          }
+        }
+        const cols = new Map();
+        const q = [];
+        for (const k of keys) {
+          if ((indeg.get(k) || 0) === 0) {
+            cols.set(k, 0);
+            q.push(k);
+          }
+        }
+        for (const k of keys) {
+          if (!cols.has(k)) {
+            cols.set(k, 0);
+            q.push(k);
+          }
+        }
+        let guard = 0;
+        while (q.length && guard < 2000) {
+          guard++;
+          const u = q.shift(),
+            cu = cols.get(u) || 0;
+          for (const v of adj.get(u) || []) {
+            const next = Math.min(3, cu + 1);
+            if ((cols.get(v) || 0) < next) {
+              cols.set(v, next);
+              q.push(v);
+            }
+          }
+        }
+        const byCol = new Map();
+        for (const k of keys) {
+          const c = cols.get(k) || 0;
+          if (!byCol.has(c)) byCol.set(c, []);
+          byCol.get(c).push(k);
+        }
+        const maxPerCol = keys.length > 20 ? 7 : 6;
+        const finalCols = [];
+        for (const c of [...byCol.keys()].sort((a, b) => a - b)) {
+          const list = byCol.get(c).sort((a, b) => {
+            const na = N[a],
+              nb = N[b];
+            if (na.kind !== nb.kind) return na.kind === "Issue" ? -1 : 1;
+            return heatScore(nb) - heatScore(na);
+          });
+          for (let i = 0; i < list.length; i += maxPerCol)
+            finalCols.push(list.slice(i, i + maxPerCol));
+        }
+        const numCols = Math.max(1, finalCols.length);
+        const maxRows = Math.max(1, ...finalCols.map((c) => c.length));
+        return {
+          frame,
+          finalCols,
+          keys,
+          width: PAD_X * 2 + numCols * CARD_W + (numCols - 1) * COL_GAP,
+          height: PAD_TOP + PAD_BOTTOM + maxRows * CARD_H + (maxRows - 1) * ROW_GAP,
+        };
+      })
+      .filter(Boolean);
+
+    const gridCols = boxes.length <= 1 ? 1 : boxes.length <= 4 ? 2 : 3;
+    const colH = new Array(gridCols).fill(72);
+    const colW = new Array(gridCols).fill(0);
+    const colsArr = new Array(gridCols).fill(0).map(() => []);
+    for (const fb of boxes) {
+      let best = 0;
+      for (let i = 1; i < gridCols; i++) if (colH[i] < colH[best]) best = i;
+      colsArr[best].push(fb);
+      colH[best] += fb.height + FRAME_GAP_Y;
+      colW[best] = Math.max(colW[best], fb.width);
+    }
+
+    const frames = [],
+      cards = [],
+      cardMap = new Map();
+    let curX = 56,
+      maxW = 0,
+      maxH = 0;
+    for (let c = 0; c < gridCols; c++) {
+      let curY = 72;
+      for (const fb of colsArr[c]) {
+        frames.push({
+          ...fb.frame,
+          x: curX,
+          y: curY,
+          w: fb.width,
+          h: fb.height,
+          count: fb.keys.length,
+        });
+        fb.finalCols.forEach((colKeys, ci) => {
+          colKeys.forEach((key, ri) => {
+            const card = {
+              key,
+              node: N[key],
+              frameId: fb.frame.id,
+              x: curX + PAD_X + ci * (CARD_W + COL_GAP),
+              y: curY + PAD_TOP + ri * (CARD_H + ROW_GAP),
+              w: CARD_W,
+              h: CARD_H,
+            };
+            cards.push(card);
+            cardMap.set(key, card);
+          });
+        });
+        curY += fb.height + FRAME_GAP_Y;
+        maxH = Math.max(maxH, curY);
+      }
+      curX += (colW[c] || 300) + FRAME_GAP_X;
+      maxW = Math.max(maxW, curX);
+    }
+
+    const edges = [],
+      seen = new Set();
+    for (const card of cards) {
+      for (const e of card.node.out || []) {
+        const target = cardMap.get(e.to);
+        if (!target || e.to === card.key) continue;
+        const isCross = target.frameId !== card.frameId;
+        const isStructural = e.via === "closes" || e.via === "blocks";
+        if (CV.edges === "closes" && !isStructural) continue;
+        if (CV.edges !== "cross" && isCross) continue;
+        const pid = isStructural
+          ? e.via + ":" + target.key + "->" + card.key
+          : "ref:" + [card.key, target.key].sort().join("--");
+        if (seen.has(pid)) continue;
+        seen.add(pid);
+        const fromCard = e.via === "closes" ? target : card;
+        const toCard = e.via === "closes" ? card : target;
+        edges.push({
+          id: pid,
+          from: fromCard.key,
+          to: toCard.key,
+          via: e.via,
+          isStructural,
+          isCross,
+        });
+      }
+    }
+    return {
+      frames,
+      cards,
+      edges,
+      cardMap,
+      bounds: { w: Math.max(maxW + 64, 640), h: Math.max(maxH + 64, 480) },
+    };
+  }
+  function cvApplyTransform() {
+    const stage = document.getElementById("cv-stage");
+    const world = document.getElementById("cv-world");
+    const readout = document.getElementById("cv-zoom-val");
+    if (!stage || !world) return;
+    world.style.transform =
+      "translate(" +
+      CV.tx.toFixed(1) +
+      "px," +
+      CV.ty.toFixed(1) +
+      "px) scale(" +
+      CV.scale.toFixed(4) +
+      ")";
+    if (readout) readout.textContent = Math.round(CV.scale * 100) + "%";
+    stage.classList.toggle("macro", CV.scale <= 0.44);
+  }
+  function cvZoomToBox(x, y, w, h) {
+    const stage = document.getElementById("cv-stage");
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const pad = 32;
+    const sx = (rect.width - pad * 2) / Math.max(w, 1);
+    const sy = (rect.height - pad * 2) / Math.max(h, 1);
+    CV.scale = Math.max(0.18, Math.min(1.1, Math.min(sx, sy)));
+    CV.tx = (rect.width - w * CV.scale) / 2 - x * CV.scale;
+    CV.ty = (rect.height - h * CV.scale) / 2 - y * CV.scale;
+    cvApplyTransform();
+  }
+  function cvFit() {
+    if (!CV.layout) return;
+    cvZoomToBox(20, 20, CV.layout.bounds.w - 40, CV.layout.bounds.h - 40);
+  }
+  function cvZoomCentered(next) {
+    const stage = document.getElementById("cv-stage");
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const cx = rect.width / 2,
+      cy = rect.height / 2;
+    const clamped = Math.max(0.18, Math.min(1.6, next));
+    const ratio = clamped / CV.scale;
+    CV.tx = cx - (cx - CV.tx) * ratio;
+    CV.ty = cy - (cy - CV.ty) * ratio;
+    CV.scale = clamped;
+    cvApplyTransform();
+  }
+  function canvasRender(shouldFit = true) {
+    const stage = document.getElementById("cv-stage");
+    if (!stage) return;
+    const ranked = cvGroupsRanked();
+    const picker = document.getElementById("cv-scope");
+    if (picker) {
+      picker.hidden = CV.mode !== "clusters";
+      const opts = [
+        '<option value="top8"' +
+          (CV.scope === "top8" ? " selected" : "") +
+          ">Top 8 clusters</option>",
+        '<option value="top14"' +
+          (CV.scope === "top14" ? " selected" : "") +
+          ">Top 14 clusters</option>",
+        ...ranked.map(
+          (g) =>
+            '<option value="' +
+            g.id +
+            '"' +
+            (CV.scope === g.id ? " selected" : "") +
+            ">" +
+            esc(g.label) +
+            " (" +
+            g.members.length +
+            ")</option>",
+        ),
+      ];
+      picker.innerHTML = opts.join("");
+    }
+    const rawFrames = cvBuildFrames(ranked);
+    const layout = cvComputeLayout(rawFrames);
+    CV.layout = layout;
+    if (CV.selected && !layout.cardMap.has(CV.selected)) CV.selected = null;
+
+    const say = document.getElementById("cv-say");
+    if (say) {
+      say.textContent =
+        layout.cards.length +
+        " items across " +
+        layout.frames.length +
+        (layout.frames.length === 1 ? " frame" : " frames") +
+        " · " +
+        layout.edges.length +
+        " links · drag to pan, scroll/pinch to zoom, double-click to inspect";
+    }
+    const legend = document.getElementById("cv-legend");
+    if (legend) {
+      legend.innerHTML = layout.cards.length
+        ? legendMarkup(
+            statusGroups(layout.cards.map((c) => c.node)),
+            layout.cards.some((c) => c.node.kind === "PullRequest"),
+          )
+        : "";
+    }
+
+    const framesEl = document.getElementById("cv-frames");
+    const edgesEl = document.getElementById("cv-edges");
+    const cardsEl = document.getElementById("cv-cards");
+    const emptyEl = document.getElementById("cv-empty");
+    const selBar = document.getElementById("cv-selbar");
+
+    if (!layout.cards.length) {
+      framesEl.innerHTML = "";
+      cardsEl.innerHTML = "";
+      edgesEl.innerHTML = "";
+      emptyEl.hidden = false;
+      emptyEl.innerHTML = emptyFilters();
+      if (selBar) selBar.hidden = true;
+      return;
+    }
+    emptyEl.hidden = true;
+
+    const conn = new Set();
+    if (CV.selected) {
+      conn.add(CV.selected);
+      for (const e of layout.edges) {
+        if (e.from === CV.selected) conn.add(e.to);
+        if (e.to === CV.selected) conn.add(e.from);
+      }
+    }
+
+    framesEl.innerHTML = layout.frames
+      .map(
+        (f, idx) =>
+          '<div class="cv-frame" style="left:' +
+          f.x +
+          "px;top:" +
+          f.y +
+          "px;width:" +
+          f.w +
+          "px;height:" +
+          f.h +
+          'px">' +
+          '<div class="cv-frame-head"><button class="cv-frame-title" data-frame="' +
+          idx +
+          '">' +
+          (f.gi >= 0
+            ? '<i class="group-swatch" style="background:' + groupColor(f.gi) + '"></i>'
+            : "") +
+          esc(f.label) +
+          '</button><span class="cv-frame-meta">' +
+          f.count +
+          " items</span></div>" +
+          (f.subtitle ? '<div class="cv-frame-sub">' + esc(f.subtitle) + "</div>" : "") +
+          "</div>",
+      )
+      .join("");
+
+    edgesEl.setAttribute("width", String(layout.bounds.w));
+    edgesEl.setAttribute("height", String(layout.bounds.h));
+    edgesEl.innerHTML =
+      '<defs><marker id="cv-arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 1.5L8 5L0 8.5Z" fill="var(--fg2)"/></marker><marker id="cv-arr-on" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 1.5L8 5L0 8.5Z" fill="var(--fg)"/></marker></defs>' +
+      layout.edges
+        .map((e, idx) => {
+          const a = layout.cardMap.get(e.from),
+            b = layout.cardMap.get(e.to);
+          if (!a || !b) return "";
+          const on = CV.selected && (e.from === CV.selected || e.to === CV.selected);
+          const dim = CV.selected && !on;
+          let cls = "cv-edge " + (e.isStructural ? "closes" : "ref");
+          if (e.isCross) cls += " cross";
+          if (on) cls += " on";
+          else if (dim) cls += " dim";
+          const marker = e.isStructural
+            ? on
+              ? ' marker-end="url(#cv-arr-on)"'
+              : ' marker-end="url(#cv-arr)"'
+            : "";
+          return '<path class="' + cls + '" d="' + cvElbow(a, b, idx) + '"' + marker + "/>";
+        })
+        .join("");
+
+    cardsEl.innerHTML = layout.cards
+      .map((c) => {
+        const n = c.node;
+        const cls =
+          "cv-card" +
+          (CV.selected === c.key
+            ? " sel"
+            : CV.selected && conn.has(c.key)
+              ? " conn"
+              : CV.selected
+                ? " dim"
+                : "");
+        const heat = hasMetric("heat") ? Math.round(heatScore(n) * 10) / 10 : 0;
+        const badge = cvIsCompeting(n)
+          ? '<span class="cv-pill warn">competing</span>'
+          : n.pr?.review === "APPROVED"
+            ? '<span class="cv-pill ok">approved</span>'
+            : "";
+        return (
+          '<div class="' +
+          cls +
+          '" data-key="' +
+          esc(c.key) +
+          '" style="left:' +
+          c.x +
+          "px;top:" +
+          c.y +
+          "px;--cv-accent:" +
+          cvAccent(n) +
+          '">' +
+          '<div class="cv-card-title">' +
+          esc(n.title) +
+          "</div>" +
+          '<div class="cv-card-foot"><span class="cv-card-id"><i class="cv-dot' +
+          (n.kind === "PullRequest" ? " diamond" : "") +
+          '" style="background:' +
+          cvAccent(n) +
+          '"></i>' +
+          esc(short(c.key)) +
+          '</span><span class="cv-badges">' +
+          badge +
+          (heat > 0 ? '<span class="cv-pill">H ' + heat + "</span>" : "") +
+          "</span></div></div>"
+        );
+      })
+      .join("");
+
+    if (selBar) {
+      if (CV.selected && N[CV.selected]) {
+        const sn = N[CV.selected];
+        selBar.hidden = false;
+        selBar.innerHTML =
+          '<span class="k">' +
+          esc(short(sn.key)) +
+          '</span><span class="t">' +
+          esc(sn.title) +
+          '</span><button id="cv-open-insp">Inspect</button><button class="cv-x" id="cv-clear-sel" aria-label="Clear selection">×</button>';
+        document.getElementById("cv-open-insp").onclick = () => select(sn.key);
+        document.getElementById("cv-clear-sel").onclick = () => {
+          CV.selected = null;
+          canvasRender(false);
+        };
+      } else {
+        selBar.hidden = true;
+      }
+    }
+
+    for (const btn of framesEl.querySelectorAll(".cv-frame-title")) {
+      btn.onclick = (ev) => {
+        ev.stopPropagation();
+        const f = layout.frames[Number(btn.dataset.frame)];
+        if (f) cvZoomToBox(f.x - 24, f.y - 48, f.w + 48, f.h + 72);
+      };
+    }
+    for (const el of cardsEl.querySelectorAll(".cv-card")) {
+      el.onclick = (ev) => {
+        ev.stopPropagation();
+        CV.selected = CV.selected === el.dataset.key ? null : el.dataset.key;
+        canvasRender(false);
+      };
+      el.ondblclick = (ev) => {
+        ev.stopPropagation();
+        select(el.dataset.key);
+      };
+    }
+    if (shouldFit) frame(() => cvFit());
+    else cvApplyTransform();
+  }
+  function canvasView(mode, scope, edges) {
+    if (mode === "clusters" || mode === "plan") CV.mode = mode;
+    if (scope) CV.scope = scope;
+    if (edges === "both" || edges === "closes" || edges === "cross") CV.edges = edges;
+    setView("canvas");
+    const seg = (id, opts, cur) =>
+      '<div class="seg" role="group" id="' +
+      id +
+      '">' +
+      opts
+        .map(
+          (o) =>
+            '<button data-v="' +
+            o[0] +
+            '" class="' +
+            (o[0] === cur ? "on" : "") +
+            '" aria-pressed="' +
+            (o[0] === cur) +
+            '">' +
+            o[1] +
+            "</button>",
+        )
+        .join("") +
+      "</div>";
+    renderMain(
+      '<div class="cv-view view-in">' +
+        '<div class="swarm-head"><div><h1>Canvas</h1><div class="muted" id="cv-say"></div></div>' +
+        '<div class="segs">' +
+        seg(
+          "cv-mode",
+          [
+            ["clusters", "Clusters"],
+            ["plan", "Execution"],
+          ],
+          CV.mode,
+        ) +
+        '<select class="cv-picker" id="cv-scope" aria-label="Canvas scope"></select>' +
+        seg(
+          "cv-edge",
+          [
+            ["both", "Closes + Refs"],
+            ["closes", "Closes only"],
+            ["cross", "+ Cross-frame"],
+          ],
+          CV.edges,
+        ) +
+        "</div></div>" +
+        '<div class="swarm-legend" id="cv-legend" aria-label="Canvas status"></div>' +
+        '<div class="cv-stage" id="cv-stage">' +
+        '<div class="cv-world" id="cv-world"><div class="cv-frames" id="cv-frames"></div><svg class="cv-edges" id="cv-edges"></svg><div class="cv-cards" id="cv-cards"></div></div>' +
+        '<div id="cv-empty" hidden></div>' +
+        '<div class="cv-selbar" id="cv-selbar" hidden></div>' +
+        '<div class="cv-dock" role="toolbar" aria-label="Canvas zoom">' +
+        '<button id="cv-zout" aria-label="Zoom out">-</button>' +
+        '<span class="cv-zoom-val" id="cv-zoom-val">50%</span>' +
+        '<button id="cv-zin" aria-label="Zoom in">+</button>' +
+        '<span class="cv-dock-sep"></span>' +
+        '<button id="cv-z25">25%</button>' +
+        '<button id="cv-z85">85%</button>' +
+        '<button id="cv-zfit" class="on">Fit</button>' +
+        "</div></div></div>",
+    );
+    for (const b of app.querySelectorAll(".item")) b.classList.remove("sel");
+    const wireSeg = (id, key, refit) => {
+      for (const b of document.querySelectorAll("#" + id + " button"))
+        b.onclick = () => {
+          CV[key] = b.dataset.v;
+          for (const o of document.querySelectorAll("#" + id + " button")) {
+            o.classList.toggle("on", o === b);
+            o.setAttribute("aria-pressed", o === b);
+          }
+          setHash(cvHash());
+          canvasRender(refit);
+        };
+    };
+    wireSeg("cv-mode", "mode", true);
+    wireSeg("cv-edge", "edges", false);
+    document.getElementById("cv-scope").onchange = (e) => {
+      CV.scope = e.target.value;
+      setHash(cvHash());
+      canvasRender(true);
+    };
+    document.getElementById("cv-zin").onclick = () => cvZoomCentered(CV.scale * 1.25);
+    document.getElementById("cv-zout").onclick = () => cvZoomCentered(CV.scale / 1.25);
+    document.getElementById("cv-z25").onclick = () => cvZoomCentered(0.28);
+    document.getElementById("cv-z85").onclick = () => cvZoomCentered(0.85);
+    document.getElementById("cv-zfit").onclick = () => cvFit();
+
+    const stage = document.getElementById("cv-stage");
+    let drag = false,
+      lx = 0,
+      ly = 0;
+    stage.onpointerdown = (e) => {
+      if (e.target.closest(".cv-card,.cv-dock,.cv-selbar,.cv-frame-title")) return;
+      drag = true;
+      lx = e.clientX;
+      ly = e.clientY;
+      stage.classList.add("panning");
+      stage.setPointerCapture(e.pointerId);
+    };
+    stage.onpointermove = (e) => {
+      if (!drag) return;
+      CV.tx += e.clientX - lx;
+      CV.ty += e.clientY - ly;
+      lx = e.clientX;
+      ly = e.clientY;
+      cvApplyTransform();
+    };
+    stage.onpointerup = () => {
+      drag = false;
+      stage.classList.remove("panning");
+    };
+    stage.onclick = (e) => {
+      if (!e.target.closest(".cv-card,.cv-selbar") && CV.selected) {
+        CV.selected = null;
+        canvasRender(false);
+      }
+    };
+    stage.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          const rect = stage.getBoundingClientRect();
+          const mx = e.clientX - rect.left,
+            my = e.clientY - rect.top;
+          const next = Math.max(0.18, Math.min(1.6, CV.scale * Math.exp(-e.deltaY * 0.008)));
+          const ratio = next / CV.scale;
+          CV.tx = mx - (mx - CV.tx) * ratio;
+          CV.ty = my - (my - CV.ty) * ratio;
+          CV.scale = next;
+        } else {
+          CV.tx -= e.deltaX;
+          CV.ty -= e.deltaY;
+        }
+        cvApplyTransform();
+      },
+      { passive: false, signal: controller.signal },
+    );
+    setHash(cvHash());
+    sel = "canvas";
+    canvasRender(true);
+  }
+
   function setView(next) {
     view = next;
     const explore = document.getElementById("explore-view"),
@@ -3277,6 +4197,8 @@ export function mountDashboardView(
     if (swarm) swarm.classList.toggle("active", view === "swarm");
     const rank = document.getElementById("rank-view");
     if (rank) rank.classList.toggle("active", view === "rank");
+    const canvas = document.getElementById("canvas-view");
+    if (canvas) canvas.classList.toggle("active", view === "canvas");
     const sweep = document.getElementById("sweep-btn");
     if (sweep) sweep.classList.toggle("active", view === "sweep");
   }
@@ -3284,6 +4206,7 @@ export function mountDashboardView(
   function wire() {
     listen(window, "resize", () => {
       if (view === "swarm") swarmRender();
+      if (view === "canvas") cvApplyTransform();
     });
     wireSidebar();
     listen(app, "click", (e) => {
@@ -3327,6 +4250,8 @@ export function mountDashboardView(
     document.getElementById("swarm-view").onclick = () => swarmView();
     const rank = document.getElementById("rank-view");
     if (rank) rank.onclick = () => rankView();
+    const canvas = document.getElementById("canvas-view");
+    if (canvas) canvas.onclick = () => canvasView();
     for (const g of app.querySelectorAll(".grp"))
       g.addEventListener("toggle", () => {
         g.classList.remove("anim");
@@ -3340,9 +4265,12 @@ export function mountDashboardView(
       b.onmouseenter = () => {
         const d = app.querySelector('.swarm .d[data-key="' + CSS.escape(b.dataset.key) + '"]');
         if (d) d.classList.add("hl");
+        const c = app.querySelector('.cv-card[data-key="' + CSS.escape(b.dataset.key) + '"]');
+        if (c) c.classList.add("hl");
       };
       b.onmouseleave = () => {
         for (const d of app.querySelectorAll(".swarm .d.hl")) d.classList.remove("hl");
+        for (const c of app.querySelectorAll(".cv-card.hl")) c.classList.remove("hl");
       };
     }
     const f = document.getElementById("filter");
@@ -3390,7 +4318,10 @@ export function mountDashboardView(
     else if (h.startsWith("impact:") && N[h.slice(7)]) impactView(h.slice(7));
     else if (h.startsWith("rank")) rankView(h.split(":")[1]);
     else if (h.startsWith("swarm")) swarmView(h.split(":")[1], h.split(":")[2]);
-    else if (h && N[h]) select(h);
+    else if (h.startsWith("canvas")) {
+      const p = h.split(":");
+      canvasView(p[1], p[2], p[3]);
+    } else if (h && N[h]) select(h);
     else exploreView();
     lastHash = decodeURIComponent(location.hash.slice(1));
   }
