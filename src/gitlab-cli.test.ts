@@ -39,7 +39,8 @@ test("help and invalid arguments never start glab", async () => {
   expect((await invoke(["--help"], fixture(hosts))).stdout).toContain("glab api --method GET");
   for (const args of [
     [],
-    ["acme/api#1", "acme/api#2"],
+    [URL, "https://other.example.org/acme/api/-/issues/2"],
+    ["acme/api#1", "--concurrency", "17"],
     ["acme/api#1", "--host", "--json"],
     ["acme/api#1", "--depth", "9"],
     ["acme/api#1", "--write"],

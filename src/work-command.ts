@@ -31,14 +31,14 @@ export interface WorkCommand<TReport extends WorkReport, TReader> {
   /** The provider's authority flag, such as `--site`. */
   authority: { flag: string; missing: string; parse(value: string): string };
   /** "Specify exactly one Jira issue". */
-  oneSeed: string;
+  oneSeed?: string;
   /** "Specify a Jira issue key or browse URL". */
   noSeed: string;
   /** Checks the seed and returns the authority to read from; throws a usage error. */
-  resolve(seed: string, authority: string | undefined): string | undefined;
+  resolve(seeds: string[], authority: string | undefined): string | undefined;
   build(
     reader: TReader,
-    seed: string,
+    seeds: string[],
     options: WorkLimitsInput & { authority?: string },
   ): Promise<TReport>;
   render(report: TReport): string;
@@ -68,7 +68,7 @@ export async function runWorkCommand<TReport extends WorkReport, TReader>(
     "--hub-threshold": "hubThreshold",
     "--concurrency": "concurrency",
   } as const;
-  let seed: string | undefined;
+  const seeds: string[] = [];
   let authority: string | undefined;
   let json = false;
   let htmlPath: string | undefined;
@@ -105,13 +105,13 @@ export async function runWorkCommand<TReport extends WorkReport, TReader>(
           throw new Error(`${arg} must be an integer from ${minimum} to ${maximum}`);
         options[name] = value;
       } else if (arg.startsWith("-")) throw new Error(`Unknown ${command.name} flag: ${arg}`);
-      else if (seed) throw new Error(command.oneSeed);
-      else seed = arg;
+      else if (seeds.length && command.oneSeed) throw new Error(command.oneSeed);
+      else seeds.push(arg);
     }
-    if (!seed) throw new Error(command.noSeed);
+    if (!seeds.length) throw new Error(command.noSeed);
     if (clustersPath && !htmlPath && !open) throw new Error("--clusters requires --html or --open");
     if (cluster && json) throw new Error("--cluster cannot be combined with --json");
-    authority = command.resolve(seed, authority);
+    authority = command.resolve(seeds, authority);
   } catch (error) {
     io.stderr(`${error instanceof Error ? error.message : `Invalid ${command.name} arguments`}\n`);
     return 2;
@@ -122,7 +122,7 @@ export async function runWorkCommand<TReport extends WorkReport, TReader>(
       if (!io.readClusters) throw new Error("Cluster file input is unavailable in this caller");
       clusters = parseWorkClusters(await io.readClusters(clustersPath));
     }
-    const report = await command.build(await reader(authority), seed, { ...options, authority });
+    const report = await command.build(await reader(authority), seeds, { ...options, authority });
     if (htmlPath || open) {
       if (!io.dashboard) throw new Error("HTML output is unavailable in this caller");
       await io.dashboard(report, { path: htmlPath, open, save, clusters });

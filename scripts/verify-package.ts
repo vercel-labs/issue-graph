@@ -182,6 +182,28 @@ if (args[0] === "version") {
   console.log("glab 1.126.0 (fixture)");
   process.exit(0);
 }
+if (args[5] === "graphql") {
+  assert.deepEqual(args, ["api", "--method", "POST", "--hostname", "gitlab.fixture.test", "graphql", "--include", "--header", "Content-Type: application/json", "--input", "-"]);
+  const { query, variables } = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+  assert.match(query, /^query IssueGraphWorkItems\(/);
+  assert.equal(variables.scope0, "eng/platform/api");
+  const nodes = variables.refs0.includes("eng/platform/api#1") ? [{
+    id: "gid://gitlab/WorkItem/1",
+    reference: "eng/platform/api#1",
+    title: "GitLab fixture issue",
+    state: "OPEN",
+    webUrl: "https://gitlab.fixture.test/eng/platform/api/-/work_items/1",
+    features: {
+      development: { closingMergeRequests: {
+        nodes: [{ mergeRequest: null }, { mergeRequest: { webUrl: "https://gitlab.fixture.test/eng/platform/api/-/merge_requests/1" } }],
+        pageInfo: { hasNextPage: false },
+      } },
+      linkedItems: { linkedItems: { nodes: [], pageInfo: { hasNextPage: false } } },
+    },
+  }] : [];
+  console.log("HTTP/2.0 200 OK\r\nContent-Type: application/json\r\n\r\n" + JSON.stringify({ data: { batch0: { nodes } } }));
+  process.exit(0);
+}
 assert.deepEqual(args.slice(0, 5), ["api", "--method", "GET", "--hostname", "gitlab.fixture.test"]);
 const path = args[5];
 const root = "projects/eng%2Fplatform%2Fapi/";
@@ -614,9 +636,24 @@ try {
   );
   assert.match(invoke(["gitlab", "--help"]).stdout, /glab api --method GET/);
   const gitlabReport = JSON.parse(
-    invoke(["gitlab", "eng/platform/api#1", "--host", "gitlab.fixture.test", "--json"], 0).stdout,
+    invoke(
+      [
+        "gitlab",
+        "eng/platform/api#1",
+        "eng/platform/api!1",
+        "--host",
+        "gitlab.fixture.test",
+        "--json",
+      ],
+      0,
+    ).stdout,
   );
   assert.equal(gitlabReport.coverageComplete, true);
+  assert.equal(gitlabReport.seeds.length, 2);
+  assert.deepEqual(
+    gitlabReport.nodes[0].coverage.map((part: { transport: string }) => part.transport),
+    ["graphql", "graphql", "rest"],
+  );
   assert.deepEqual(
     gitlabReport.nodes.map((node: { identifier: string }) => node.identifier),
     ["eng/platform/api#1", "eng/platform/api!1"],

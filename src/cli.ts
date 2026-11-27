@@ -91,7 +91,7 @@ Run with no arguments inside a GitHub repository to open its backlog dashboard.
 commands
   linear <issue>          read Linear issue relationships or capture --project UUID
   jira <issue>            read Jira issue links through the Atlassian TWG CLI (twg)
-  gitlab <issue-or-mr>    read GitLab issue links, closing MRs, and mentions through glab
+  gitlab <issue-or-mr...> read GitLab issue links, closing MRs, and mentions through glab
   youtrack <issue>        read YouTrack issue links and pull requests through the REST API
   open [repo]              open issues and PRs → optional root-cause clusters → dashboard
   graph <item...>          reference graph of issues/PRs: linked work, competing fixes, overlap

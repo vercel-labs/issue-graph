@@ -113,30 +113,31 @@ export const ISSUE_GRAPH_SCHEMA = {
       remoteMutations: false,
       localWrites: [
         "HTML with --html PATH or --open",
-        "latest host and seed-project model under ~/.issue-graph/dashboard with HTML output unless --no-save",
+        "latest host and seed-project set model under ~/.issue-graph/dashboard with HTML output unless --no-save",
       ],
       outputSchemaVersion: 1,
       formats: ["markdown", "json", "html"],
       authentication:
         "the glab session from `glab auth login`, or GITLAB_TOKEN, which glab sends only to its default or configured hosts; issue-graph reads and stores no GitLab credential",
       transport:
-        "glab api --method GET [--hostname HOST] projects/:path/(issues|merge_requests)/:iid[/links|/closed_by|/closes_issues|/notes], no shell",
+        "glab api graphql for read-only issue batches of up to 30, with glab api --method GET for REST fallback, notes, and merge requests; no shell",
       required: [
-        "GitLab issue, work item, or merge request URL, or a group/project#N or group/project!N reference",
+        "One or more GitLab issue, work item, or merge request URLs, or group/project#N and group/project!N references on one host",
       ],
       requires:
         "glab 1.126 or later, checked with `glab version` before the first read; older or unreadable versions fail with GLAB_TOO_OLD or GLAB_VERSION_UNKNOWN",
-      host: "--host HOST; a URL names the host and must agree with --host; default is the authenticated host of the current Git directory, or gitlab.com; node keys use the host from the seed's web_url",
+      host: "--host HOST; a URL names the host and must agree with --host; all seed URLs must name the same host; default is the authenticated host of the current Git directory, or gitlab.com",
       maxDepth: { default: 1, minimum: 0, maximum: 8 },
       maxNodes: { default: 80, minimum: 1, maximum: 1000 },
       hubThreshold: { default: 12, minimum: 1, maximum: 1000 },
-      concurrency: { default: 4, minimum: 1, maximum: 16 },
+      concurrency: { default: 4, minimum: 1, maximum: 16, requestCap: 4 },
       relationships: ["issue links", "closing merge requests", "system note mentions"],
       identities:
         "gitlab:<host>:<lowercase project path>#<iid> for issues and !<iid> for merge requests",
-      crossProject: "references into other projects are read at the next depth and not expanded",
+      crossProject:
+        "only projects with seeds are expanded; other projects are read at the next depth",
       dashboard:
-        "--html PATH or --open writes the explorer and saves model gitlab:<host>:project:<lowercase path> for dashboard and query; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
+        "--html PATH or --open writes the explorer and saves model gitlab:<host>:project:<lowercase path> for one project or gitlab:<host>:projects:<project-set hash> for multiple; --no-save skips saving; --cluster prints a clustering task; --clusters PATH applies themes",
       exclusions: [
         "references in descriptions or comments that GitLab did not record as a system note on the mentioned item",
         "group-level work items such as epics, which are listed as link targets but not read",
@@ -144,7 +145,7 @@ export const ISSUE_GRAPH_SCHEMA = {
         "commits",
       ],
       failures:
-        "unreadable linked items stay as unavailable nodes with an error code; a seed that can't be read exits 1 with the code on stderr and no report; a failed or page-capped links, closing, or notes listing marks the item partial; after the first HTTP 429 no new reads start, unread items fail with RATE_LIMITED and listings cut short record the reason rate-limited",
+        "unreadable linked items stay as unavailable nodes with an error code; an unreadable sole seed or a run that cannot determine the host exits 1 with the code on stderr and no report; a failed or page-capped links, closing, or notes listing marks the item partial; coverage lists the transport for each relation; after the first HTTP 429 no new reads start, unread items fail with RATE_LIMITED and listings cut short record the reason rate-limited",
       exitCodes: { completeWithinScope: 0, incompleteOrFailure: 1, usageError: 2 },
       jsonFlag: "--json emits the report on stdout; takes no path",
       description:

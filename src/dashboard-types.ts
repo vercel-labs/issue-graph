@@ -10,6 +10,7 @@ export interface OpenItemCount {
 
 export interface ReadCoverage {
   source: string;
+  transport?: "graphql" | "rest";
   pages: number;
   complete: boolean;
   reason?:
