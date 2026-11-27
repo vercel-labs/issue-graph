@@ -78,6 +78,20 @@ describe("glabGitLabReader", () => {
     await expect(
       glabGitLabReader({ binary: unauthorized }).get("projects/acme%2Fapi/issues/1/links"),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    const limited = stub(
+      "glab-429",
+      `printf 'glab: HTTP 429\\nglab: rate limited, retry after 30s\\n' >&2\nexit 1`,
+    );
+    await expect(
+      glabGitLabReader({ binary: limited }).get("projects/acme%2Fapi/issues/1"),
+    ).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    const proxied = stub(
+      "glab-proxied",
+      `echo 'glab: upstream returned HTTP 429' >&2\necho 'glab: 404 Project Not Found (HTTP 404)' >&2\nexit 1`,
+    );
+    await expect(
+      glabGitLabReader({ binary: proxied }).get("projects/acme%2Fapi/issues/1"),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
     await expect(
       glabGitLabReader({ binary: join(dir, "missing") }).get("projects/acme%2Fapi/issues/1"),
     ).rejects.toMatchObject({ code: "GLAB_NOT_FOUND" });
@@ -111,5 +125,104 @@ describe("glabGitLabReader", () => {
       `if [ "$1" = version ]; then echo 'glab 2.0.0 (abc)'; exit 0; fi`,
     );
     expect(await glabGitLabReader({ binary: newer }).get(read)).toEqual({});
+  });
+});
+
+test("reads aliased work-item queries through glab and handles schema errors", async () => {
+  const log = join(dir, "graphql-input.json");
+  const binary = stub(
+    "glab-graphql",
+    `cat > '${log}'
+    printf '%s\n' '{"errors":[{"message":"Field is not available","extensions":{"code":"undefinedField"}}]}'
+    exit 1`,
+  );
+  const reader = glabGitLabReader({ binary, host: "gitlab.example.com" });
+  const items = Array.from({ length: 21 }, (_, index) => ({
+    kind: "issue" as const,
+    path: "acme/api",
+    iid: index + 1,
+  }));
+  await expect(reader.getIssues?.(items)).resolves.toEqual({ supported: false, issues: new Map() });
+  const { query, variables } = JSON.parse(readFileSync(log, "utf8"));
+  expect(query.match(/: workItemsByReference/g)).toHaveLength(3);
+  expect(query).toContain("closingMergeRequests");
+  expect(query).not.toContain("relatedMergeRequests");
+  expect([variables.refs0.length, variables.refs1.length, variables.refs2.length]).toEqual([
+    10, 10, 1,
+  ]);
+  expect(variables.refs2).toEqual(["acme/api#21"]);
+});
+
+test("reads the GraphQL HTTP status when stderr has no status", async () => {
+  const binary = stub(
+    "glab-graphql-throttle",
+    `cat >/dev/null
+    printf 'HTTP/2.0 429 Too Many Requests\\nContent-Type: application/json\\r\\n\\r\\n{"errors":[{"message":"Rate limit exceeded"}]}'
+    echo 'glab: Rate limit exceeded' >&2
+    exit 1`,
+  );
+  const reader = glabGitLabReader({ binary });
+  await expect(
+    reader.getIssues?.([{ kind: "issue", path: "acme/api", iid: 1 }]),
+  ).rejects.toMatchObject({
+    code: "RATE_LIMITED",
+  });
+});
+
+test("keeps issue details and unaffected relations after a GraphQL field error", async () => {
+  const reference = "acme/api#1";
+  const data = {
+    batch0: {
+      nodes: [
+        {
+          reference,
+          title: "Issue 1",
+          state: "OPEN",
+          webUrl: "https://gitlab.example.com/acme/api/-/work_items/1",
+          features: {
+            development: {
+              closingMergeRequests: {
+                nodes: [{ mergeRequest: null }],
+                pageInfo: { hasNextPage: false },
+              },
+            },
+            linkedItems: { linkedItems: { nodes: [], pageInfo: { hasNextPage: false } } },
+          },
+        },
+      ],
+    },
+  };
+  const json = JSON.stringify({
+    data,
+    errors: [
+      {
+        message: "Internal error",
+        path: [
+          "batch0",
+          "nodes",
+          0,
+          "features",
+          "development",
+          "closingMergeRequests",
+          "nodes",
+          0,
+          "mergeRequest",
+        ],
+      },
+    ],
+  });
+  const binary = stub(
+    "glab-graphql-partial",
+    `cat >/dev/null
+    printf '%s\\n' '${json}'
+    exit 1`,
+  );
+  const reader = glabGitLabReader({ binary });
+  const result = await reader.getIssues?.([{ kind: "issue", path: "acme/api", iid: 1 }]);
+  expect(result?.issues.get(reference)).toMatchObject({
+    body: { title: "Issue 1", state: "opened" },
+    links: [],
+    closing: [],
+    closingIncomplete: "read-failed",
   });
 });

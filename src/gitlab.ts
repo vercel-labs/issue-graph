@@ -1,4 +1,4 @@
-import { components, crawlGraph } from "./crawl.js";
+import { components, crawlGraph, mapConcurrent } from "./crawl.js";
 import type { GraphCrawlOptions } from "./types.js";
 import {
   renderWorkMarkdown,
@@ -16,6 +16,9 @@ const ITEM_PATH =
 const MENTION = /^mentioned in ([a-z ]+?) ((?:[\w.-]+(?:\/[\w.-]+)*)?[#!][1-9]\d*)$/;
 const PER_PAGE = 100;
 const MAX_PAGES = 10;
+export const GITLAB_MAX_CONCURRENCY = 16;
+const GITLAB_MAX_REQUESTS = 4;
+export const GITLAB_ISSUE_BATCH_SIZE = 30;
 
 export type GitLabItemKind = "issue" | "merge_request";
 
@@ -139,6 +142,19 @@ export interface GitLabReader {
   label?: string;
   /** One REST API v4 GET, such as `projects/group%2Fproject/issues/12`, returning the JSON body. */
   get(path: string): Promise<unknown>;
+  getIssues?(items: GitLabItem[]): Promise<GitLabIssueBatch>;
+}
+
+export interface GitLabIssueRead {
+  body: unknown;
+  links?: unknown[];
+  closing?: unknown[];
+  closingIncomplete?: "page-limit" | "read-failed";
+}
+
+export interface GitLabIssueBatch {
+  supported: boolean;
+  issues: Map<string, GitLabIssueRead>;
 }
 
 export class GitLabReadError extends Error {
@@ -221,8 +237,13 @@ function linked(value: unknown, host: string): GitLabItem | undefined {
 
 interface Listing {
   items: unknown[];
-  coverage?: ReadCoverage;
+  coverage: ReadCoverage;
 }
+
+const failed = (error: unknown) =>
+  error instanceof GitLabReadError && error.code === "RATE_LIMITED"
+    ? "rate-limited"
+    : "read-failed";
 
 /**
  * Reads up to MAX_PAGES pages; a failed or capped listing becomes incomplete coverage. After
@@ -236,27 +257,29 @@ async function list(
   paged: boolean,
 ): Promise<Listing> {
   const items: unknown[] = [];
-  for (let page = 1; page <= (paged ? MAX_PAGES : 1); page++) {
+  const result = (pages: number, reason?: ReadCoverage["reason"]): Listing => ({
+    items,
+    coverage: {
+      source,
+      transport: "rest",
+      pages,
+      complete: reason === undefined,
+      ...(reason && { reason }),
+    },
+  });
+  const pages = paged ? MAX_PAGES + 1 : 1;
+  for (let page = 1; page <= pages; page++) {
     let body: unknown[];
     try {
       body = array(await reader.get(paged ? `${path}?per_page=${PER_PAGE}&page=${page}` : path));
-    } catch {
-      return { items, coverage: { source, pages: page, complete: false, reason: "read-failed" } };
+    } catch (error) {
+      return result(page, failed(error));
     }
+    if (page > MAX_PAGES) return body.length ? result(MAX_PAGES, "page-limit") : result(page);
     items.push(...body);
-    if (!paged || body.length < PER_PAGE) return { items };
+    if (body.length < PER_PAGE) return result(page);
   }
-  let probe: unknown[];
-  try {
-    probe = array(await reader.get(`${path}?per_page=${PER_PAGE}&page=${MAX_PAGES + 1}`));
-  } catch {
-    return {
-      items,
-      coverage: { source, pages: MAX_PAGES + 1, complete: false, reason: "read-failed" },
-    };
-  }
-  if (!probe.length) return { items };
-  return { items, coverage: { source, pages: MAX_PAGES, complete: false, reason: "page-limit" } };
+  return result(pages);
 }
 
 /** `is_blocked_by` is the far end of a `blocks` link, so both ends share one native relation. */
@@ -269,23 +292,7 @@ const LINK_RELATIONS: Record<
   is_blocked_by: { relation: "blocks", direction: "incoming", nativeRelation: "blocks" },
 };
 
-interface Read {
-  node: GitLabNode;
-  host: string;
-  targets: Map<string, GitLabItem>;
-}
-
-/**
- * Reads one item and its edges. `host` is the instance host; for the seed it may be unknown, and
- * the item's `web_url` names it.
- */
-async function readItem(
-  reader: GitLabReader,
-  item: GitLabItem,
-  depth: number,
-  host: string | undefined,
-): Promise<Read> {
-  const body = object(await reader.get(api(item)));
+function itemIdentity(body: RecordValue, item: GitLabItem, host?: string) {
   const reported = parseGitLabUrl(text(body.web_url));
   if (
     !reported ||
@@ -297,22 +304,58 @@ async function readItem(
     throw new GitLabReadError("IDENTITY_MISMATCH");
   if (host && reported.host !== host)
     throw new GitLabReadError("HOST_MISMATCH", `${gitlabReference(item)} is on ${reported.host}`);
+  return reported;
+}
+
+function graphQLListing(items: unknown[], source: string): Listing {
+  return { items, coverage: { source, transport: "graphql", pages: 1, complete: true } };
+}
+
+interface Read {
+  node: GitLabNode;
+  targets: Map<string, GitLabItem>;
+}
+
+/**
+ * Reads one item and its edges. `host` is the instance host; for the seed it may be unknown, and
+ * the item's `web_url` names it.
+ */
+async function readItem(
+  reader: GitLabReader,
+  item: GitLabItem,
+  depth: number,
+  host: string,
+  cached?: GitLabIssueRead,
+): Promise<Read> {
+  const body = object(cached?.body ?? (await reader.get(api(item))));
+  const reported = itemIdentity(body, item, host);
   const instance = reported.host;
   const self: GitLabItem = { path: reported.path, kind: item.kind, iid: item.iid };
   const key = gitlabNodeKey(instance, self);
   const issue = item.kind === "issue";
-  const [links, closing, notes] = await Promise.all([
-    issue
-      ? list(reader, api(item, "/links"), "issue links", false)
-      : Promise.resolve<Listing>({ items: [] }),
-    list(
-      reader,
-      api(item, issue ? "/closed_by" : "/closes_issues"),
-      issue ? "closing merge requests" : "closed issues",
-      true,
-    ),
-    list(reader, api(item, "/notes"), "system notes", true),
-  ]);
+  const links = issue
+    ? cached?.links
+      ? graphQLListing(cached.links, "issue links")
+      : await list(reader, api(item, "/links"), "issue links", false)
+    : undefined;
+  const closingSource = issue ? "closing merge requests" : "closed issues";
+  const closing =
+    cached?.closing && !cached.closingIncomplete
+      ? graphQLListing(cached.closing, closingSource)
+      : await list(reader, api(item, issue ? "/closed_by" : "/closes_issues"), closingSource, true);
+  const partialClosing: ReadCoverage[] = cached?.closingIncomplete
+    ? [
+        {
+          source: closingSource,
+          transport: "graphql",
+          pages: 1,
+          complete: false,
+          reason: cached.closingIncomplete,
+        },
+      ]
+    : [];
+  if (cached?.closingIncomplete && cached.closing) closing.items.push(...cached.closing);
+  const notes = await list(reader, api(item, "/notes"), "system notes", true);
   const targets = new Map<string, GitLabItem>();
   const edges = new Map<string, WorkEdge>();
   const add = (target: GitLabItem, edge: Omit<WorkEdge, "to">) => {
@@ -321,7 +364,7 @@ async function readItem(
     targets.set(to, target);
     edges.set(`${to}\0${edge.nativeRelation}\0${edge.evidence.id}`, { to, ...edge });
   };
-  for (const value of links.items) {
+  for (const value of links?.items ?? []) {
     const link = object(value);
     const target = linked(link, instance);
     const type = text(link.link_type);
@@ -366,7 +409,6 @@ async function readItem(
   }
   const state = text(body.state);
   return {
-    host: instance,
     targets,
     node: {
       key,
@@ -386,9 +428,12 @@ async function readItem(
       depth,
       edges: [...edges.keys()].sort().map((identity) => edges.get(identity) as WorkEdge),
       externalLinks: [],
-      coverage: [links.coverage, closing.coverage, notes.coverage].filter(
-        (part): part is ReadCoverage => part !== undefined,
-      ),
+      coverage: [
+        ...(links ? [links.coverage] : []),
+        closing.coverage,
+        ...partialClosing,
+        notes.coverage,
+      ],
     },
   };
 }
@@ -420,51 +465,184 @@ function unavailable(host: string, item: GitLabItem, depth: number, error: unkno
 }
 
 /**
- * Reads a bounded GitLab neighborhood of issues and merge requests. Same-project references
- * recurse to `maxDepth`; references into other projects are read one hop and not expanded.
+ * Stops reading after the first rate limit: every later read fails as RATE_LIMITED without a
+ * request, since GitLab counts blocked requests against the limit too.
+ */
+function stopOnRateLimit(reader: GitLabReader): GitLabReader {
+  let limited = false;
+  async function read<T>(request: () => Promise<T>): Promise<T> {
+    if (limited) throw new GitLabReadError("RATE_LIMITED");
+    try {
+      return await request();
+    } catch (error) {
+      if (error instanceof GitLabReadError && error.code === "RATE_LIMITED") limited = true;
+      throw error;
+    }
+  }
+  const getIssues = reader.getIssues?.bind(reader);
+  return {
+    get: (path) => read(() => reader.get(path)),
+    ...(getIssues && { getIssues: (items) => read(() => getIssues(items)) }),
+  };
+}
+
+export function parseGitLabSeeds(seeds: readonly string[], requested?: string) {
+  if (!seeds.length) throw new Error("Specify a GitLab issue or merge request URL or reference");
+  let host = requested ? parseGitLabHost(requested) : undefined;
+  const items = new Map<string, GitLabItem>();
+  for (const seed of seeds) {
+    const { host: given, ...item } = parseGitLabLocator(seed);
+    if (given && host && given !== host)
+      throw new Error("GitLab URL and --host disagree, or seed URLs use different hosts");
+    host ??= given;
+    const key = gitlabReference(item).toLowerCase();
+    if (!items.has(key)) items.set(key, item);
+  }
+  return { host, items: [...items.values()] };
+}
+
+function issueBatches(reader: GitLabReader, concurrency: number) {
+  const cache = new Map<string, GitLabIssueRead>();
+  let supported: boolean | undefined;
+  let transientFailures = 0;
+
+  async function prepare(items: GitLabItem[]) {
+    const getIssues = reader.getIssues?.bind(reader);
+    if (!getIssues || supported === false) return;
+    const issues = items.filter((item) => item.kind === "issue");
+    const batches: GitLabItem[][] = [];
+    for (let index = 0; index < issues.length; index += GITLAB_ISSUE_BATCH_SIZE)
+      batches.push(issues.slice(index, index + GITLAB_ISSUE_BATCH_SIZE));
+
+    async function load(batch: GitLabItem[]) {
+      if (!getIssues || supported === false) return;
+      try {
+        const result = await getIssues(batch);
+        if (!result.supported || supported === undefined) supported = result.supported;
+        for (const [key, value] of result.issues) cache.set(key, value);
+      } catch (error) {
+        if (error instanceof GitLabReadError && ["TIMEOUT", "SERVER_ERROR"].includes(error.code)) {
+          transientFailures++;
+          if (transientFailures < 2) return;
+        }
+        supported = false;
+      }
+    }
+
+    const probe = supported === undefined ? batches.shift() : undefined;
+    if (probe) await load(probe);
+    if (supported === undefined && transientFailures === 1) {
+      const next = batches.shift();
+      if (next) await load(next);
+    }
+    await mapConcurrent(batches, concurrency, load);
+  }
+
+  const take = (item: GitLabItem) => {
+    const reference = gitlabReference(item).toLowerCase();
+    const value = cache.get(reference);
+    cache.delete(reference);
+    return value;
+  };
+  const get = (item: GitLabItem) => cache.get(gitlabReference(item).toLowerCase());
+  return { prepare, get, take };
+}
+
+interface SeedHost {
+  host: string;
+  failures?: Map<GitLabItem, unknown>;
+  initial?: { item: GitLabItem; read: GitLabIssueRead };
+}
+
+async function discoverSeedHost(
+  reader: GitLabReader,
+  items: GitLabItem[],
+  batches: ReturnType<typeof issueBatches>,
+): Promise<SeedHost> {
+  for (const item of items) {
+    const cached = batches.get(item);
+    if (!cached) continue;
+    try {
+      const { host } = itemIdentity(object(cached.body), item);
+      return { host };
+    } catch {
+      batches.take(item);
+    }
+  }
+
+  const failures = new Map<GitLabItem, unknown>();
+  for (const item of items) {
+    try {
+      const body = await reader.get(api(item));
+      const { host } = itemIdentity(object(body), item);
+      return { host, failures, initial: { item, read: { body } } };
+    } catch (error) {
+      failures.set(item, error);
+      if (error instanceof GitLabReadError && error.code === "RATE_LIMITED") throw error;
+    }
+  }
+  throw failures.values().next().value;
+}
+
+/**
+ * Reads a bounded GitLab neighborhood of issues and merge requests. Projects with seeds recurse
+ * to the requested depth; other projects are read one hop and not expanded.
  */
 export async function buildGitLabGraph(
-  reader: GitLabReader,
-  seed: string,
+  source: GitLabReader,
+  seed: string | readonly string[],
   options: GitLabGraphOptions,
 ): Promise<GitLabReport> {
-  validateWorkLimits(options, 16);
-  const locator = parseGitLabLocator(seed);
-  const requested = options.host ? parseGitLabHost(options.host) : undefined;
-  if (locator.host && requested && locator.host !== requested)
-    throw new Error("GitLab URL and --host disagree");
-  const { host: given, ...seedItem } = locator;
-  const first = await readItem(reader, seedItem, 0, given ?? requested);
-  const host = first.host;
+  validateWorkLimits(options, GITLAB_MAX_CONCURRENCY);
   const limits = {
     maxDepth: options.maxDepth,
     maxNodes: options.maxNodes,
     hubThreshold: options.hubThreshold,
-    concurrency: options.concurrency ?? 4,
+    concurrency: Math.min(options.concurrency ?? GITLAB_MAX_REQUESTS, GITLAB_MAX_REQUESTS),
   };
-  const known = new Map<string, GitLabItem>(first.targets);
-  const seedProject = first.node.projectPath.toLowerCase();
-  const sameProject = (key: string) =>
-    known.get(key)?.path.toLowerCase() === seedProject || key === first.node.key;
+  const { host: requested, items } = parseGitLabSeeds(
+    typeof seed === "string" ? [seed] : seed,
+    options.host,
+  );
+  const reader = stopOnRateLimit(source);
+  const batches = issueBatches(reader, limits.concurrency);
+  const admitted = items.slice(0, limits.maxNodes);
+  await batches.prepare(admitted);
+  const discovered: SeedHost = requested
+    ? { host: requested }
+    : await discoverSeedHost(reader, admitted, batches);
+  const { host } = discovered;
+  const seeds = items.map((item) => ({ key: gitlabNodeKey(host, item) }));
+  const known = new Map(items.map((item, index) => [seeds[index].key, item]));
+  const projects = new Set(items.map((item) => item.path.toLowerCase()));
+  const sameProject = (key: string) => projects.has(known.get(key)?.path.toLowerCase() ?? "");
   const isGroupItem = (key: string) => known.get(key)?.group === true;
+  const itemFor = (key: string) => known.get(key) as GitLabItem;
   const { nodes, cappedOut } = await crawlGraph<GitLabNode>(
-    [{ key: first.node.key }],
+    seeds,
     {
       ...limits,
       expand: sameProject,
       depthForEdge: ({ edge, sourceDepth }) => (isGroupItem(edge.to) ? null : sourceDepth + 1),
     },
     async (key, depth) => {
-      if (key === first.node.key) return first.node;
-      const item = known.get(key) as GitLabItem;
+      const item = itemFor(key);
+      if (discovered.failures?.has(item))
+        return unavailable(host, item, depth, discovered.failures.get(item));
+      const cached =
+        discovered.initial?.item === item ? discovered.initial.read : batches.take(item);
       try {
-        const read = await readItem(reader, item, depth, host);
+        const read = await readItem(reader, item, depth, host, cached);
         for (const [target, value] of read.targets)
           if (!known.has(target)) known.set(target, value);
         return read.node;
       } catch (error) {
+        if (seeds.length === 1 && depth === 0) throw error;
         return unavailable(host, item, depth, error);
       }
+    },
+    async (keys, depth) => {
+      if (depth > 0) await batches.prepare(keys.map(itemFor));
     },
   );
   const values = [...nodes.values()];
@@ -483,8 +661,8 @@ export async function buildGitLabGraph(
     source: "gitlab",
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     host,
-    ...(reader.label ? { readSource: reader.label } : {}),
-    seeds: [first.node.key],
+    ...(source.label ? { readSource: source.label } : {}),
+    seeds: seeds.map(({ key }) => key),
     scope: {
       relationships: ["issue links", "closing merge requests", "system note mentions"],
       crossProject: "one-hop",

@@ -51,13 +51,13 @@ const JIRA_COMMAND: WorkCommand<JiraReport, JiraReader> = {
   authority: { flag: "--site", missing: "--site requires a Jira site", parse: parseJiraSite },
   oneSeed: "Specify exactly one Jira issue",
   noSeed: "Specify a Jira issue key or browse URL",
-  resolve(seed, site) {
+  resolve([seed], site) {
     const locator = parseJiraLocator(seed);
     if (locator.site && site && jiraSiteConflicts(locator.site, site))
       throw new Error("Jira URL and --site disagree");
     return site ?? locator.site;
   },
-  build: (reader, seed, { authority, ...options }) =>
+  build: (reader, [seed], { authority, ...options }) =>
     buildJiraGraph(reader, seed, { ...options, site: authority }),
   render: renderJira,
   label: (report) => jiraDashboardModel(report).label ?? report.site,

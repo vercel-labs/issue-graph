@@ -10,6 +10,7 @@ import {
   renderGitLab,
   resolveGitLabReference,
 } from "./gitlab.js";
+import { parseIssueBatch } from "./transports/glab-graphql.js";
 
 const HOST = "gitlab.example.com";
 const options = { maxDepth: 1, maxNodes: 80, hubThreshold: 12, concurrency: 2 };
@@ -271,9 +272,21 @@ describe("buildGitLabGraph", () => {
       options,
     );
     const seed = report.nodes[0];
-    expect(seed.coverage).toEqual([
-      { source: "issue links", pages: 1, complete: false, reason: "read-failed" },
-      { source: "system notes", pages: 10, complete: false, reason: "page-limit" },
+    expect(seed.coverage.filter((listing) => !listing.complete)).toEqual([
+      {
+        source: "issue links",
+        transport: "rest",
+        pages: 1,
+        complete: false,
+        reason: "read-failed",
+      },
+      {
+        source: "system notes",
+        transport: "rest",
+        pages: 10,
+        complete: false,
+        reason: "page-limit",
+      },
     ]);
     expect(report.coverage.partial).toEqual([seed.key]);
     expect(report.coverageComplete).toBe(false);
@@ -293,9 +306,64 @@ describe("buildGitLabGraph", () => {
       `${API}#1`,
       options,
     );
-    expect(report.nodes[0].coverage).toEqual([]);
+    expect(report.nodes[0].coverage.every(({ complete }) => complete)).toBe(true);
     expect(report.coverageComplete).toBe(true);
     expect(requests.some((request) => request.includes("notes?per_page=100&page=11"))).toBe(true);
+  });
+
+  test("sends no reads after the first rate limit and marks the unread items failed", async () => {
+    const requests: string[] = [];
+    const links = [2, 3, 4].map((iid) => ({ ...item(API, "issue", iid), link_type: "relates_to" }));
+    const report = await buildGitLabGraph(
+      reader(
+        {
+          [base(API, "issue", 1)]: item(API, "issue", 1),
+          [`${base(API, "issue", 1)}/links`]: links,
+          [base(API, "issue", 2)]: new GitLabReadError("RATE_LIMITED"),
+          [base(API, "issue", 3)]: item(API, "issue", 3),
+          [base(API, "issue", 4)]: item(API, "issue", 4),
+        },
+        requests,
+      ),
+      `${API}#1`,
+      { ...options, concurrency: 1 },
+    );
+    expect(requests.filter((request) => request.startsWith(base(API, "issue", 3)))).toEqual([]);
+    expect(requests.filter((request) => request.startsWith(base(API, "issue", 4)))).toEqual([]);
+    expect(report.nodes.filter((node) => !node.fetched).map((node) => node.error)).toEqual([
+      "RATE_LIMITED",
+      "RATE_LIMITED",
+      "RATE_LIMITED",
+    ]);
+    expect(report.coverageComplete).toBe(false);
+  });
+
+  test("a rate-limited listing marks the item partial and stops the crawl", async () => {
+    const requests: string[] = [];
+    const report = await buildGitLabGraph(
+      reader(
+        {
+          [base(API, "issue", 1)]: item(API, "issue", 1),
+          [`${base(API, "issue", 1)}/links`]: [
+            { ...item(API, "issue", 2), link_type: "relates_to" },
+          ],
+          [`${base(API, "issue", 1)}/notes`]: new GitLabReadError("RATE_LIMITED"),
+          [base(API, "issue", 2)]: item(API, "issue", 2),
+        },
+        requests,
+      ),
+      `${API}#1`,
+      options,
+    );
+    expect(report.nodes[0].coverage).toContainEqual({
+      source: "system notes",
+      transport: "rest",
+      pages: 1,
+      complete: false,
+      reason: "rate-limited",
+    });
+    expect(requests.filter((request) => request.startsWith(base(API, "issue", 2)))).toEqual([]);
+    expect(report.coverageComplete).toBe(false);
   });
 
   test("keeps an unreadable linked item as an unavailable node", async () => {
@@ -312,4 +380,185 @@ describe("buildGitLabGraph", () => {
     expect(report.coverage.failed).toEqual([key(API, "issue", 2)]);
     expect(report.coverageComplete).toBe(false);
   });
+});
+
+test("batches unique seeds by layer and reads a shared neighbor once", async () => {
+  const requests: string[] = [];
+  const batches: number[][] = [];
+  const source: GitLabReader = {
+    ...reader({}, requests),
+    async getIssues(items) {
+      batches.push(items.map(({ iid }) => iid));
+      const issues = new Map(
+        items.map(({ path, iid }) => [
+          `${path}#${iid}`,
+          {
+            body: item(path, "issue", iid),
+            links: iid <= 2 ? [{ ...item(API, "issue", 99), link_type: "relates_to" }] : [],
+            closing: [],
+          },
+        ]),
+      );
+      return { supported: true, issues };
+    },
+  };
+  const seeds = Array.from({ length: 31 }, (_, index) => `${API}#${index + 1}`);
+  const report = await buildGitLabGraph(source, [...seeds, url(API.toUpperCase(), "issue", 1)], {
+    ...options,
+    concurrency: 16,
+  });
+  expect(batches.map((batch) => batch.length)).toEqual([30, 1, 1]);
+  expect(batches[2]).toEqual([99]);
+  expect(report.seeds).toHaveLength(31);
+  expect(report.nodes).toHaveLength(32);
+  expect(report.limits.concurrency).toBe(4);
+  expect(report.coverageComplete).toBe(true);
+  expect(requests).toHaveLength(32);
+  expect(requests.every((request) => request.includes("/notes?"))).toBe(true);
+  expect(report.nodes[0].coverage.map(({ source, transport }) => [source, transport])).toEqual([
+    ["issue links", "graphql"],
+    ["closing merge requests", "graphql"],
+    ["system notes", "rest"],
+  ]);
+});
+
+test("falls back to REST across layers when GraphQL is unsupported", async () => {
+  const requests: string[] = [];
+  let batches = 0;
+  const source: GitLabReader = {
+    ...reader(
+      {
+        [base(API, "issue", 1)]: item(API, "issue", 1),
+        [base(API, "issue", 2)]: item(API, "issue", 2),
+        [`${base(API, "issue", 1)}/links`]: [{ ...item(API, "issue", 2), link_type: "relates_to" }],
+      },
+      requests,
+    ),
+    async getIssues() {
+      batches++;
+      return { supported: false, issues: new Map() };
+    },
+  };
+  const report = await buildGitLabGraph(source, url(API, "issue", 1), options);
+  expect(batches).toBe(1);
+  expect(report.coverageComplete).toBe(true);
+  expect(requests).toHaveLength(8);
+});
+
+test("does not fall back to network reads after a GraphQL 429", async () => {
+  const requests: string[] = [];
+  let batches = 0;
+  const source: GitLabReader = {
+    ...reader({}, requests),
+    async getIssues() {
+      batches++;
+      throw new GitLabReadError("RATE_LIMITED");
+    },
+  };
+  const seeds = Array.from({ length: 31 }, (_, index) => url(API, "issue", index + 1));
+  const report = await buildGitLabGraph(source, seeds, options);
+  expect(batches).toBe(1);
+  expect(requests).toEqual([]);
+  expect(report.coverage.failed).toEqual(report.seeds);
+  expect(report.nodes.every((node) => node.error === "RATE_LIMITED")).toBe(true);
+});
+
+test("a missing bare seed does not prevent discovery from another seed", async () => {
+  const requests: string[] = [];
+  const source = reader({ [base(API, "issue", 2)]: item(API, "issue", 2) }, requests);
+  const report = await buildGitLabGraph(source, [`${API}#1`, `${API}#2`], options);
+  expect(report.host).toBe(HOST);
+  expect(report.nodes.map(({ fetched }) => fetched)).toEqual([false, true]);
+  expect(requests.filter((request) => request === base(API, "issue", 1))).toHaveLength(1);
+  expect(requests.filter((request) => request === base(API, "issue", 2))).toHaveLength(1);
+});
+
+test.each([
+  false,
+  true,
+])("keeps cross-project closing MRs from a truncated GraphQL page, with sibling error %s", async (siblingError) => {
+  const requestLog: string[] = [];
+  const source: GitLabReader = {
+    ...reader({}, requestLog),
+    async getIssues(items) {
+      const issue = {
+        reference: `${API}#1`,
+        title: "Issue 1",
+        state: "OPEN",
+        webUrl: url(API, "issue", 1),
+        features: {
+          development: {
+            closingMergeRequests: {
+              pageInfo: { hasNextPage: true },
+              nodes: [
+                { mergeRequest: { webUrl: url(WEB, "merge_request", 1) } },
+                ...(siblingError ? [null] : []),
+              ],
+            },
+          },
+        },
+      };
+      const errors = siblingError
+        ? [
+            {
+              path: [
+                "batch0",
+                "nodes",
+                0,
+                "features",
+                "development",
+                "closingMergeRequests",
+                "nodes",
+                1,
+                "mergeRequest",
+              ],
+            },
+          ]
+        : [];
+      return parseIssueBatch({ data: { batch0: { nodes: [issue] } }, errors }, items);
+    },
+  };
+  const report = await buildGitLabGraph(source, url(API, "issue", 1), { ...options, maxDepth: 0 });
+  expect(report.nodes[0].edges.map(({ to }) => to)).toEqual([key(WEB, "merge_request", 1)]);
+  expect(report.nodes[0].coverage).toContainEqual({
+    source: "closing merge requests",
+    transport: "graphql",
+    pages: 1,
+    complete: false,
+    reason: siblingError ? "read-failed" : "page-limit",
+  });
+  expect(requestLog.some((request) => request.includes("/closed_by?"))).toBe(true);
+  expect(report.coverageComplete).toBe(false);
+});
+
+test.each([
+  1, 2,
+])("stops later GraphQL batches only after two transient failures (%s)", async (failures) => {
+  const requests: string[] = [];
+  const items = Array.from({ length: 61 }, (_, index) => index + 1);
+  let batches = 0;
+  const source: GitLabReader = {
+    ...reader(
+      Object.fromEntries(items.map((iid) => [base(API, "issue", iid), item(API, "issue", iid)])),
+      requests,
+    ),
+    async getIssues(batch) {
+      batches++;
+      if (batches <= failures) throw new GitLabReadError("TIMEOUT");
+      return {
+        supported: true,
+        issues: new Map(
+          batch.map(({ iid }) => [
+            `${API}#${iid}`,
+            { body: item(API, "issue", iid), links: [], closing: [] },
+          ]),
+        ),
+      };
+    },
+  };
+  const seeds = items.map((iid) => url(API, "issue", iid));
+  const report = await buildGitLabGraph(source, seeds, { ...options, maxDepth: 0, concurrency: 4 });
+  expect(report.coverageComplete).toBe(true);
+  expect(batches).toBe(failures === 1 ? 3 : 2);
+  expect(requests.includes(base(API, "issue", 61))).toBe(failures === 2);
 });

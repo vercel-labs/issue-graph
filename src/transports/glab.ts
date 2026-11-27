@@ -1,5 +1,6 @@
 import { type ExecException, execFile } from "node:child_process";
 import { GitLabReadError, type GitLabReader, parseGitLabHost } from "../gitlab.js";
+import { issueBatchQuery, parseIssueBatch } from "./glab-graphql.js";
 
 export interface GlabGitLabReaderOptions {
   /** GitLab host; a port is dropped, since glab configures it per host. Omit for the authenticated host of the current Git directory, or gitlab.com. */
@@ -32,7 +33,9 @@ function failure(error: ExecException, stderr: string) {
     return new GitLabReadError("GLAB_NOT_FOUND", "glab is not installed or not on PATH");
   if (error.killed || error.signal)
     return new GitLabReadError("TIMEOUT", "glab did not finish in time");
-  const status = stderr.match(/\(HTTP (\d{3})\)/)?.[1];
+  // glab prints "message (HTTP 404)" for a JSON error body and a bare "glab: HTTP 429" line otherwise.
+  const status =
+    stderr.match(/\(HTTP (\d{3})\)/)?.[1] ?? stderr.match(/^glab: HTTP (\d{3})\b/m)?.[1];
   return new GitLabReadError(
     (status && HTTP_CODES[status]) || "GLAB_FAILED",
     clean(stderr) || clean(error.message),
@@ -48,7 +51,7 @@ function parseVersion(output: string): [number, number] | undefined {
 }
 
 /**
- * Reads GitLab REST resources by running `glab api --method GET` without a shell.
+ * Reads GitLab REST resources and batched GraphQL queries through glab without a shell.
  * glab holds the credentials, including `GITLAB_TOKEN`; this reader never sees a token.
  */
 export function glabGitLabReader(options: GlabGitLabReaderOptions = {}): GitLabReader {
@@ -83,30 +86,65 @@ export function glabGitLabReader(options: GlabGitLabReaderOptions = {}): GitLabR
         },
       );
     });
+  const hostname = host?.replace(/:\d+$/, "");
+  const hostArgs = hostname ? ["--hostname", hostname] : [];
+
+  async function run(args: string[], input?: string): Promise<unknown> {
+    supported ??= checkVersion();
+    await supported;
+    return new Promise((resolve, reject) => {
+      const child = execFile(
+        binary,
+        ["api", ...args],
+        { encoding: "utf8", timeout, maxBuffer, killSignal: "SIGKILL" },
+        (error, stdout, stderr) => {
+          const status = input ? stdout.match(/^HTTP\/[\d.]+ (\d{3})\b/)?.[1] : undefined;
+          const code = status && HTTP_CODES[status];
+          if (code) return reject(new GitLabReadError(code, clean(stderr)));
+          if (status?.startsWith("5"))
+            return reject(new GitLabReadError("SERVER_ERROR", `HTTP ${status}`));
+          const failed = error && failure(error, stderr);
+          if (failed && (!input || failed.code !== "GLAB_FAILED")) return reject(failed);
+          try {
+            const separator = status ? /\r?\n\r?\n/.exec(stdout) : undefined;
+            const body = separator ? stdout.slice(separator.index + separator[0].length) : stdout;
+            const payload = JSON.parse(body);
+            if (failed && !Array.isArray(payload?.errors)) return reject(failed);
+            resolve(payload);
+          } catch {
+            reject(failed || new GitLabReadError("INVALID_PAYLOAD", "glab did not print JSON"));
+          }
+        },
+      );
+      if (input) {
+        child.stdin?.on("error", () => {});
+        child.stdin?.end(input);
+      }
+    });
+  }
   return {
     label: "glab",
     async get(path) {
       if (!READ_PATH.test(path)) throw new GitLabReadError("INVALID_PATH");
-      supported ??= checkVersion();
-      await supported;
-      // glab takes a bare hostname; its host configuration supplies a nondefault API port.
-      const hostname = host?.replace(/:\d+$/, "");
-      const args = ["api", "--method", "GET", ...(hostname ? ["--hostname", hostname] : []), path];
-      return new Promise((resolve, reject) => {
-        execFile(
-          binary,
-          args,
-          { encoding: "utf8", timeout, maxBuffer, killSignal: "SIGKILL" },
-          (error, stdout, stderr) => {
-            if (error) return reject(failure(error, stderr));
-            try {
-              resolve(JSON.parse(stdout));
-            } catch {
-              reject(new GitLabReadError("INVALID_PAYLOAD", "glab did not print JSON"));
-            }
-          },
-        );
-      });
+      return run(["--method", "GET", ...hostArgs, path]);
+    },
+    async getIssues(items) {
+      const input = JSON.stringify(issueBatchQuery(items));
+      const payload = await run(
+        [
+          "--method",
+          "POST",
+          ...hostArgs,
+          "graphql",
+          "--include",
+          "--header",
+          "Content-Type: application/json",
+          "--input",
+          "-",
+        ],
+        input,
+      );
+      return parseIssueBatch(payload, items);
     },
   };
 }

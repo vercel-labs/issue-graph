@@ -1,5 +1,6 @@
 import type { GitLabReport } from "./gitlab.js";
 import type { Model } from "./html.js";
+import { contentId } from "./local-store.js";
 import { workDashboardModel, workEdgeLabels } from "./work-dashboard.js";
 import type { WorkEdge } from "./work-types.js";
 
@@ -15,19 +16,27 @@ function edgeLabels(edge: WorkEdge): [string, string] {
   return workEdgeLabels(edge);
 }
 
-/** The dashboard model for one GitLab run, saved per host and seed project. */
+/** The dashboard model for one GitLab run, saved per host and seed project set. */
 export function gitlabDashboardModel(
   report: GitLabReport,
   clusters?: unknown,
 ): Model & { id: string } {
   const seeds = new Set(report.seeds);
   const seed = report.nodes.find((node) => seeds.has(node.key));
-  const project = seed?.projectPath ?? "";
+  const prefix = `gitlab:${report.host}:`;
+  const projects = [
+    ...new Set(report.seeds.map((key) => key.slice(prefix.length).replace(/[#!]\d+$/, ""))),
+  ].sort();
+  const project = seed?.projectPath ?? projects[0] ?? "";
+  const multiple = projects.length > 1;
+  const scope = multiple
+    ? `projects:${contentId(projects.join(","))}`
+    : `project:${project.toLowerCase()}`;
   return workDashboardModel(
     report,
     {
-      id: `gitlab:${report.host}:project:${project.toLowerCase()}`,
-      label: `${report.host} / ${project}`,
+      id: `${prefix}${scope}`,
+      label: `${report.host} / ${multiple ? projects.join(", ") : project}`,
       ...(seed ? { url: seed.url } : {}),
       provider: {
         id: "gitlab",
@@ -47,7 +56,7 @@ export function gitlabDashboardModel(
       openIssue: (node) => node.state === "OPEN" && node.kind === "Issue",
       messages: [
         `Source: ${report.readSource ?? "glab"}.`,
-        `Issue and merge request neighborhood, up to ${report.limits.maxDepth} reference steps within ${project}; other projects one hop.`,
+        `Issue and merge request neighborhood, up to ${report.limits.maxDepth} reference steps within ${multiple ? "seed projects" : project}; other projects one hop.`,
         ...(report.coverage.depthBoundaries.length
           ? [`${report.coverage.depthBoundaries.length} items not expanded`]
           : []),

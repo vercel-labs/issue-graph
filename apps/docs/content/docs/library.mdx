@@ -60,7 +60,7 @@ const report = await buildGitLabGraph(
 console.log(renderGitLab(report));
 ```
 
-Pass the same `host` to the reader and the options, or omit both to use the authenticated host of the current Git directory, or gitlab.com. A reader you write yourself implements `get(path)`, which receives a REST API v4 path such as `projects/group%2Fproject/issues/123/links` and returns the parsed JSON body. See [GitLab](/docs/gitlab) for what the graph includes.
+Pass a string or an array of seed strings to `buildGitLabGraph`. Pass the same `host` to the reader and the options, or omit both to use the authenticated host of the current Git directory, or gitlab.com. A reader you write yourself implements `get(path)`, which receives a REST API v4 path such as `projects/group%2Fproject/issues/123/links` and returns the parsed JSON body. See [GitLab](/docs/gitlab) for what the graph includes.
 
 ## Read YouTrack through the REST API
 

@@ -52,7 +52,7 @@ function command(defaultUrl: string | undefined): WorkCommand<YouTrackReport, Yo
     },
     oneSeed: "Specify exactly one YouTrack issue",
     noSeed: "Specify a YouTrack issue ID or issue URL",
-    resolve(seed, url) {
+    resolve([seed], url) {
       const locator = parseYouTrackLocator(seed);
       const configured = url ?? (defaultUrl ? parseYouTrackBase(defaultUrl) : undefined);
       if (!configured) {
@@ -68,7 +68,7 @@ function command(defaultUrl: string | undefined): WorkCommand<YouTrackReport, Yo
         );
       return configured;
     },
-    build: (reader, seed, options) => buildYouTrackGraph(reader, seed, options),
+    build: (reader, [seed], options) => buildYouTrackGraph(reader, seed, options),
     render: renderYouTrack,
     label: (report) => youTrackDashboardModel(report).label ?? report.authority,
   };

@@ -53,6 +53,7 @@ export async function crawlGraph<TNode extends CrawlNode>(
   seeds: GraphSeed[],
   opts: GraphCrawlOptions,
   fetch: GraphFetchNode<TNode>,
+  prepare?: (keys: NodeKey[], depth: number) => Promise<void>,
 ): Promise<GraphCrawlResult<TNode>> {
   const nodes = new Map<NodeKey, TNode>();
   const cappedOut = new Set<NodeKey>();
@@ -82,6 +83,10 @@ export async function crawlGraph<TNode extends CrawlNode>(
       break;
     }
 
+    await prepare?.(
+      admitted.map(({ key }) => key),
+      layerDepth,
+    );
     const fetched = await mapConcurrent(admitted, opts.concurrency ?? 4, (current) =>
       fetch(current.key, current.depth),
     );
