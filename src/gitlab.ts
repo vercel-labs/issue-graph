@@ -531,6 +531,10 @@ function issueBatches(reader: GitLabReader, concurrency: number) {
 
     const probe = supported === undefined ? batches.shift() : undefined;
     if (probe) await load(probe);
+    if (supported === undefined && transientFailures === 1) {
+      const next = batches.shift();
+      if (next) await load(next);
+    }
     await mapConcurrent(batches, concurrency, load);
   }
 

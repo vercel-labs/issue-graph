@@ -492,7 +492,7 @@ test.each([
               pageInfo: { hasNextPage: true },
               nodes: [
                 { mergeRequest: { webUrl: url(WEB, "merge_request", 1) } },
-                ...(siblingError ? [{ mergeRequest: null }] : []),
+                ...(siblingError ? [null] : []),
               ],
             },
           },
@@ -557,7 +557,7 @@ test.each([
     },
   };
   const seeds = items.map((iid) => url(API, "issue", iid));
-  const report = await buildGitLabGraph(source, seeds, { ...options, maxDepth: 0, concurrency: 1 });
+  const report = await buildGitLabGraph(source, seeds, { ...options, maxDepth: 0, concurrency: 4 });
   expect(report.coverageComplete).toBe(true);
   expect(batches).toBe(failures === 1 ? 3 : 2);
   expect(requests.includes(base(API, "issue", 61))).toBe(failures === 2);

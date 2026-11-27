@@ -80,13 +80,19 @@ function connection(
   if (typeof hasNextPage !== "boolean" || !Array.isArray(body?.nodes)) return undefined;
 
   const results: RecordValue[] = [];
+  let malformed = false;
   for (const raw of body.nodes) {
     const node = record(raw);
     const item = node && convert(node);
-    if (item === undefined) return undefined;
-    if (item !== null) results.push(item);
+    if (item === undefined) malformed = true;
+    else if (item !== null) results.push(item);
   }
-  return { items: results, hasNextPage };
+  const incomplete = malformed
+    ? ("read-failed" as const)
+    : hasNextPage
+      ? ("page-limit" as const)
+      : undefined;
+  return { items: results, incomplete };
 }
 
 function urlItem(value: unknown) {
@@ -119,9 +125,9 @@ function issueRead(node: RecordValue): GitLabIssueRead | undefined {
       web_url: webUrl,
       updated_at: updatedAt,
     },
-    links: links?.hasNextPage === false ? links.items : undefined,
+    links: links?.incomplete ? undefined : links?.items,
     closing: closing?.items,
-    closingIncomplete: closing?.hasNextPage ? "page-limit" : undefined,
+    closingIncomplete: closing?.incomplete,
   };
 }
 
